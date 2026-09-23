@@ -448,7 +448,12 @@ fn fetch_state(conn: &Connection) -> Result<StateSnapshot, String> {
     }
 }
 
-fn insert_event_tx(tx: &rusqlite::Transaction, tournament_id: i64, event_type: &str, payload: serde_json::Value) -> Result<(), String> {
+fn insert_event_tx(
+    tx: &rusqlite::Transaction,
+    tournament_id: i64,
+    event_type: &str,
+    payload: serde_json::Value,
+) -> Result<(), String> {
     tx.execute(
         "INSERT INTO events (tournament_id, type, payload_json, created_at) VALUES (?, ?, ?, ?)",
         params![tournament_id, event_type, payload.to_string(), now_ts()],
@@ -502,10 +507,18 @@ fn elapsed_seconds(conn: &Connection, tournament: &Tournament) -> Result<i64, St
     Ok(past + elapsed_current)
 }
 
-fn choose_seat(conn: &Connection, tournament: &Tournament, strategy: &str) -> Result<Option<Seat>, String> {
+fn choose_seat(
+    conn: &Connection,
+    tournament: &Tournament,
+    strategy: &str,
+) -> Result<Option<Seat>, String> {
     let tables = fetch_tables(conn, tournament.id)?;
     let seats = fetch_seats(conn, tournament.id)?;
-    let open_table_ids: Vec<i64> = tables.iter().filter(|t| !t.is_closed).map(|t| t.id).collect();
+    let open_table_ids: Vec<i64> = tables
+        .iter()
+        .filter(|t| !t.is_closed)
+        .map(|t| t.id)
+        .collect();
     if open_table_ids.is_empty() {
         return Ok(None);
     }
@@ -523,7 +536,10 @@ fn choose_seat(conn: &Connection, tournament: &Tournament, strategy: &str) -> Re
     if strategy == "balanced" {
         let mut counts = std::collections::HashMap::<i64, i64>::new();
         for table_id in &open_table_ids {
-            let count = seats.iter().filter(|seat| seat.table_id == *table_id && seat.player_id.is_some()).count() as i64;
+            let count = seats
+                .iter()
+                .filter(|seat| seat.table_id == *table_id && seat.player_id.is_some())
+                .count() as i64;
             counts.insert(*table_id, count);
         }
         let min_count = counts.values().min().cloned().unwrap_or(0);
@@ -540,7 +556,10 @@ fn choose_seat(conn: &Connection, tournament: &Tournament, strategy: &str) -> Re
             .collect();
 
         let mut rng = rand::thread_rng();
-        return Ok(candidates.choose(&mut rng).cloned().or_else(|| available.choose(&mut rng).cloned()));
+        return Ok(candidates
+            .choose(&mut rng)
+            .cloned()
+            .or_else(|| available.choose(&mut rng).cloned()));
     }
 
     let mut rng = rand::thread_rng();
@@ -568,7 +587,11 @@ fn update_status_after_elimination(conn: &Connection, tournament_id: i64) -> Res
 
 fn recalculate_status(conn: &Connection, tournament_id: i64) -> Result<(), String> {
     let status: String = conn
-        .query_row("SELECT status FROM tournaments WHERE id = ?", [tournament_id], |row| row.get(0))
+        .query_row(
+            "SELECT status FROM tournaments WHERE id = ?",
+            [tournament_id],
+            |row| row.get(0),
+        )
         .map_err(|err| err.to_string())?;
 
     if status == "setup" {
@@ -600,7 +623,14 @@ fn recalculate_status(conn: &Connection, tournament_id: i64) -> Result<(), Strin
     Ok(())
 }
 
-fn apply_clock_change(conn: &mut Connection, tournament: &Tournament, event_type: &str, new_state: &str, new_level_index: i64, new_remaining: i64) -> Result<(), String> {
+fn apply_clock_change(
+    conn: &mut Connection,
+    tournament: &Tournament,
+    event_type: &str,
+    new_state: &str,
+    new_level_index: i64,
+    new_remaining: i64,
+) -> Result<(), String> {
     let payload = ClockPayload {
         from_level_index: tournament.current_level_index,
         to_level_index: new_level_index,
@@ -617,7 +647,12 @@ fn apply_clock_change(conn: &mut Connection, tournament: &Tournament, event_type
     )
     .map_err(|err| err.to_string())?;
 
-    insert_event_tx(&tx, tournament.id, event_type, serde_json::to_value(payload).unwrap())?;
+    insert_event_tx(
+        &tx,
+        tournament.id,
+        event_type,
+        serde_json::to_value(payload).unwrap(),
+    )?;
     tx.commit().map_err(|err| err.to_string())?;
     Ok(())
 }
@@ -629,12 +664,20 @@ fn get_state(state: State<AppState>) -> Result<StateSnapshot, String> {
 }
 
 #[tauri::command]
-fn create_tournament(state: State<AppState>, app: AppHandle, config: TournamentConfig, levels: Vec<LevelDraft>) -> Result<(), String> {
+fn create_tournament(
+    state: State<AppState>,
+    app: AppHandle,
+    config: TournamentConfig,
+    levels: Vec<LevelDraft>,
+) -> Result<(), String> {
     let mut conn = open_connection(&state.db_path)?;
     let mut levels_sorted = levels.clone();
     levels_sorted.sort_by_key(|level| level.index);
     let start_index = levels_sorted.first().map(|level| level.index).unwrap_or(0);
-    let start_duration = levels_sorted.first().map(|level| level.duration_seconds).unwrap_or(0);
+    let start_duration = levels_sorted
+        .first()
+        .map(|level| level.duration_seconds)
+        .unwrap_or(0);
 
     let tx = conn.transaction().map_err(|err| err.to_string())?;
     tx.execute(
@@ -703,16 +746,24 @@ fn reset_tournament(state: State<AppState>, app: AppHandle) -> Result<(), String
     let tx = conn.transaction().map_err(|err| err.to_string())?;
     // Deleting the tournament will cascade delete players, tables, seats, levels, and events
     // due to foreign key constraints with ON DELETE CASCADE in the schema.
-    tx.execute("DELETE FROM tournaments WHERE id = ?", params![tournament.id])
-        .map_err(|err| err.to_string())?;
-    
+    tx.execute(
+        "DELETE FROM tournaments WHERE id = ?",
+        params![tournament.id],
+    )
+    .map_err(|err| err.to_string())?;
+
     tx.commit().map_err(|err| err.to_string())?;
     emit_state(&app);
     Ok(())
 }
 
 #[tauri::command]
-fn register_player(state: State<AppState>, app: AppHandle, name: String, strategy: String) -> Result<Seat, String> {
+fn register_player(
+    state: State<AppState>,
+    app: AppHandle,
+    name: String,
+    strategy: String,
+) -> Result<Seat, String> {
     let mut conn = open_connection(&state.db_path)?;
     let tournament = fetch_tournament(&conn)?.ok_or("Tournament not found")?;
     let trimmed = name.trim();
@@ -749,11 +800,22 @@ fn register_player(state: State<AppState>, app: AppHandle, name: String, strateg
     .map_err(|err| err.to_string())?;
     let player_id = tx.last_insert_rowid();
 
-    tx.execute("UPDATE seats SET player_id = ? WHERE id = ?", params![player_id, seat.id])
-        .map_err(|err| err.to_string())?;
+    tx.execute(
+        "UPDATE seats SET player_id = ? WHERE id = ?",
+        params![player_id, seat.id],
+    )
+    .map_err(|err| err.to_string())?;
 
-    let payload = JoinPlayerPayload { player_id, seat_id: seat.id };
-    insert_event_tx(&tx, tournament.id, "JOIN_PLAYER", serde_json::to_value(payload).unwrap())?;
+    let payload = JoinPlayerPayload {
+        player_id,
+        seat_id: seat.id,
+    };
+    insert_event_tx(
+        &tx,
+        tournament.id,
+        "JOIN_PLAYER",
+        serde_json::to_value(payload).unwrap(),
+    )?;
     tx.commit().map_err(|err| err.to_string())?;
 
     seat.player_id = Some(player_id);
@@ -828,11 +890,19 @@ fn register_player_at_seat(
     .map_err(|err| err.to_string())?;
     let player_id = tx.last_insert_rowid();
 
-    tx.execute("UPDATE seats SET player_id = ? WHERE id = ?", params![player_id, seat_id])
-        .map_err(|err| err.to_string())?;
+    tx.execute(
+        "UPDATE seats SET player_id = ? WHERE id = ?",
+        params![player_id, seat_id],
+    )
+    .map_err(|err| err.to_string())?;
 
     let payload = JoinPlayerPayload { player_id, seat_id };
-    insert_event_tx(&tx, tournament.id, "JOIN_PLAYER", serde_json::to_value(payload).unwrap())?;
+    insert_event_tx(
+        &tx,
+        tournament.id,
+        "JOIN_PLAYER",
+        serde_json::to_value(payload).unwrap(),
+    )?;
     tx.commit().map_err(|err| err.to_string())?;
 
     let mut seat = fetch_seats(&conn, tournament.id)?
@@ -866,12 +936,20 @@ fn eliminate_player(state: State<AppState>, app: AppHandle, player_id: i64) -> R
     .map_err(|err| err.to_string())?;
 
     if let Some(seat_id) = seat_id {
-        tx.execute("UPDATE seats SET player_id = NULL WHERE id = ?", params![seat_id])
-            .map_err(|err| err.to_string())?;
+        tx.execute(
+            "UPDATE seats SET player_id = NULL WHERE id = ?",
+            params![seat_id],
+        )
+        .map_err(|err| err.to_string())?;
     }
 
-    let payload = EliminatePlayerPayload { player_id, seat_id: seat_id };
-    insert_event_tx(&tx, tournament.id, "ELIMINATE_PLAYER", serde_json::to_value(payload).unwrap())?;
+    let payload = EliminatePlayerPayload { player_id, seat_id };
+    insert_event_tx(
+        &tx,
+        tournament.id,
+        "ELIMINATE_PLAYER",
+        serde_json::to_value(payload).unwrap(),
+    )?;
     update_status_after_elimination(&tx, tournament.id)?;
     tx.commit().map_err(|err| err.to_string())?;
     emit_state(&app);
@@ -938,18 +1016,35 @@ fn revive_player_at_seat(
         params![player_id],
     )
     .map_err(|err| err.to_string())?;
-    tx.execute("UPDATE seats SET player_id = ? WHERE id = ?", params![player_id, seat_id])
-        .map_err(|err| err.to_string())?;
+    tx.execute(
+        "UPDATE seats SET player_id = ? WHERE id = ?",
+        params![player_id, seat_id],
+    )
+    .map_err(|err| err.to_string())?;
 
-    let payload = RevivePlayerPayload { player_id, seat_id, previous_eliminated_at: eliminated_at };
-    insert_event_tx(&tx, tournament.id, "REVIVE_PLAYER", serde_json::to_value(payload).unwrap())?;
+    let payload = RevivePlayerPayload {
+        player_id,
+        seat_id,
+        previous_eliminated_at: eliminated_at,
+    };
+    insert_event_tx(
+        &tx,
+        tournament.id,
+        "REVIVE_PLAYER",
+        serde_json::to_value(payload).unwrap(),
+    )?;
     tx.commit().map_err(|err| err.to_string())?;
     emit_state(&app);
     Ok(())
 }
 
 #[tauri::command]
-fn move_player(state: State<AppState>, app: AppHandle, player_id: i64, to_seat_id: i64) -> Result<(), String> {
+fn move_player(
+    state: State<AppState>,
+    app: AppHandle,
+    player_id: i64,
+    to_seat_id: i64,
+) -> Result<(), String> {
     let mut conn = open_connection(&state.db_path)?;
     let tournament = fetch_tournament(&conn)?.ok_or("Tournament not found")?;
 
@@ -976,13 +1071,28 @@ fn move_player(state: State<AppState>, app: AppHandle, player_id: i64, to_seat_i
     }
 
     let tx = conn.transaction().map_err(|err| err.to_string())?;
-    tx.execute("UPDATE seats SET player_id = NULL WHERE id = ?", params![from_seat_id])
-        .map_err(|err| err.to_string())?;
-    tx.execute("UPDATE seats SET player_id = ? WHERE id = ?", params![player_id, to_seat_id])
-        .map_err(|err| err.to_string())?;
+    tx.execute(
+        "UPDATE seats SET player_id = NULL WHERE id = ?",
+        params![from_seat_id],
+    )
+    .map_err(|err| err.to_string())?;
+    tx.execute(
+        "UPDATE seats SET player_id = ? WHERE id = ?",
+        params![player_id, to_seat_id],
+    )
+    .map_err(|err| err.to_string())?;
 
-    let payload = MovePlayerPayload { player_id, from_seat_id, to_seat_id };
-    insert_event_tx(&tx, tournament.id, "MOVE_PLAYER", serde_json::to_value(payload).unwrap())?;
+    let payload = MovePlayerPayload {
+        player_id,
+        from_seat_id,
+        to_seat_id,
+    };
+    insert_event_tx(
+        &tx,
+        tournament.id,
+        "MOVE_PLAYER",
+        serde_json::to_value(payload).unwrap(),
+    )?;
     tx.commit().map_err(|err| err.to_string())?;
     emit_state(&app);
     Ok(())
@@ -1000,12 +1110,15 @@ fn compute_balance_suggestions(conn: &Connection) -> Result<Vec<MoveSuggestion>,
 
     let mut counts = std::collections::HashMap::<i64, i64>::new();
     for table in &open_tables {
-        let count = seats.iter().filter(|seat| seat.table_id == table.id && seat.player_id.is_some()).count() as i64;
+        let count = seats
+            .iter()
+            .filter(|seat| seat.table_id == table.id && seat.player_id.is_some())
+            .count() as i64;
         counts.insert(table.id, count);
     }
 
-
-    let mut empty_seats: std::collections::HashMap<i64, Vec<Seat>> = std::collections::HashMap::new();
+    let mut empty_seats: std::collections::HashMap<i64, Vec<Seat>> =
+        std::collections::HashMap::new();
     for table in &open_tables {
         let list = seats
             .iter()
@@ -1032,9 +1145,9 @@ fn compute_balance_suggestions(conn: &Connection) -> Result<Vec<MoveSuggestion>,
             break;
         }
 
-        let from_seat = seats
-            .iter()
-            .find(|seat| seat.table_id == max_id && seat.player_id.is_some() && !used_from.contains(&seat.id));
+        let from_seat = seats.iter().find(|seat| {
+            seat.table_id == max_id && seat.player_id.is_some() && !used_from.contains(&seat.id)
+        });
         let to_seat = empty_seats.get(&min_id).and_then(|list| list.first());
         if from_seat.is_none() || to_seat.is_none() {
             break;
@@ -1071,18 +1184,34 @@ fn close_table(state: State<AppState>, app: AppHandle, table_id: i64) -> Result<
     let tournament = fetch_tournament(&conn)?.ok_or("Tournament not found")?;
     let tables = fetch_tables(&conn, tournament.id)?;
     let seats = fetch_seats(&conn, tournament.id)?;
-    let target_table = tables.iter().find(|table| table.id == table_id).ok_or("Table not found")?;
+    let target_table = tables
+        .iter()
+        .find(|table| table.id == table_id)
+        .ok_or("Table not found")?;
     if target_table.is_closed {
         return Ok(());
     }
 
-    let seats_in_table: Vec<Seat> = seats.iter().filter(|seat| seat.table_id == table_id).cloned().collect();
-    let players_to_move: Vec<i64> = seats_in_table.iter().filter_map(|seat| seat.player_id).collect();
+    let seats_in_table: Vec<Seat> = seats
+        .iter()
+        .filter(|seat| seat.table_id == table_id)
+        .cloned()
+        .collect();
+    let players_to_move: Vec<i64> = seats_in_table
+        .iter()
+        .filter_map(|seat| seat.player_id)
+        .collect();
 
     let mut available: Vec<Seat> = seats
         .iter()
         .filter(|seat| seat.player_id.is_none() && seat.table_id != table_id)
-        .filter(|seat| !tables.iter().find(|t| t.id == seat.table_id).map(|t| t.is_closed).unwrap_or(true))
+        .filter(|seat| {
+            !tables
+                .iter()
+                .find(|t| t.id == seat.table_id)
+                .map(|t| t.is_closed)
+                .unwrap_or(true)
+        })
         .cloned()
         .collect();
 
@@ -1095,7 +1224,10 @@ fn close_table(state: State<AppState>, app: AppHandle, table_id: i64) -> Result<
     available.shuffle(&mut rng);
 
     let mut moves = Vec::new();
-    for seat in seats_in_table.iter().filter(|seat| seat.player_id.is_some()) {
+    for seat in seats_in_table
+        .iter()
+        .filter(|seat| seat.player_id.is_some())
+    {
         let target = available.pop().unwrap();
         moves.push(CloseMove {
             player_id: seat.player_id.unwrap(),
@@ -1106,16 +1238,30 @@ fn close_table(state: State<AppState>, app: AppHandle, table_id: i64) -> Result<
 
     let tx = conn.transaction().map_err(|err| err.to_string())?;
     for mv in &moves {
-        tx.execute("UPDATE seats SET player_id = NULL WHERE id = ?", params![mv.from_seat_id])
-            .map_err(|err| err.to_string())?;
-        tx.execute("UPDATE seats SET player_id = ? WHERE id = ?", params![mv.player_id, mv.to_seat_id])
-            .map_err(|err| err.to_string())?;
-    }
-    tx.execute("UPDATE tables SET is_closed = 1 WHERE id = ?", params![table_id])
+        tx.execute(
+            "UPDATE seats SET player_id = NULL WHERE id = ?",
+            params![mv.from_seat_id],
+        )
         .map_err(|err| err.to_string())?;
+        tx.execute(
+            "UPDATE seats SET player_id = ? WHERE id = ?",
+            params![mv.player_id, mv.to_seat_id],
+        )
+        .map_err(|err| err.to_string())?;
+    }
+    tx.execute(
+        "UPDATE tables SET is_closed = 1 WHERE id = ?",
+        params![table_id],
+    )
+    .map_err(|err| err.to_string())?;
 
     let payload = CloseTablePayload { table_id, moves };
-    insert_event_tx(&tx, tournament.id, "CLOSE_TABLE", serde_json::to_value(payload).unwrap())?;
+    insert_event_tx(
+        &tx,
+        tournament.id,
+        "CLOSE_TABLE",
+        serde_json::to_value(payload).unwrap(),
+    )?;
     tx.commit().map_err(|err| err.to_string())?;
     emit_state(&app);
     Ok(())
@@ -1128,7 +1274,14 @@ fn clock_start(state: State<AppState>, app: AppHandle) -> Result<(), String> {
     if tournament.clock_state == "running" {
         return Ok(());
     }
-    apply_clock_change(&mut conn, &tournament, "CLOCK_START", "running", tournament.current_level_index, tournament.clock_remaining_seconds)?;
+    apply_clock_change(
+        &mut conn,
+        &tournament,
+        "CLOCK_START",
+        "running",
+        tournament.current_level_index,
+        tournament.clock_remaining_seconds,
+    )?;
     emit_state(&app);
     Ok(())
 }
@@ -1140,7 +1293,14 @@ fn clock_pause(state: State<AppState>, app: AppHandle) -> Result<(), String> {
     if tournament.clock_state == "paused" {
         return Ok(());
     }
-    apply_clock_change(&mut conn, &tournament, "CLOCK_PAUSE", "paused", tournament.current_level_index, tournament.clock_remaining_seconds)?;
+    apply_clock_change(
+        &mut conn,
+        &tournament,
+        "CLOCK_PAUSE",
+        "paused",
+        tournament.current_level_index,
+        tournament.clock_remaining_seconds,
+    )?;
     emit_state(&app);
     Ok(())
 }
@@ -1155,8 +1315,19 @@ fn clock_next(state: State<AppState>, app: AppHandle) -> Result<(), String> {
         return Ok(());
     }
     let new_index = tournament.current_level_index + 1;
-    let new_remaining = levels.iter().find(|level| level.index == new_index).map(|level| level.duration_seconds).unwrap_or(tournament.clock_remaining_seconds);
-    apply_clock_change(&mut conn, &tournament, "CLOCK_NEXT", tournament.clock_state.as_str(), new_index, new_remaining)?;
+    let new_remaining = levels
+        .iter()
+        .find(|level| level.index == new_index)
+        .map(|level| level.duration_seconds)
+        .unwrap_or(tournament.clock_remaining_seconds);
+    apply_clock_change(
+        &mut conn,
+        &tournament,
+        "CLOCK_NEXT",
+        tournament.clock_state.as_str(),
+        new_index,
+        new_remaining,
+    )?;
     emit_state(&app);
     Ok(())
 }
@@ -1170,8 +1341,19 @@ fn clock_prev(state: State<AppState>, app: AppHandle) -> Result<(), String> {
     }
     let levels = fetch_levels(&conn, tournament.id)?;
     let new_index = tournament.current_level_index - 1;
-    let new_remaining = levels.iter().find(|level| level.index == new_index).map(|level| level.duration_seconds).unwrap_or(tournament.clock_remaining_seconds);
-    apply_clock_change(&mut conn, &tournament, "CLOCK_PREV", tournament.clock_state.as_str(), new_index, new_remaining)?;
+    let new_remaining = levels
+        .iter()
+        .find(|level| level.index == new_index)
+        .map(|level| level.duration_seconds)
+        .unwrap_or(tournament.clock_remaining_seconds);
+    apply_clock_change(
+        &mut conn,
+        &tournament,
+        "CLOCK_PREV",
+        tournament.clock_state.as_str(),
+        new_index,
+        new_remaining,
+    )?;
     emit_state(&app);
     Ok(())
 }
@@ -1181,7 +1363,14 @@ fn clock_adjust(state: State<AppState>, app: AppHandle, seconds: i64) -> Result<
     let mut conn = open_connection(&state.db_path)?;
     let tournament = fetch_tournament(&conn)?.ok_or("Tournament not found")?;
     let new_remaining = (tournament.clock_remaining_seconds + seconds).max(0);
-    apply_clock_change(&mut conn, &tournament, "CLOCK_ADJUST", tournament.clock_state.as_str(), tournament.current_level_index, new_remaining)?;
+    apply_clock_change(
+        &mut conn,
+        &tournament,
+        "CLOCK_ADJUST",
+        tournament.clock_state.as_str(),
+        tournament.current_level_index,
+        new_remaining,
+    )?;
     emit_state(&app);
     Ok(())
 }
@@ -1196,7 +1385,14 @@ fn clock_trigger_break(state: State<AppState>, app: AppHandle) -> Result<(), Str
         .filter(|level| level.is_break && level.index > tournament.current_level_index)
         .min_by_key(|level| level.index);
     if let Some(next_break) = next_break {
-        apply_clock_change(&mut conn, &tournament, "CLOCK_NEXT", tournament.clock_state.as_str(), next_break.index, next_break.duration_seconds)?;
+        apply_clock_change(
+            &mut conn,
+            &tournament,
+            "CLOCK_NEXT",
+            tournament.clock_state.as_str(),
+            next_break.index,
+            next_break.duration_seconds,
+        )?;
         emit_state(&app);
     }
     Ok(())
@@ -1207,10 +1403,21 @@ fn update_itm(state: State<AppState>, app: AppHandle, new_count: i64) -> Result<
     let mut conn = open_connection(&state.db_path)?;
     let tournament = fetch_tournament(&conn)?.ok_or("Tournament not found")?;
     let tx = conn.transaction().map_err(|err| err.to_string())?;
-    tx.execute("UPDATE tournaments SET itm_count = ? WHERE id = ?", params![new_count, tournament.id])
-        .map_err(|err| err.to_string())?;
-    let payload = UpdateItmPayload { previous_itm_count: tournament.itm_count, new_itm_count: new_count };
-    insert_event_tx(&tx, tournament.id, "UPDATE_ITM", serde_json::to_value(payload).unwrap())?;
+    tx.execute(
+        "UPDATE tournaments SET itm_count = ? WHERE id = ?",
+        params![new_count, tournament.id],
+    )
+    .map_err(|err| err.to_string())?;
+    let payload = UpdateItmPayload {
+        previous_itm_count: tournament.itm_count,
+        new_itm_count: new_count,
+    };
+    insert_event_tx(
+        &tx,
+        tournament.id,
+        "UPDATE_ITM",
+        serde_json::to_value(payload).unwrap(),
+    )?;
     tx.commit().map_err(|err| err.to_string())?;
     emit_state(&app);
     Ok(())
@@ -1222,12 +1429,18 @@ fn undo_last_event(state: State<AppState>, app: AppHandle) -> Result<(), String>
     let tournament = fetch_tournament(&conn)?.ok_or("Tournament not found")?;
 
     let mut stmt = conn
-        .prepare("SELECT id, type, payload_json FROM events WHERE tournament_id = ? ORDER BY id DESC")
+        .prepare(
+            "SELECT id, type, payload_json FROM events WHERE tournament_id = ? ORDER BY id DESC",
+        )
         .map_err(|err| err.to_string())?;
 
     let rows = stmt
         .query_map([tournament.id], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
         })
         .map_err(|err| err.to_string())?;
 
@@ -1246,7 +1459,9 @@ fn undo_last_event(state: State<AppState>, app: AppHandle) -> Result<(), String>
         }
     }
 
-    let target = events.into_iter().find(|(event_id, event_type, _)| event_type != "UNDO_EVENT" && !undone.contains(event_id));
+    let target = events
+        .into_iter()
+        .find(|(event_id, event_type, _)| event_type != "UNDO_EVENT" && !undone.contains(event_id));
     if target.is_none() {
         return Ok(());
     }
@@ -1256,33 +1471,52 @@ fn undo_last_event(state: State<AppState>, app: AppHandle) -> Result<(), String>
     let tx = conn.transaction().map_err(|err| err.to_string())?;
     match event_type.as_str() {
         "JOIN_PLAYER" => {
-            let payload: JoinPlayerPayload = serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
-            tx.execute("DELETE FROM players WHERE id = ?", params![payload.player_id])
-                .map_err(|err| err.to_string())?;
-            tx.execute("UPDATE seats SET player_id = NULL WHERE id = ?", params![payload.seat_id])
-                .map_err(|err| err.to_string())?;
+            let payload: JoinPlayerPayload =
+                serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
+            tx.execute(
+                "DELETE FROM players WHERE id = ?",
+                params![payload.player_id],
+            )
+            .map_err(|err| err.to_string())?;
+            tx.execute(
+                "UPDATE seats SET player_id = NULL WHERE id = ?",
+                params![payload.seat_id],
+            )
+            .map_err(|err| err.to_string())?;
         }
         "ELIMINATE_PLAYER" => {
-            let payload: EliminatePlayerPayload = serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
+            let payload: EliminatePlayerPayload =
+                serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
             tx.execute(
                 "UPDATE players SET status = 'active', eliminated_at = NULL WHERE id = ?",
                 params![payload.player_id],
             )
             .map_err(|err| err.to_string())?;
             if let Some(seat_id) = payload.seat_id {
-                tx.execute("UPDATE seats SET player_id = ? WHERE id = ?", params![payload.player_id, seat_id])
-                    .map_err(|err| err.to_string())?;
+                tx.execute(
+                    "UPDATE seats SET player_id = ? WHERE id = ?",
+                    params![payload.player_id, seat_id],
+                )
+                .map_err(|err| err.to_string())?;
             }
         }
         "MOVE_PLAYER" => {
-            let payload: MovePlayerPayload = serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
-            tx.execute("UPDATE seats SET player_id = NULL WHERE id = ?", params![payload.to_seat_id])
-                .map_err(|err| err.to_string())?;
-            tx.execute("UPDATE seats SET player_id = ? WHERE id = ?", params![payload.player_id, payload.from_seat_id])
-                .map_err(|err| err.to_string())?;
+            let payload: MovePlayerPayload =
+                serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
+            tx.execute(
+                "UPDATE seats SET player_id = NULL WHERE id = ?",
+                params![payload.to_seat_id],
+            )
+            .map_err(|err| err.to_string())?;
+            tx.execute(
+                "UPDATE seats SET player_id = ? WHERE id = ?",
+                params![payload.player_id, payload.from_seat_id],
+            )
+            .map_err(|err| err.to_string())?;
         }
         "CLOCK_START" | "CLOCK_PAUSE" | "CLOCK_NEXT" | "CLOCK_PREV" | "CLOCK_ADJUST" => {
-            let payload: ClockPayload = serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
+            let payload: ClockPayload =
+                serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
             tx.execute(
                 "UPDATE tournaments SET current_level_index = ?, clock_state = ?, clock_remaining_seconds = ? WHERE id = ?",
                 params![payload.from_level_index, payload.from_state, payload.from_remaining_seconds, tournament.id],
@@ -1290,37 +1524,60 @@ fn undo_last_event(state: State<AppState>, app: AppHandle) -> Result<(), String>
             .map_err(|err| err.to_string())?;
         }
         "UPDATE_ITM" => {
-            let payload: UpdateItmPayload = serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
-            tx.execute("UPDATE tournaments SET itm_count = ? WHERE id = ?", params![payload.previous_itm_count, tournament.id])
-                .map_err(|err| err.to_string())?;
+            let payload: UpdateItmPayload =
+                serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
+            tx.execute(
+                "UPDATE tournaments SET itm_count = ? WHERE id = ?",
+                params![payload.previous_itm_count, tournament.id],
+            )
+            .map_err(|err| err.to_string())?;
         }
         "CLOSE_TABLE" => {
-            let payload: CloseTablePayload = serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
+            let payload: CloseTablePayload =
+                serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
             for mv in payload.moves {
-                tx.execute("UPDATE seats SET player_id = NULL WHERE id = ?", params![mv.to_seat_id])
-                    .map_err(|err| err.to_string())?;
-                tx.execute("UPDATE seats SET player_id = ? WHERE id = ?", params![mv.player_id, mv.from_seat_id])
-                    .map_err(|err| err.to_string())?;
-            }
-            tx.execute("UPDATE tables SET is_closed = 0 WHERE id = ?", params![payload.table_id])
+                tx.execute(
+                    "UPDATE seats SET player_id = NULL WHERE id = ?",
+                    params![mv.to_seat_id],
+                )
                 .map_err(|err| err.to_string())?;
+                tx.execute(
+                    "UPDATE seats SET player_id = ? WHERE id = ?",
+                    params![mv.player_id, mv.from_seat_id],
+                )
+                .map_err(|err| err.to_string())?;
+            }
+            tx.execute(
+                "UPDATE tables SET is_closed = 0 WHERE id = ?",
+                params![payload.table_id],
+            )
+            .map_err(|err| err.to_string())?;
         }
         "REVIVE_PLAYER" => {
-            let payload: RevivePlayerPayload = serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
+            let payload: RevivePlayerPayload =
+                serde_json::from_str(&payload_json).map_err(|err| err.to_string())?;
             tx.execute(
                 "UPDATE players SET status = 'eliminated', eliminated_at = ? WHERE id = ?",
                 params![payload.previous_eliminated_at, payload.player_id],
             )
             .map_err(|err| err.to_string())?;
-            tx.execute("UPDATE seats SET player_id = NULL WHERE id = ?", params![payload.seat_id])
-                .map_err(|err| err.to_string())?;
+            tx.execute(
+                "UPDATE seats SET player_id = NULL WHERE id = ?",
+                params![payload.seat_id],
+            )
+            .map_err(|err| err.to_string())?;
         }
         _ => {}
     }
 
     recalculate_status(&tx, tournament.id)?;
     let undo_payload = UndoPayload { event_id };
-    insert_event_tx(&tx, tournament.id, "UNDO_EVENT", serde_json::to_value(undo_payload).unwrap())?;
+    insert_event_tx(
+        &tx,
+        tournament.id,
+        "UNDO_EVENT",
+        serde_json::to_value(undo_payload).unwrap(),
+    )?;
     tx.commit().map_err(|err| err.to_string())?;
     emit_state(&app);
     Ok(())
@@ -1344,54 +1601,57 @@ fn open_display_window(app: AppHandle) -> Result<(), String> {
 }
 
 fn start_clock_thread(app: AppHandle, db_path: PathBuf) {
-    std::thread::spawn(move || {
-        loop {
-            std::thread::sleep(Duration::from_secs(1));
-            if let Ok(mut conn) = open_connection(&db_path) {
-                if let Ok(Some(tournament)) = fetch_tournament(&conn) {
-                    if tournament.clock_state == "running" {
-                        let levels = fetch_levels(&conn, tournament.id).unwrap_or_default();
-                        let mut new_remaining = (tournament.clock_remaining_seconds - 1).max(0);
-                        let mut new_index = tournament.current_level_index;
-                        let mut needs_event = false;
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_secs(1));
+        if let Ok(mut conn) = open_connection(&db_path) {
+            if let Ok(Some(tournament)) = fetch_tournament(&conn) {
+                if tournament.clock_state == "running" {
+                    let levels = fetch_levels(&conn, tournament.id).unwrap_or_default();
+                    let mut new_remaining = (tournament.clock_remaining_seconds - 1).max(0);
+                    let mut new_index = tournament.current_level_index;
+                    let mut needs_event = false;
 
-                        if new_remaining == 0 {
-                            let max_index = levels.iter().map(|level| level.index).max().unwrap_or(0);
-                            if tournament.current_level_index < max_index {
-                                new_index = tournament.current_level_index + 1;
-                                new_remaining = levels
-                                    .iter()
-                                    .find(|level| level.index == new_index)
-                                    .map(|level| level.duration_seconds)
-                                    .unwrap_or(0);
-                                needs_event = true;
-                            }
+                    if new_remaining == 0 {
+                        let max_index = levels.iter().map(|level| level.index).max().unwrap_or(0);
+                        if tournament.current_level_index < max_index {
+                            new_index = tournament.current_level_index + 1;
+                            new_remaining = levels
+                                .iter()
+                                .find(|level| level.index == new_index)
+                                .map(|level| level.duration_seconds)
+                                .unwrap_or(0);
+                            needs_event = true;
                         }
+                    }
 
-                        let tx = match conn.transaction() {
-                            Ok(tx) => tx,
-                            Err(_) => continue,
+                    let tx = match conn.transaction() {
+                        Ok(tx) => tx,
+                        Err(_) => continue,
+                    };
+
+                    if needs_event {
+                        let payload = ClockPayload {
+                            from_level_index: tournament.current_level_index,
+                            to_level_index: new_index,
+                            from_remaining_seconds: tournament.clock_remaining_seconds,
+                            to_remaining_seconds: new_remaining,
+                            from_state: tournament.clock_state.clone(),
+                            to_state: tournament.clock_state.clone(),
                         };
+                        let _ = insert_event_tx(
+                            &tx,
+                            tournament.id,
+                            "CLOCK_NEXT",
+                            serde_json::to_value(payload).unwrap(),
+                        );
+                    }
 
-                        if needs_event {
-                            let payload = ClockPayload {
-                                from_level_index: tournament.current_level_index,
-                                to_level_index: new_index,
-                                from_remaining_seconds: tournament.clock_remaining_seconds,
-                                to_remaining_seconds: new_remaining,
-                                from_state: tournament.clock_state.clone(),
-                                to_state: tournament.clock_state.clone(),
-                            };
-                            let _ = insert_event_tx(&tx, tournament.id, "CLOCK_NEXT", serde_json::to_value(payload).unwrap());
-                        }
-
-                        let _ = tx.execute(
+                    let _ = tx.execute(
                             "UPDATE tournaments SET current_level_index = ?, clock_remaining_seconds = ? WHERE id = ?",
                             params![new_index, new_remaining, tournament.id],
                         );
-                        let _ = tx.commit();
-                        emit_state(&app);
-                    }
+                    let _ = tx.commit();
+                    emit_state(&app);
                 }
             }
         }
@@ -1413,7 +1673,9 @@ fn main() {
             let db_path = ensure_db_path(&app.handle())?;
             let conn = open_connection(&db_path)?;
             migrate(&conn)?;
-            app.manage(AppState { db_path: db_path.clone() });
+            app.manage(AppState {
+                db_path: db_path.clone(),
+            });
             start_clock_thread(app.handle(), db_path);
             Ok(())
         })
@@ -1463,11 +1725,19 @@ mod tests {
         let id = tx.last_insert_rowid();
 
         for t in 1..=2 {
-             tx.execute("INSERT INTO tables (tournament_id, table_no, is_closed) VALUES (?, ?, 0)", params![id, t]).unwrap();
-             let tid = tx.last_insert_rowid();
-             for s in 1..=9 {
-                 tx.execute("INSERT INTO seats (table_id, seat_no, player_id) VALUES (?, ?, NULL)", params![tid, s]).unwrap();
-             }
+            tx.execute(
+                "INSERT INTO tables (tournament_id, table_no, is_closed) VALUES (?, ?, 0)",
+                params![id, t],
+            )
+            .unwrap();
+            let tid = tx.last_insert_rowid();
+            for s in 1..=9 {
+                tx.execute(
+                    "INSERT INTO seats (table_id, seat_no, player_id) VALUES (?, ?, NULL)",
+                    params![tid, s],
+                )
+                .unwrap();
+            }
         }
         tx.execute("INSERT INTO levels (tournament_id, idx, duration_seconds, small_blind, big_blind, ante, is_break, label) VALUES (?, 0, 600, 100, 200, 0, 0, 'L1')", params![id]).unwrap();
         tx.commit().unwrap();
@@ -1479,18 +1749,22 @@ mod tests {
         let mut conn = setup_db();
         let tournament = create_dummy_tournament(&mut conn).unwrap();
         let tx = conn.transaction().unwrap();
-        
+
         for i in 1..=15 {
-             let name = format!("Player {}", i);
-             let seat_opt = choose_seat(&tx, &tournament, "random").unwrap();
-             if let Some(seat) = seat_opt {
-                 tx.execute("INSERT INTO players (tournament_id, name, status, registered_at) VALUES (?, ?, 'active', ?)", params![tournament.id, name, now_ts()]).unwrap();
-                 let pid = tx.last_insert_rowid();
-                 tx.execute("UPDATE seats SET player_id = ? WHERE id = ?", params![pid, seat.id]).unwrap();
-             }
+            let name = format!("Player {}", i);
+            let seat_opt = choose_seat(&tx, &tournament, "random").unwrap();
+            if let Some(seat) = seat_opt {
+                tx.execute("INSERT INTO players (tournament_id, name, status, registered_at) VALUES (?, ?, 'active', ?)", params![tournament.id, name, now_ts()]).unwrap();
+                let pid = tx.last_insert_rowid();
+                tx.execute(
+                    "UPDATE seats SET player_id = ? WHERE id = ?",
+                    params![pid, seat.id],
+                )
+                .unwrap();
+            }
         }
         tx.commit().unwrap();
-        
+
         let seats = fetch_seats(&conn, tournament.id).unwrap();
         let occupied = seats.iter().filter(|s| s.player_id.is_some()).count();
         assert_eq!(occupied, 15);
@@ -1503,24 +1777,35 @@ mod tests {
         let tables = fetch_tables(&conn, tournament.id).unwrap();
         let t1 = tables[0].id; // Table 1
         let t2 = tables[1].id; // Table 2
-        
+
         let tx = conn.transaction().unwrap();
         // 9 players on T1
         for i in 1..=9 {
             tx.execute("INSERT INTO players (tournament_id, name, status, registered_at) VALUES (?, ?, 'active', 0)", params![tournament.id, format!("P1-{}", i)]).unwrap();
             let pid = tx.last_insert_rowid();
-            tx.execute("UPDATE seats SET player_id = ? WHERE table_id = ? AND seat_no = ?", params![pid, t1, i]).unwrap();
+            tx.execute(
+                "UPDATE seats SET player_id = ? WHERE table_id = ? AND seat_no = ?",
+                params![pid, t1, i],
+            )
+            .unwrap();
         }
         // 3 players on T2 (Diff = 6)
         for i in 1..=3 {
             tx.execute("INSERT INTO players (tournament_id, name, status, registered_at) VALUES (?, ?, 'active', 0)", params![tournament.id, format!("P2-{}", i)]).unwrap();
             let pid = tx.last_insert_rowid();
-            tx.execute("UPDATE seats SET player_id = ? WHERE table_id = ? AND seat_no = ?", params![pid, t2, i]).unwrap();
+            tx.execute(
+                "UPDATE seats SET player_id = ? WHERE table_id = ? AND seat_no = ?",
+                params![pid, t2, i],
+            )
+            .unwrap();
         }
         tx.commit().unwrap();
 
         let suggestions = compute_balance_suggestions(&conn).unwrap();
-        assert!(!suggestions.is_empty(), "Should suggest moves when diff is 6");
+        assert!(
+            !suggestions.is_empty(),
+            "Should suggest moves when diff is 6"
+        );
         // Should move enough to balance. (9+3)/2 = 6. T1 has 9 -> needs -3. T2 has 3 -> needs +3.
         // Suggestions should be around 3 moves.
         assert!(suggestions.len() >= 2);

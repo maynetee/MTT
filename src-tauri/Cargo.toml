@@ -2,6 +2,10 @@
 name = "mtt"
 version = "0.1.0"
 edition = "2021"
+description = "Poker tournament director for live events"
+license = "MIT"
+authors = ["Mendel Teichman"]
+repository = "https://github.com/maynetee/MTT"
 
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }
