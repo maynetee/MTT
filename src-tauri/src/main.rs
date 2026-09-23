@@ -790,7 +790,13 @@ fn register_player(
         return Err("Late registration is closed".into());
     }
 
-    let mut seat = choose_seat(&conn, &tournament, &strategy)?.ok_or("Tournament is full")?;
+    let mut seat = match choose_seat(&conn, &tournament, &strategy)? {
+        Some(seat) => seat,
+        None => {
+            emit_error(&app, "Tournament is full");
+            return Err("Tournament is full".into());
+        }
+    };
 
     let tx = conn.transaction().map_err(|err| err.to_string())?;
     tx.execute(

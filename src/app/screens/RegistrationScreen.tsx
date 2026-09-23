@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { registerPlayer, registerPlayerAtSeat } from "../api";
 import type { StateSnapshot } from "../types";
+import { openSeatsLeft } from "../utils/seating";
 
 function lateRegOpen(state: StateSnapshot) {
   const tournament = state.tournament;
@@ -30,12 +31,6 @@ export default function RegistrationScreen({ state }: { state: StateSnapshot }) 
   const [seatNo, setSeatNo] = useState(1);
   const lateRegStatus = lateRegOpen(state);
 
-  const tournament = state.tournament;
-  const capacity = useMemo(() => {
-    if (!tournament) return 0;
-    return tournament.tablesCount * tournament.seatsPerTable;
-  }, [tournament]);
-
   const handleAdd = async () => {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -49,11 +44,12 @@ export default function RegistrationScreen({ state }: { state: StateSnapshot }) 
       }
       setName("");
     } catch (err) {
+      // The API layer already reports the failure through app_error.
       console.error(err);
     }
   };
 
-  const remainingSeats = Math.max(0, capacity - state.players.length);
+  const remainingSeats = openSeatsLeft(state);
 
   return (
     <div className="grid-2">
