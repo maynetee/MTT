@@ -3,7 +3,6 @@ import { writeBinaryFile, writeTextFile } from "@tauri-apps/api/fs";
 import type { RankingEntry } from "../types";
 import { emitAppError, isTauriAvailable } from "../api";
 import { rankingStatusLabel } from "./ranking";
-import { buildRankingPdf } from "./rankingPdf";
 
 export interface PdfExportMeta {
   tournamentName: string;
@@ -56,6 +55,8 @@ export async function exportCSV(entries: RankingEntry[], tournamentName: string)
 /** Never rejects: failures are reported through the app error banner. */
 export async function exportPDF(entries: RankingEntry[], { tournamentName, finished }: PdfExportMeta): Promise<void> {
   try {
+    // pdf-lib, fontkit and the fonts are only downloaded when a PDF is actually exported.
+    const { buildRankingPdf } = await import("./rankingPdf");
     const bytes = await buildRankingPdf(entries, { tournamentName, finished });
 
     if (!isTauriAvailable()) {
