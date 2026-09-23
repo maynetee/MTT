@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { eliminatePlayer, revivePlayerAtSeat, updateItmCount } from "../api";
 import type { StateSnapshot } from "../types";
+import { freeSeatsAtOpenTables } from "../utils/seating";
 
 export default function PlayersScreen({ state }: { state: StateSnapshot }) {
   const [search, setSearch] = useState("");
   const [itm, setItm] = useState(state.tournament?.itmCount ?? 0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [revivePlayerId, setRevivePlayerId] = useState<number | "">("");
-  const [reviveTableNo, setReviveTableNo] = useState<number>(1);
-  const [reviveSeatNo, setReviveSeatNo] = useState<number>(1);
+  // null follows the first free seat, "" is an explicit empty choice.
+  const [reviveSeatChoice, setReviveSeatChoice] = useState<number | "" | null>(null);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -30,15 +31,11 @@ export default function PlayersScreen({ state }: { state: StateSnapshot }) {
 
   const eliminatedPlayers = useMemo(() => state.players.filter((p) => p.status === "eliminated"), [state.players]);
 
-  const availableSeats = useMemo(() => {
-    return state.seats
-      .filter((seat) => seat.playerId === null && !state.tables.find((t) => t.id === seat.tableId)?.isClosed)
-      .map((seat) => {
-        const tableNo = state.tables.find((t) => t.id === seat.tableId)?.tableNo ?? 0;
-        return { tableNo, seatNo: seat.seatNo };
-      })
-      .sort((a, b) => (a.tableNo === b.tableNo ? a.seatNo - b.seatNo : a.tableNo - b.tableNo));
-  }, [state.seats, state.tables]);
+  const availableSeats = useMemo(() => freeSeatsAtOpenTables(state), [state]);
+
+  // A chosen seat that is no longer free is dropped rather than submitted.
+  const reviveSeatId = reviveSeatChoice ?? availableSeats[0]?.seatId ?? "";
+  const reviveSeat = availableSeats.find((seat) => seat.seatId === reviveSeatId) ?? null;
 
   const handleUpdateItm = async () => {
     if (!Number.isFinite(itm)) return;
@@ -46,8 +43,10 @@ export default function PlayersScreen({ state }: { state: StateSnapshot }) {
   };
 
   const handleRevive = async () => {
-    if (revivePlayerId === "") return;
-    await revivePlayerAtSeat(revivePlayerId, reviveTableNo, reviveSeatNo);
+    if (revivePlayerId === "" || !reviveSeat) return;
+    await revivePlayerAtSeat(revivePlayerId, reviveSeat.tableNo, reviveSeat.seatNo);
+    setRevivePlayerId("");
+    setReviveSeatChoice(null);
   };
 
   return (
@@ -72,7 +71,10 @@ export default function PlayersScreen({ state }: { state: StateSnapshot }) {
         <div className="grid-2">
           <label>
             Player
-            <select value={revivePlayerId} onChange={(event) => setRevivePlayerId(Number(event.target.value))}>
+            <select
+              value={revivePlayerId}
+              onChange={(event) => setRevivePlayerId(event.target.value === "" ? "" : Number(event.target.value))}
+            >
               <option value="">Select eliminated player</option>
               {eliminatedPlayers.map((player) => (
                 <option key={player.id} value={player.id}>{player.name}</option>
@@ -82,22 +84,19 @@ export default function PlayersScreen({ state }: { state: StateSnapshot }) {
           <label>
             Seat
             <select
-              value={`${reviveTableNo}-${reviveSeatNo}`}
-              onChange={(event) => {
-                const [table, seat] = event.target.value.split("-").map(Number);
-                setReviveTableNo(table);
-                setReviveSeatNo(seat);
-              }}
+              value={reviveSeat?.seatId ?? ""}
+              onChange={(event) => setReviveSeatChoice(event.target.value === "" ? "" : Number(event.target.value))}
             >
+              <option value="">Select seat</option>
               {availableSeats.map((seat) => (
-                <option key={`${seat.tableNo}-${seat.seatNo}`} value={`${seat.tableNo}-${seat.seatNo}`}>
+                <option key={seat.seatId} value={seat.seatId}>
                   Table {seat.tableNo} Seat {seat.seatNo}
                 </option>
               ))}
             </select>
           </label>
         </div>
-        <button className="btn" onClick={handleRevive} disabled={revivePlayerId === ""}>
+        <button className="btn" onClick={handleRevive} disabled={revivePlayerId === "" || !reviveSeat}>
           Revive Player
         </button>
       </div>

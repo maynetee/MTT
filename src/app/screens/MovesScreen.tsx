@@ -65,7 +65,10 @@ export default function MovesScreen({ state }: { state: StateSnapshot }) {
         <div className="grid-2">
           <label>
             Player
-            <select value={selectedPlayer} onChange={(event) => setSelectedPlayer(Number(event.target.value))}>
+            <select
+              value={selectedPlayer}
+              onChange={(event) => setSelectedPlayer(event.target.value === "" ? "" : Number(event.target.value))}
+            >
               <option value="">Select player</option>
               {state.players.filter((p) => p.status === "active").map((player) => (
                 <option key={player.id} value={player.id}>{player.name}</option>
@@ -74,7 +77,10 @@ export default function MovesScreen({ state }: { state: StateSnapshot }) {
           </label>
           <label>
             Seat
-            <select value={selectedSeat} onChange={(event) => setSelectedSeat(Number(event.target.value))}>
+            <select
+              value={selectedSeat}
+              onChange={(event) => setSelectedSeat(event.target.value === "" ? "" : Number(event.target.value))}
+            >
               <option value="">Select seat</option>
               {availableSeats.map((seat) => (
                 <option key={seat.id} value={seat.id}>{seatLabel(seat.id)}</option>
