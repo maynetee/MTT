@@ -80,7 +80,9 @@ export interface MoveSuggestion {
 }
 
 export interface RankingEntry {
-  place: number;
+  /** Finishing place, or null while the player is still in play. */
+  place: number | null;
+  playerId: number;
   playerName: string;
   status: PlayerStatus;
   eliminatedAt: number | null;

@@ -3,6 +3,13 @@ import { writeBinaryFile, writeTextFile } from "@tauri-apps/api/fs";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { RankingEntry } from "../types";
 import { isTauriAvailable } from "../api";
+import { formatPlace, rankingStatusLabel, rankingTitle } from "./ranking";
+
+export interface PdfExportMeta {
+  tournamentName: string;
+  /** Whether the tournament is finished, i.e. whether the ranking is final. */
+  finished: boolean;
+}
 
 function downloadBrowser(filename: string, content: BlobPart, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
@@ -17,9 +24,8 @@ function downloadBrowser(filename: string, content: BlobPart, mimeType: string) 
 export async function exportCSV(entries: RankingEntry[], tournamentName: string) {
   const header = "Place,Player,Status\n";
   const rows = entries.map((entry) => {
-    const status = entry.status === "eliminated" ? "Eliminated" : "Active";
     const safeName = entry.playerName.replace(/"/g, '""');
-    return `${entry.place},"${safeName}",${status}`;
+    return `${entry.place ?? ""},"${safeName}",${rankingStatusLabel(entry)}`;
   });
   const content = header + rows.join("\n");
 
@@ -40,14 +46,14 @@ export async function exportCSV(entries: RankingEntry[], tournamentName: string)
   }
 }
 
-export async function exportPDF(entries: RankingEntry[], tournamentName: string) {
+export async function exportPDF(entries: RankingEntry[], { tournamentName, finished }: PdfExportMeta) {
   const pdfDoc = await PDFDocument.create();
   let page = pdfDoc.addPage([595, 842]);
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const titleFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   let y = 800;
-  page.drawText("Final Ranking", { x: 40, y, size: 20, font: titleFont, color: rgb(0, 0, 0) });
+  page.drawText(rankingTitle(finished, new Date()), { x: 40, y, size: 20, font: titleFont, color: rgb(0, 0, 0) });
   y -= 26;
   page.drawText(tournamentName, { x: 40, y, size: 12, font, color: rgb(0.2, 0.2, 0.2) });
   y -= 20;
@@ -57,9 +63,8 @@ export async function exportPDF(entries: RankingEntry[], tournamentName: string)
       y = 800;
       page = pdfDoc.addPage([595, 842]);
     }
-    const status = entry.status === "eliminated" ? "Eliminated" : "Active";
-    page.drawText(`#${entry.place}  ${entry.playerName}`, { x: 40, y, size: 12, font, color: rgb(0, 0, 0) });
-    page.drawText(status, { x: 430, y, size: 12, font, color: rgb(0.4, 0.4, 0.4) });
+    page.drawText(`${formatPlace(entry.place)}  ${entry.playerName}`, { x: 40, y, size: 12, font, color: rgb(0, 0, 0) });
+    page.drawText(rankingStatusLabel(entry), { x: 430, y, size: 12, font, color: rgb(0.4, 0.4, 0.4) });
     y -= 18;
   }
 
