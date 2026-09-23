@@ -15,6 +15,12 @@ const defaultLevels: LevelDraft[] = [
   { index: 9, durationSeconds: 20 * 60, smallBlind: 800, bigBlind: 1600, ante: 200, isBreak: false, label: "Level 8" }
 ];
 
+// Stable per-row key so editing a row never remounts it.
+type LevelRow = LevelDraft & { rowId: number };
+
+let nextRowId = 0;
+const withRowId = (level: LevelDraft): LevelRow => ({ ...level, rowId: nextRowId++ });
+
 export default function SetupScreen() {
   const [name, setName] = useState("MTT");
   const [tablesCount, setTablesCount] = useState(8);
@@ -23,7 +29,7 @@ export default function SetupScreen() {
   const [lateRegEnabled, setLateRegEnabled] = useState(true);
   const [lateRegEndLevel, setLateRegEndLevel] = useState<number | null>(6);
   const [lateRegEndMinutes, setLateRegEndMinutes] = useState<number | null>(90);
-  const [levels, setLevels] = useState<LevelDraft[]>(defaultLevels);
+  const [levels, setLevels] = useState<LevelRow[]>(() => defaultLevels.map(withRowId));
 
   const capacity = useMemo(() => tablesCount * seatsPerTable, [tablesCount, seatsPerTable]);
 
@@ -38,7 +44,9 @@ export default function SetupScreen() {
       lateRegEndTimeSeconds: lateRegEndMinutes ? lateRegEndMinutes * 60 : null
     };
 
-    const sortedLevels = [...levels].sort((a, b) => a.index - b.index);
+    const sortedLevels = [...levels]
+      .sort((a, b) => a.index - b.index)
+      .map(({ rowId, ...level }) => level);
     await createTournament(config, sortedLevels);
   };
 
@@ -52,7 +60,7 @@ export default function SetupScreen() {
     const nextIndex = levels.length;
     setLevels((prev) => [
       ...prev,
-      {
+      withRowId({
         index: nextIndex,
         durationSeconds: 20 * 60,
         smallBlind: 0,
@@ -60,7 +68,7 @@ export default function SetupScreen() {
         ante: 0,
         isBreak: false,
         label: `Level ${nextIndex + 1}`
-      }
+      })
     ]);
   };
 
@@ -141,7 +149,7 @@ export default function SetupScreen() {
         </div>
         <div className="levels">
           {levels.map((level, idx) => (
-            <div key={`${level.label}-${idx}`} className="level-row">
+            <div key={level.rowId} className="level-row">
               <input
                 className="level-label"
                 value={level.label}
