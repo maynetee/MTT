@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RankingEntry } from "../types";
-import { exportPDF } from "./exports";
+import { OBJECT_URL_REVOKE_DELAY_MS, exportCSV, exportPDF } from "./exports";
 
 const entries: RankingEntry[] = [
   { place: 1, playerId: 1, playerName: "Łukasz", status: "active", eliminatedAt: null },
-  { place: 2, playerId: 2, playerName: "Дмитрий", status: "eliminated", eliminatedAt: 1_000 }
+  { place: 2, playerId: 2, playerName: "=1+1", status: "eliminated", eliminatedAt: 1_000 }
 ];
 
 function captureAppErrors() {
@@ -14,11 +14,60 @@ function captureAppErrors() {
   return { messages, stop: () => window.removeEventListener("app_error", listener) };
 }
 
+// jsdom implements neither createObjectURL nor revokeObjectURL.
+const createObjectURL = vi.fn<(blob: Blob) => string>();
+const revokeObjectURL = vi.fn<(url: string) => void>();
+
+beforeEach(() => {
+  createObjectURL.mockReset().mockReturnValue("blob:mtt-test");
+  revokeObjectURL.mockReset();
+  Object.assign(URL, { createObjectURL, revokeObjectURL });
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
-describe("exportPDF", () => {
+describe("exportCSV (browser)", () => {
+  it("downloads the escaped CSV under a sanitized name and revokes the URL only later", async () => {
+    vi.useFakeTimers();
+    const clicked: Array<{ download: string; href: string; attached: boolean }> = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push({ download: this.download, href: this.href, attached: document.body.contains(this) });
+    });
+
+    await exportCSV(entries, 'Main Event: "Day 1/2"');
+
+    expect(clicked).toEqual([{ download: "Main Event Day 1 2-ranking.csv", href: "blob:mtt-test", attached: true }]);
+    expect(document.querySelector("a[download]")).toBeNull();
+
+    const blob = createObjectURL.mock.calls[0][0];
+    expect(blob.type).toBe("text/csv;charset=utf-8");
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    expect(Array.from(bytes.subarray(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+    expect(new TextDecoder().decode(bytes)).toBe("Place,Player,Status\r\n1,Łukasz,Winner\r\n2,'=1+1,Eliminated\r\n");
+
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(OBJECT_URL_REVOKE_DELAY_MS);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:mtt-test");
+  });
+
+  it("reports a failure through the app_error event instead of rejecting", async () => {
+    createObjectURL.mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const errors = captureAppErrors();
+
+    await expect(exportCSV(entries, "Main Event")).resolves.toBeUndefined();
+
+    errors.stop();
+    expect(errors.messages).toEqual(["CSV export failed: quota exceeded"]);
+  });
+});
+
+describe("exportPDF (browser)", () => {
   it("reports a failure through the app_error event instead of rejecting", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
     vi.spyOn(console, "error").mockImplementation(() => {});

@@ -3,6 +3,7 @@ import { writeBinaryFile, writeTextFile } from "@tauri-apps/api/fs";
 import type { RankingEntry } from "../types";
 import { emitAppError, isTauriAvailable } from "../api";
 import { buildRankingCsv } from "./csv";
+import { rankingFileName } from "./fileName";
 
 export interface PdfExportMeta {
   tournamentName: string;
@@ -10,14 +11,21 @@ export interface PdfExportMeta {
   finished: boolean;
 }
 
+/** Delay before releasing a download's object URL (the value FileSaver.js uses). */
+export const OBJECT_URL_REVOKE_DELAY_MS = 40_000;
+
 function downloadBrowser(filename: string, content: BlobPart, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  // Revoking synchronously after click() can cancel the download before the browser has read the blob.
+  setTimeout(() => URL.revokeObjectURL(url), OBJECT_URL_REVOKE_DELAY_MS);
 }
 
 function reportExportError(format: "CSV" | "PDF", error: unknown) {
@@ -30,14 +38,15 @@ function reportExportError(format: "CSV" | "PDF", error: unknown) {
 export async function exportCSV(entries: RankingEntry[], tournamentName: string): Promise<void> {
   try {
     const content = buildRankingCsv(entries);
+    const fileName = rankingFileName(tournamentName, "csv");
 
     if (!isTauriAvailable()) {
-      downloadBrowser(`${tournamentName}-ranking.csv`, content, "text/csv;charset=utf-8");
+      downloadBrowser(fileName, content, "text/csv;charset=utf-8");
       return;
     }
 
     const path = await save({
-      defaultPath: `${tournamentName}-ranking.csv`,
+      defaultPath: fileName,
       filters: [{ name: "CSV", extensions: ["csv"] }]
     });
     if (!path) return;
@@ -53,14 +62,15 @@ export async function exportPDF(entries: RankingEntry[], { tournamentName, finis
     // pdf-lib, fontkit and the fonts are only downloaded when a PDF is actually exported.
     const { buildRankingPdf } = await import("./rankingPdf");
     const bytes = await buildRankingPdf(entries, { tournamentName, finished });
+    const fileName = rankingFileName(tournamentName, "pdf");
 
     if (!isTauriAvailable()) {
-      downloadBrowser(`${tournamentName}-ranking.pdf`, bytes.slice().buffer, "application/pdf");
+      downloadBrowser(fileName, bytes.slice().buffer, "application/pdf");
       return;
     }
 
     const path = await save({
-      defaultPath: `${tournamentName}-ranking.pdf`,
+      defaultPath: fileName,
       filters: [{ name: "PDF", extensions: ["pdf"] }]
     });
     if (!path) return;
