@@ -12,6 +12,7 @@ import ClockScreen from "./screens/ClockScreen";
 import LevelsScreen from "./screens/LevelsScreen";
 import DisplayScreen from "./screens/DisplayScreen";
 import ExportsScreen from "./screens/ExportsScreen";
+import { isEditableTarget } from "./utils/keyboard";
 
 const tabs = [
   { label: "Levels", path: "/levels" },
@@ -30,6 +31,7 @@ export default function App() {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target) || isEditableTarget(document.activeElement)) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
         event.preventDefault();
         undoLastEvent();
