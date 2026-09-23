@@ -1,0 +1,35 @@
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "MTT",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "windows": [
+      {
+        "title": "MTT",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1200,
+        "minHeight": 800,
+        "resizable": true
+      }
+    ],
+    "bundle": {
+      "identifier": "com.mtt.app",
+      "active": true
+    },
+    "allowlist": {
+      "all": false,
+      "dialog": { "all": true },
+      "fs": { "all": true },
+      "path": { "all": true },
+      "window": { "all": true }
+    }
+  }
+}
