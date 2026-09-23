@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { createTournament } from "../api";
 import type { LevelDraft, TournamentConfig } from "../types";
+import { playLevelNumber } from "../utils/tournament";
 
 const defaultLevels: LevelDraft[] = [
   { index: 0, durationSeconds: 20 * 60, smallBlind: 100, bigBlind: 200, ante: 0, isBreak: false, label: "Level 1" },
@@ -67,7 +68,7 @@ export default function SetupScreen() {
         bigBlind: 0,
         ante: 0,
         isBreak: false,
-        label: `Level ${nextIndex + 1}`
+        label: `Level ${playLevelNumber(levels, { index: nextIndex, isBreak: false })}`
       })
     ]);
   };

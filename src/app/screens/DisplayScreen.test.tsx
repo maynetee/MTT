@@ -21,7 +21,8 @@ const levels: Level[] = [
   level(0, 100, 200, 0),
   level(1, 150, 300, 0),
   level(2, 0, 0, 0, true),
-  level(3, 200, 400, 50)
+  level(3, 200, 400, 50),
+  level(4, 300, 600, 75)
 ];
 
 function activePlayer(id: number): Player {
@@ -75,6 +76,13 @@ describe("DisplayScreen", () => {
     expect(screen.getByText("BREAK")).toBeInTheDocument();
     expect(screen.queryByText("PAUSED")).not.toBeInTheDocument();
     expect(screen.queryByText(/^Blinds/)).not.toBeInTheDocument();
+  });
+
+  it("numbers play levels without counting breaks", () => {
+    render(<DisplayScreen state={snapshot(3, "running")} />);
+    expect(screen.getByText("Level 3")).toBeInTheDocument();
+    expect(screen.getByText("Blinds 200/400 Ante 50")).toBeInTheDocument();
+    expect(screen.getByText("Next: L4 300/600 A75")).toBeInTheDocument();
   });
 
   it("announces the bubble when one elimination is left before the money", () => {

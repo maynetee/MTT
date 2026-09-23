@@ -1,13 +1,7 @@
 import { useEffect, useRef } from "react";
 import { openDisplayWindow } from "../api";
 import type { Player, StateSnapshot } from "../types";
-import { moneyStatus } from "../utils/tournament";
-
-function formatTime(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
-}
+import { formatTime, moneyStatus, playLevelNumber } from "../utils/tournament";
 
 function sortEliminated(players: Player[]) {
   return [...players]
@@ -51,7 +45,7 @@ export default function DisplayScreen({ state, preview }: { state: StateSnapshot
             <div className="display-break">BREAK</div>
           ) : (
             <>
-              <div className="display-level">Level {currentLevel ? currentLevel.index + 1 : "—"}</div>
+              <div className="display-level">Level {currentLevel ? playLevelNumber(state.levels, currentLevel) : "—"}</div>
               {currentLevel && (
                 <div className="display-blinds">Blinds {currentLevel.smallBlind}/{currentLevel.bigBlind} Ante {currentLevel.ante}</div>
               )}
@@ -59,7 +53,7 @@ export default function DisplayScreen({ state, preview }: { state: StateSnapshot
           )}
           {nextLevel && (
             <div className="display-next">
-              Next: {nextLevel.isBreak ? "Break" : `L${nextLevel.index + 1} ${nextLevel.smallBlind}/${nextLevel.bigBlind} A${nextLevel.ante}`}
+              Next: {nextLevel.isBreak ? "Break" : `L${playLevelNumber(state.levels, nextLevel)} ${nextLevel.smallBlind}/${nextLevel.bigBlind} A${nextLevel.ante}`}
             </div>
           )}
         </div>

@@ -1,3 +1,17 @@
+import type { Level } from "../types";
+
+export function formatTime(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
+}
+
+// 1-based number of a play level, counting only the non-break levels before it; null for a break.
+export function playLevelNumber(levels: Pick<Level, "index" | "isBreak">[], level: Pick<Level, "index" | "isBreak">): number | null {
+  if (level.isBreak) return null;
+  return levels.filter((l) => !l.isBreak && l.index < level.index).length + 1;
+}
+
 export interface MoneyStatus {
   kind: "away" | "bubble" | "itm";
   text: string;

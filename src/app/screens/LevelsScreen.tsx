@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { updateLevels, nextLevel } from "../api";
 import type { LevelDraft, StateSnapshot } from "../types";
+import { playLevelNumber } from "../utils/tournament";
 
 const defaultLevelDraft: LevelDraft = {
     index: 0,
@@ -44,7 +45,7 @@ export default function LevelsScreen({ state }: { state: StateSnapshot }) {
     const handleAddLevel = () => {
         setLevels(prev => {
             const nextIndex = prev.length;
-            return [...prev, { ...defaultLevelDraft, index: nextIndex, label: `Level ${nextIndex + 1}` }];
+            return [...prev, { ...defaultLevelDraft, index: nextIndex, label: `Level ${playLevelNumber(prev, { index: nextIndex, isBreak: false })}` }];
         });
         setIsDirty(true);
     };

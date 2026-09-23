@@ -1,16 +1,11 @@
 import { adjustClock, nextLevel, pauseClock, previousLevel, startClock, triggerNextBreak } from "../api";
 import type { Level, StateSnapshot } from "../types";
+import { formatTime, playLevelNumber } from "../utils/tournament";
 
-function formatTime(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
-}
-
-function levelLabel(level?: Level | null) {
+function levelLabel(levels: Level[], level?: Level | null) {
   if (!level) return "—";
   if (level.isBreak) return "Break";
-  return `L${level.index + 1} ${level.smallBlind}/${level.bigBlind} (A${level.ante})`;
+  return `L${playLevelNumber(levels, level)} ${level.smallBlind}/${level.bigBlind} (A${level.ante})`;
 }
 
 export default function ClockScreen({ state }: { state: StateSnapshot }) {
@@ -27,11 +22,11 @@ export default function ClockScreen({ state }: { state: StateSnapshot }) {
         </div>
         <div>
           <div className="stat-label">Current</div>
-          <div className="clock-level">{levelLabel(current)}</div>
+          <div className="clock-level">{levelLabel(state.levels, current)}</div>
         </div>
         <div>
           <div className="stat-label">Next</div>
-          <div className="clock-level">{levelLabel(next)}</div>
+          <div className="clock-level">{levelLabel(state.levels, next)}</div>
         </div>
       </div>
 
