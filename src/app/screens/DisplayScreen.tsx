@@ -44,8 +44,9 @@ export default function DisplayScreen({ state, preview }: { state: StateSnapshot
       <div className="display-left">
         <div className="display-card">
           <h2>Clock</h2>
+          {tournament?.clockState === "paused" && <div className="display-paused">PAUSED</div>}
           <div className="display-time">{formatTime(tournament?.clockRemainingSeconds ?? 0)}</div>
-          {currentLevel?.isBreak || tournament?.clockState === "paused" ? (
+          {currentLevel?.isBreak ? (
             <div className="display-break">BREAK</div>
           ) : (
             <>

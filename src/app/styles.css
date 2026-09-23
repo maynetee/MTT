@@ -418,6 +418,14 @@ label {
   text-align: center;
 }
 
+.display-paused {
+  font-size: 48px;
+  font-weight: 800;
+  color: #f87171;
+  text-align: center;
+  letter-spacing: 0.2em;
+}
+
 .display-level {
   font-size: 48px;
   font-weight: 700;
