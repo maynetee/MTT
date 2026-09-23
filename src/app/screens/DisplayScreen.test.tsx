@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { ClockState, Level, StateSnapshot } from "../types";
+import type { ClockState, Level, Player, StateSnapshot } from "../types";
 import DisplayScreen from "./DisplayScreen";
 
 function level(index: number, smallBlind: number, bigBlind: number, ante: number, isBreak = false): Level {
@@ -24,7 +24,11 @@ const levels: Level[] = [
   level(3, 200, 400, 50)
 ];
 
-function snapshot(currentLevelIndex: number, clockState: ClockState): StateSnapshot {
+function activePlayer(id: number): Player {
+  return { id, tournamentId: 1, name: `Player ${id}`, status: "active", registeredAt: 0, eliminatedAt: null };
+}
+
+function snapshot(currentLevelIndex: number, clockState: ClockState, alive = 0): StateSnapshot {
   return {
     tournament: {
       id: 1,
@@ -41,7 +45,7 @@ function snapshot(currentLevelIndex: number, clockState: ClockState): StateSnaps
       clockRemainingSeconds: 754,
       createdAt: 0
     },
-    players: [],
+    players: Array.from({ length: alive }, (_, i) => activePlayer(i + 1)),
     tables: [],
     seats: [],
     levels
@@ -71,5 +75,10 @@ describe("DisplayScreen", () => {
     expect(screen.getByText("BREAK")).toBeInTheDocument();
     expect(screen.queryByText("PAUSED")).not.toBeInTheDocument();
     expect(screen.queryByText(/^Blinds/)).not.toBeInTheDocument();
+  });
+
+  it("announces the bubble when one elimination is left before the money", () => {
+    render(<DisplayScreen state={snapshot(1, "running", 4)} />);
+    expect(screen.getByText("Bubble!")).toBeInTheDocument();
   });
 });

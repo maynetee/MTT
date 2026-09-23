@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { openDisplayWindow } from "../api";
 import type { Player, StateSnapshot } from "../types";
+import { moneyStatus } from "../utils/tournament";
 
 function formatTime(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -36,7 +37,7 @@ export default function DisplayScreen({ state, preview }: { state: StateSnapshot
   const remainingPlayers = state.players.filter((p) => p.status === "active").length;
   const eliminatedPlayers = state.players.filter((p) => p.status === "eliminated").length;
   const activeTables = state.tables.filter((t) => !t.isClosed).length;
-  const remainingToITM = tournament ? remainingPlayers - tournament.itmCount : 0;
+  const money = tournament ? moneyStatus(remainingPlayers, tournament.itmCount) : null;
   const eliminatedList = sortEliminated(state.players);
 
   const content = (
@@ -74,9 +75,7 @@ export default function DisplayScreen({ state, preview }: { state: StateSnapshot
         <div className="display-card">
           <h2>ITM / Bubble</h2>
           <div className="display-stat">ITM: {tournament?.itmCount ?? 0}</div>
-          {remainingToITM > 0 && <div className="display-warning">{remainingToITM} eliminations to ITM</div>}
-          {remainingToITM === 0 && <div className="display-warning">Bubble!</div>}
-          {remainingToITM < 0 && <div className="display-success">ITM reached</div>}
+          {money && <div className={money.kind === "itm" ? "display-success" : "display-warning"}>{money.text}</div>}
         </div>
       </div>
 
