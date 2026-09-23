@@ -1,9 +1,9 @@
 import { save } from "@tauri-apps/api/dialog";
 import { writeBinaryFile, writeTextFile } from "@tauri-apps/api/fs";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { RankingEntry } from "../types";
-import { isTauriAvailable } from "../api";
-import { formatPlace, rankingStatusLabel, rankingTitle } from "./ranking";
+import { emitAppError, isTauriAvailable } from "../api";
+import { rankingStatusLabel } from "./ranking";
+import { buildRankingPdf } from "./rankingPdf";
 
 export interface PdfExportMeta {
   tournamentName: string;
@@ -21,68 +21,55 @@ function downloadBrowser(filename: string, content: BlobPart, mimeType: string) 
   URL.revokeObjectURL(url);
 }
 
-export async function exportCSV(entries: RankingEntry[], tournamentName: string) {
-  const header = "Place,Player,Status\n";
-  const rows = entries.map((entry) => {
-    const safeName = entry.playerName.replace(/"/g, '""');
-    return `${entry.place ?? ""},"${safeName}",${rankingStatusLabel(entry)}`;
-  });
-  const content = header + rows.join("\n");
+function reportExportError(format: "CSV" | "PDF", error: unknown) {
+  console.error(`${format} export failed`, error);
+  const reason = error instanceof Error ? error.message : String(error);
+  emitAppError(`${format} export failed: ${reason}`);
+}
 
-  if (!isTauriAvailable()) {
-    downloadBrowser(`${tournamentName}-ranking.csv`, content, "text/csv");
-    return;
-  }
-
+/** Never rejects: failures are reported through the app error banner. */
+export async function exportCSV(entries: RankingEntry[], tournamentName: string): Promise<void> {
   try {
+    const header = "Place,Player,Status\n";
+    const rows = entries.map((entry) => {
+      const safeName = entry.playerName.replace(/"/g, '""');
+      return `${entry.place ?? ""},"${safeName}",${rankingStatusLabel(entry)}`;
+    });
+    const content = header + rows.join("\n");
+
+    if (!isTauriAvailable()) {
+      downloadBrowser(`${tournamentName}-ranking.csv`, content, "text/csv");
+      return;
+    }
+
     const path = await save({
       defaultPath: `${tournamentName}-ranking.csv`,
       filters: [{ name: "CSV", extensions: ["csv"] }]
     });
     if (!path) return;
     await writeTextFile(path, content);
-  } catch (err) {
-    console.error("Export failed", err);
+  } catch (error) {
+    reportExportError("CSV", error);
   }
 }
 
-export async function exportPDF(entries: RankingEntry[], { tournamentName, finished }: PdfExportMeta) {
-  const pdfDoc = await PDFDocument.create();
-  let page = pdfDoc.addPage([595, 842]);
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const titleFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-  let y = 800;
-  page.drawText(rankingTitle(finished, new Date()), { x: 40, y, size: 20, font: titleFont, color: rgb(0, 0, 0) });
-  y -= 26;
-  page.drawText(tournamentName, { x: 40, y, size: 12, font, color: rgb(0.2, 0.2, 0.2) });
-  y -= 20;
-
-  for (const entry of entries) {
-    if (y < 40) {
-      y = 800;
-      page = pdfDoc.addPage([595, 842]);
-    }
-    page.drawText(`${formatPlace(entry.place)}  ${entry.playerName}`, { x: 40, y, size: 12, font, color: rgb(0, 0, 0) });
-    page.drawText(rankingStatusLabel(entry), { x: 430, y, size: 12, font, color: rgb(0.4, 0.4, 0.4) });
-    y -= 18;
-  }
-
-  const bytes = await pdfDoc.save();
-
-  if (!isTauriAvailable()) {
-    downloadBrowser(`${tournamentName}-ranking.pdf`, bytes.slice().buffer, "application/pdf");
-    return;
-  }
-
+/** Never rejects: failures are reported through the app error banner. */
+export async function exportPDF(entries: RankingEntry[], { tournamentName, finished }: PdfExportMeta): Promise<void> {
   try {
+    const bytes = await buildRankingPdf(entries, { tournamentName, finished });
+
+    if (!isTauriAvailable()) {
+      downloadBrowser(`${tournamentName}-ranking.pdf`, bytes.slice().buffer, "application/pdf");
+      return;
+    }
+
     const path = await save({
       defaultPath: `${tournamentName}-ranking.pdf`,
       filters: [{ name: "PDF", extensions: ["pdf"] }]
     });
     if (!path) return;
     await writeBinaryFile(path, bytes);
-  } catch (err) {
-    console.error("Export failed", err);
+  } catch (error) {
+    reportExportError("PDF", error);
   }
 }

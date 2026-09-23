@@ -45,18 +45,22 @@ export function useTournament() {
     if (isTauriAvailable()) return;
     const interval = setInterval(() => tickClockIfDemo(), 1000);
     const handler = () => refresh();
+    window.addEventListener("state_updated", handler);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("state_updated", handler);
+    };
+  }, [refresh]);
+
+  // Front-end errors (demo mode, exports) are dispatched as window events in both modes.
+  useEffect(() => {
     const errorHandler = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if (detail) setError(String(detail));
     };
-    window.addEventListener("state_updated", handler);
-    window.addEventListener("app_error", errorHandler as EventListener);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("state_updated", handler);
-      window.removeEventListener("app_error", errorHandler as EventListener);
-    };
-  }, [refresh]);
+    window.addEventListener("app_error", errorHandler);
+    return () => window.removeEventListener("app_error", errorHandler);
+  }, []);
 
   return { state, error, setError, refresh };
 }

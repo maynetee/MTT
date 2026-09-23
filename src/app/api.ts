@@ -28,7 +28,8 @@ export function isTauriAvailable() {
   return typeof window !== "undefined" && "__TAURI_IPC__" in window;
 }
 
-function emitDemoError(message: string) {
+/** Surfaces an error to the user through the app's error banner. */
+export function emitAppError(message: string) {
   window.dispatchEvent(new CustomEvent("app_error", { detail: message }));
 }
 
@@ -36,7 +37,7 @@ function runDemo<T>(action: () => T): T {
   try {
     return action();
   } catch (error) {
-    emitDemoError(String(error));
+    emitAppError(String(error));
     throw error;
   }
 }
