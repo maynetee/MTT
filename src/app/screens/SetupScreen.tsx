@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createTournament } from "../api";
 import type { LevelDraft, TournamentConfig } from "../types";
 

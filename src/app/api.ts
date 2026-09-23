@@ -20,7 +20,8 @@ import {
   tickClockLocal,
   triggerNextBreakLocal,
   undoLastEventLocal,
-  updateItmLocal
+  updateItmLocal,
+  updateLevelsLocal
 } from "./demoStore";
 
 export function isTauriAvailable() {

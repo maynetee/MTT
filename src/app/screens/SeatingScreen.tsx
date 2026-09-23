@@ -1,4 +1,3 @@
-import React from "react";
 import { closeTable } from "../api";
 import type { StateSnapshot } from "../types";
 

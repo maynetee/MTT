@@ -1,4 +1,3 @@
-import React from "react";
 import { adjustClock, nextLevel, pauseClock, previousLevel, startClock, triggerNextBreak } from "../api";
 import type { Level, StateSnapshot } from "../types";
 

@@ -66,7 +66,7 @@ export async function exportPDF(entries: RankingEntry[], tournamentName: string)
   const bytes = await pdfDoc.save();
 
   if (!isTauriAvailable()) {
-    downloadBrowser(`${tournamentName}-ranking.pdf`, bytes, "application/pdf");
+    downloadBrowser(`${tournamentName}-ranking.pdf`, bytes.slice().buffer, "application/pdf");
     return;
   }
 

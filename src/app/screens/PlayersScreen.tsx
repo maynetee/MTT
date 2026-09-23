@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { eliminatePlayer, revivePlayerAtSeat, updateItmCount } from "../api";
 import type { StateSnapshot } from "../types";
 

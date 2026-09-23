@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { openDisplayWindow } from "../api";
 import type { Player, StateSnapshot } from "../types";
 

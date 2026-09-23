@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import type { Player, RankingEntry, StateSnapshot } from "../types";
 import { exportCSV, exportPDF } from "../utils/exports";
 
