@@ -2,7 +2,7 @@ import { save } from "@tauri-apps/api/dialog";
 import { writeBinaryFile, writeTextFile } from "@tauri-apps/api/fs";
 import type { RankingEntry } from "../types";
 import { emitAppError, isTauriAvailable } from "../api";
-import { rankingStatusLabel } from "./ranking";
+import { buildRankingCsv } from "./csv";
 
 export interface PdfExportMeta {
   tournamentName: string;
@@ -29,15 +29,10 @@ function reportExportError(format: "CSV" | "PDF", error: unknown) {
 /** Never rejects: failures are reported through the app error banner. */
 export async function exportCSV(entries: RankingEntry[], tournamentName: string): Promise<void> {
   try {
-    const header = "Place,Player,Status\n";
-    const rows = entries.map((entry) => {
-      const safeName = entry.playerName.replace(/"/g, '""');
-      return `${entry.place ?? ""},"${safeName}",${rankingStatusLabel(entry)}`;
-    });
-    const content = header + rows.join("\n");
+    const content = buildRankingCsv(entries);
 
     if (!isTauriAvailable()) {
-      downloadBrowser(`${tournamentName}-ranking.csv`, content, "text/csv");
+      downloadBrowser(`${tournamentName}-ranking.csv`, content, "text/csv;charset=utf-8");
       return;
     }
 
