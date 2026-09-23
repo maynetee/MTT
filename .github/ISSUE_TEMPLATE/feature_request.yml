@@ -1,0 +1,16 @@
+name: Feature request
+description: Suggest an improvement for tournament directors
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do during a tournament, and what gets in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How should it work? Mention the rule or house practice if it is about tournament rules.
