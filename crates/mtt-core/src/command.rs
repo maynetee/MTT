@@ -96,10 +96,27 @@ pub enum Command {
     /// Declares the winner when one player is left and registration is closed.
     #[serde(rename = "finish_tournament")]
     FinishTournament {},
+    /// Starts or resumes the clock; the first start begins the tournament.
     #[serde(rename = "start_clock")]
     StartClock {},
     #[serde(rename = "pause_clock")]
     PauseClock {},
+    /// Next level, with its full duration.
+    #[serde(rename = "next_level")]
+    NextLevel {},
+    /// Previous level, with its full duration.
+    #[serde(rename = "prev_level")]
+    PrevLevel {},
+    /// Level `level` (0-based index), with its full duration.
+    #[serde(rename = "jump_to")]
+    JumpTo { level: u16 },
+    #[serde(rename = "jump_to_next_break")]
+    JumpToNextBreak {},
+    /// Adds (or removes, if negative) time to the current level.
+    #[serde(rename = "adjust_time")]
+    AdjustTime { delta_ms: i64 },
+    #[serde(rename = "set_remaining")]
+    SetRemaining { ms: i64 },
     #[serde(rename = "undo")]
     Undo {},
     #[serde(rename = "redo")]

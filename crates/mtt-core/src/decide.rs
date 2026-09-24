@@ -50,8 +50,14 @@ pub fn decide(state: &State, cmd: &Command, ctx: &Ctx) -> Result<Event, DomainEr
         Command::CloseRegistration {} => registration::decide_close(state, now),
         Command::ReopenRegistration {} => registration::decide_reopen(state),
         Command::FinishTournament {} => players::decide_finish(state, now),
-        Command::StartClock {} => clock::decide_start(state, now),
-        Command::PauseClock {} => clock::decide_pause(state, now),
+        Command::StartClock {}
+        | Command::PauseClock {}
+        | Command::NextLevel {}
+        | Command::PrevLevel {}
+        | Command::JumpTo { .. }
+        | Command::JumpToNextBreak {}
+        | Command::AdjustTime { .. }
+        | Command::SetRemaining { .. } => clock::decide(state, cmd, now),
         Command::Undo {} | Command::Redo {} => Err(DomainError::Internal {
             reason: "undo and redo are handled by the engine".to_owned(),
         }),

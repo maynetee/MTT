@@ -5,7 +5,9 @@ mod common;
 use common::*;
 use mtt_core::state::TableStatus;
 use mtt_core::view::Itm;
-use mtt_core::{Clock, Command, Ctx, DomainError, Phase, SeatRef, TableNo, decide};
+use mtt_core::{
+    Clock, Command, Config, Ctx, Deadline, DomainError, Phase, SeatRef, TableNo, Warning, decide,
+};
 
 #[test]
 fn ranking_not_inverted_mid_tournament() {
@@ -176,6 +178,11 @@ fn simultaneous_busts_rank_by_starting_stack() {
     assert_eq!(place_of(&view, ids[4]), Some((2, Some(3))));
 }
 
+fn level_and_remaining(h: &Harness) -> (u16, i64) {
+    let clock = h.view().clock;
+    (clock.level_index, clock.remaining_ms)
+}
+
 #[test]
 fn update_structure_while_running() {
     let mut h = Harness::standard(9, 1);
@@ -185,45 +192,185 @@ fn update_structure_while_running() {
     let mut levels = levels();
     // The current level is editable: +10 minutes keeps the 5 elapsed minutes.
     levels[0] = play(25, 50, 30);
-    levels.push(play(150, 300, 20));
     h.ok(Command::UpdateStructure {
         levels: levels.clone(),
     });
-    assert_eq!(h.view().clock.remaining_ms, 25 * MIN);
+    assert_eq!(level_and_remaining(&h), (0, 25 * MIN));
     assert_eq!(h.view().clock.duration_ms, 30 * MIN);
-    // Shortening below the elapsed time ends the level now.
+    // Shortening it below the elapsed time ends it now.
     levels[0] = play(25, 50, 2);
     h.ok(Command::UpdateStructure {
         levels: levels.clone(),
     });
-    assert_eq!(h.view().clock.remaining_ms, 0);
+    assert_eq!(level_and_remaining(&h), (1, 20 * MIN));
     assert_eq!(
         h.err(Command::UpdateStructure {
             levels: levels.clone()
         }),
         DomainError::NoChange
     );
-    // Levels already played are frozen.
-    let mut state = h.agg.state().clone();
-    state.clock = Clock::Running {
-        level: 1,
-        ends_at_ms: h.now + 10 * MIN,
-    };
+    // Levels already played are frozen and the current one cannot be removed.
     let mut edited = levels.clone();
     edited[0] = play(25, 50, 25);
-    let ctx = Ctx::new(h.now, 1);
     assert_eq!(
-        decide(&state, &Command::UpdateStructure { levels: edited }, &ctx),
-        Err(DomainError::PastLevelModified { index: 0 })
+        h.err(Command::UpdateStructure { levels: edited }),
+        DomainError::PastLevelModified { index: 0 }
     );
     assert_eq!(
-        decide(
-            &state,
-            &Command::UpdateStructure {
-                levels: levels[..1].to_vec()
+        h.err(Command::UpdateStructure {
+            levels: levels[..1].to_vec()
+        }),
+        DomainError::CurrentLevelRemoved { index: 1 }
+    );
+    // Future levels are free.
+    levels[3] = play(80, 160, 20);
+    h.ok(Command::UpdateStructure {
+        levels: levels.clone(),
+    });
+    // In overtime, appended levels start now.
+    h.advance(3 * 60 * MIN);
+    assert!(h.view().warnings.contains(&Warning::StructureExhausted));
+    levels.push(play(150, 300, 20));
+    h.ok(Command::UpdateStructure { levels });
+    let clock = h.view().clock;
+    assert_eq!(
+        (clock.level_index, clock.remaining_ms, clock.overtime_ms),
+        (5, 20 * MIN, 0)
+    );
+}
+
+#[test]
+fn undo_across_auto_boundary() {
+    let mut h = Harness::standard(9, 1);
+    h.register_many(2);
+    h.start();
+    h.advance(25 * MIN);
+    // Level 1 started on its own five minutes ago, without writing anything.
+    assert_eq!(h.agg.events().len(), 4);
+    assert_eq!(level_and_remaining(&h), (1, 15 * MIN));
+    h.ok(Command::PauseClock {});
+    assert_eq!(
+        h.agg.state().clock,
+        Clock::Paused {
+            level: 1,
+            remaining_ms: 15 * MIN
+        }
+    );
+    h.advance(5 * MIN);
+    // Undoing the pause restores the running clock, not the level it started on.
+    h.ok(Command::Undo {});
+    assert!(h.view().clock.running);
+    assert_eq!(level_and_remaining(&h), (1, 10 * MIN));
+    // A mistaken "next level" is undone the same way.
+    h.ok(Command::NextLevel {});
+    assert_eq!(level_and_remaining(&h), (2, 10 * MIN));
+    h.advance(MIN);
+    h.ok(Command::Undo {});
+    assert_eq!(level_and_remaining(&h), (1, 9 * MIN));
+}
+
+#[test]
+fn late_reg_level_is_1_based_play_level() {
+    let with = |through_break| {
+        let config = Config {
+            late_reg: Deadline::EndOfPlayLevel {
+                n: 2,
+                through_break,
             },
-            &ctx
-        ),
-        Err(DomainError::CurrentLevelRemoved { index: 1 })
+            ..config(9, 2)
+        };
+        let mut h = Harness::new(config, levels());
+        h.register_many(2);
+        h.start();
+        h
+    };
+    // Levels: play 1, play 2, break, play 3, play 4 (20' each, break 10').
+    let mut h = with(false);
+    h.advance(39 * MIN);
+    assert_eq!(h.view().clock.play_level, Some(2));
+    assert!(h.view().registration.open);
+    h.register("Late");
+    h.advance(MIN);
+    assert!(h.view().clock.is_break);
+    assert!(!h.view().registration.open);
+    assert_eq!(
+        h.err(Command::Register {
+            name: "Too late".into(),
+            seat: Some(SeatRef::new(2, 1)),
+        }),
+        DomainError::LateRegClosed
     );
+    // Through the break: open until play level 3 starts.
+    let mut h = with(true);
+    h.advance(49 * MIN);
+    assert!(h.view().registration.open);
+    h.advance(MIN);
+    assert_eq!(h.view().clock.play_level, Some(3));
+    assert!(!h.view().registration.open);
+    // n counts play levels only: there are 4.
+    let mut config = h.agg.state().config.clone();
+    config.late_reg = Deadline::EndOfPlayLevel {
+        n: 5,
+        through_break: false,
+    };
+    assert_eq!(
+        h.err(Command::UpdateConfig { config }),
+        DomainError::InvalidLateRegLevel { n: 5, max: 4 }
+    );
+}
+
+#[test]
+fn clock_never_writes_on_tick() {
+    let mut h = Harness::standard(9, 1);
+    h.register_many(2);
+    h.start();
+    let before = h.agg.clone();
+    let mut previous = 0;
+    for minute in 0..=200 {
+        let at = h.now + minute * MIN;
+        let view = h.agg.view(at);
+        assert!(view.clock.level_index >= previous);
+        previous = view.clock.level_index;
+        assert_eq!(view, h.agg.view(at), "the view is a pure function of time");
+    }
+    assert_eq!(previous, 4);
+    assert_eq!(h.agg, before, "reading the clock changed the aggregate");
+}
+
+#[test]
+fn pause_resume_keeps_remaining() {
+    let mut h = Harness::standard(9, 1);
+    h.register_many(2);
+    h.start();
+    h.advance(7 * MIN + 13_000);
+    h.ok(Command::PauseClock {});
+    let remaining = 20 * MIN - 7 * MIN - 13_000;
+    assert_eq!(level_and_remaining(&h), (0, remaining));
+    h.advance(60 * MIN);
+    assert_eq!(level_and_remaining(&h), (0, remaining));
+    h.ok(Command::StartClock {});
+    assert_eq!(level_and_remaining(&h), (0, remaining));
+    assert_eq!(h.view().clock.ends_at_ms, Some(h.now + remaining));
+    // Pausing after an automatic level change keeps the new level's time.
+    h.advance(remaining + 3 * MIN);
+    h.ok(Command::PauseClock {});
+    assert_eq!(level_and_remaining(&h), (1, 17 * MIN));
+}
+
+#[test]
+fn adjust_below_zero_advances() {
+    let mut h = Harness::standard(9, 1);
+    h.register_many(2);
+    h.start();
+    h.advance(8 * MIN);
+    h.ok(Command::AdjustTime {
+        delta_ms: -15 * MIN,
+    });
+    assert_eq!(level_and_remaining(&h), (1, 20 * MIN));
+    // Paused at zero, the level changes as soon as the clock starts.
+    h.ok(Command::PauseClock {});
+    h.ok(Command::SetRemaining { ms: 0 });
+    assert_eq!(level_and_remaining(&h), (1, 0));
+    h.ok(Command::StartClock {});
+    assert_eq!(level_and_remaining(&h), (2, 10 * MIN));
 }

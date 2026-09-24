@@ -154,6 +154,19 @@ pub enum DomainError {
     // Clock.
     ClockAlreadyRunning,
     ClockAlreadyPaused,
+    NoNextLevel,
+    NoPrevLevel,
+    NoNextBreak,
+    LevelOutOfRange {
+        level: u16,
+        max: u16,
+    },
+    InvalidTimeAdjustment {
+        max_ms: i64,
+    },
+    InvalidRemaining {
+        max_ms: i64,
+    },
 
     // History.
     NothingToUndo,

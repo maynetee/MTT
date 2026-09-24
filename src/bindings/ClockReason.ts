@@ -3,4 +3,4 @@
 /**
  * Why the clock changed.
  */
-export type ClockReason = "start" | "pause";
+export type ClockReason = "start" | "pause" | "next_level" | "prev_level" | "jump_to" | "next_break" | "adjust" | "set_remaining";

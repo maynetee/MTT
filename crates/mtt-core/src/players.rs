@@ -65,7 +65,7 @@ pub(crate) fn decide_bust(
             .find(|p| p.is_alive() && !seen.contains(&p.id))
             .map(|p| Finish {
                 winner: p.id,
-                clock: clock::paused_at(&state.clock, now_ms),
+                clock: clock::paused_at(&state.clock, &state.structure, now_ms),
             })
     } else {
         None
@@ -108,7 +108,7 @@ pub(crate) fn decide_finish(state: &State, now_ms: i64) -> Result<Event, DomainE
     Ok(Event::TournamentFinished {
         finish: Finish {
             winner,
-            clock: clock::paused_at(&state.clock, now_ms),
+            clock: clock::paused_at(&state.clock, &state.structure, now_ms),
         },
     })
 }

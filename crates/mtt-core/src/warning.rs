@@ -13,4 +13,8 @@ pub enum Warning {
     BlindsDecrease { index: u16 },
     /// One player is left but registration is still open: close it to finish.
     FinishPending,
+    /// The last level is over; blinds stay there until the director adds levels.
+    StructureExhausted,
+    /// Only `levels_left` levels remain after the current one.
+    StructureEnding { levels_left: u16 },
 }

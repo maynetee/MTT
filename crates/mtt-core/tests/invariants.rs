@@ -3,7 +3,10 @@
 mod common;
 
 use common::*;
-use mtt_core::{Aggregate, BustInput, Chips, Command, Config, Deadline, Level, PlayerId, SeatRef};
+use mtt_core::clock::{Clock, effective, schedule};
+use mtt_core::{
+    Aggregate, BustInput, Chips, Command, Config, Deadline, Level, PlayerId, SeatRef, State,
+};
 use proptest::prelude::*;
 
 const SEATS: u8 = 4;
@@ -66,6 +69,12 @@ fn command() -> impl Strategy<Value = Command> {
         1 => Just(Command::FinishTournament {}),
         2 => Just(Command::StartClock {}),
         1 => Just(Command::PauseClock {}),
+        1 => Just(Command::NextLevel {}),
+        1 => Just(Command::PrevLevel {}),
+        1 => (0u16..8).prop_map(|level| Command::JumpTo { level }),
+        1 => Just(Command::JumpToNextBreak {}),
+        1 => (-30 * MIN..=30 * MIN).prop_map(|delta_ms| Command::AdjustTime { delta_ms }),
+        1 => (-MIN..=30 * MIN).prop_map(|ms| Command::SetRemaining { ms }),
         3 => Just(Command::Undo {}),
         1 => Just(Command::Redo {}),
         1 => (1u16..=5, 2u16..=TABLES + 1, 3u8..=SEATS + 1).prop_map(|(paid, tables, seats)| {
@@ -84,17 +93,42 @@ fn op() -> impl Strategy<Value = Op> {
     ]
 }
 
-fn harness() -> Harness {
-    let config = Config {
-        places_paid: 2,
-        late_reg: Deadline::Manual,
-        ..Config::new("Prop", SEATS, TABLES, 10_000)
-    };
-    Harness::new(config, levels())
+fn deadline() -> impl Strategy<Value = Deadline> {
+    prop_oneof![
+        Just(Deadline::Manual),
+        (1u16..=4, any::<bool>())
+            .prop_map(|(n, through_break)| Deadline::EndOfPlayLevel { n, through_break }),
+        (1i64..=90).prop_map(|minutes| Deadline::Elapsed { ms: minutes * MIN }),
+    ]
 }
 
-fn run_ops(players: u32, start: bool, ops: Vec<Op>) {
-    let mut h = harness();
+/// The clock only moves forward with time and its schedule is strictly increasing.
+fn check_clock(state: &State, now: i64) {
+    let levels = &state.structure;
+    let mut previous = effective(&state.clock, levels, now);
+    for step in [1, MIN, 7 * MIN, 45 * MIN, 400 * MIN] {
+        let next = effective(&state.clock, levels, now + step);
+        assert!(next.level >= previous.level, "clock went back in time");
+        previous = next;
+    }
+    let starts: Vec<i64> = schedule(&state.clock, levels, now)
+        .boundaries
+        .iter()
+        .map(|b| b.starts_in_ms)
+        .collect();
+    assert!(
+        starts.windows(2).all(|w| w[0] < w[1]),
+        "schedule not increasing: {starts:?}"
+    );
+}
+
+fn run_ops(late_reg: Deadline, players: u32, start: bool, ops: Vec<Op>) {
+    let config = Config {
+        places_paid: 2,
+        late_reg,
+        ..Config::new("Prop", SEATS, TABLES, 10_000)
+    };
+    let mut h = Harness::new(config, levels());
     for i in 0..players {
         h.register(&format!("S{i}"));
     }
@@ -131,6 +165,7 @@ fn run_ops(players: u32, start: bool, ops: Vec<Op>) {
             }
         }
         check_invariants(h.agg.state(), &h.view());
+        check_clock(h.agg.state(), h.now);
     }
     let json = h.agg.to_json().expect("serializable log");
     let reloaded = Aggregate::from_json(&json).expect("replayable log");
@@ -142,10 +177,37 @@ proptest! {
 
     #[test]
     fn random_sequences_keep_invariants(
+        late_reg in deadline(),
         players in 2u32..=12,
         start in any::<bool>(),
         ops in prop::collection::vec(op(), 1..80),
     ) {
-        run_ops(players, start, ops);
+        run_ops(late_reg, players, start, ops);
+    }
+
+    #[test]
+    fn pause_then_resume_keeps_the_remaining_time(
+        levels in structure(),
+        level in 0u16..8,
+        ends_in in 1i64..=30 * MIN,
+        pause_after in 0i64..=200 * MIN,
+        resume_after in 0i64..=200 * MIN,
+    ) {
+        let now = T0;
+        let level = level.min(levels.len() as u16 - 1);
+        let running = Clock::Running { level, ends_at_ms: now + ends_in };
+        let paused_at = now + pause_after;
+        let before = effective(&running, &levels, paused_at);
+        let paused = Clock::Paused { level: before.level as u16, remaining_ms: before.remaining_ms };
+        let resumed_at = paused_at + resume_after;
+        let resumed = Clock::Running {
+            level: before.level as u16,
+            ends_at_ms: resumed_at + before.remaining_ms,
+        };
+        let after = effective(&resumed, &levels, resumed_at);
+        prop_assert_eq!(effective(&paused, &levels, resumed_at).remaining_ms, before.remaining_ms);
+        if before.remaining_ms > 0 {
+            prop_assert_eq!((after.level, after.remaining_ms), (before.level, before.remaining_ms));
+        }
     }
 }

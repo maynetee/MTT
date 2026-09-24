@@ -91,8 +91,7 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
   - forced seat: the table must exist and not be `Closed`; an idle table gets opened; the
     seat must exist and be empty. Same late-registration check as any registration.
 - Registration is always open in setup; once running, the director's override
-  (`CloseRegistration` / `ReopenRegistration`) wins. Deadline windows arrive with the clock
-  timeline (currently every deadline behaves as manual).
+  (`CloseRegistration` / `ReopenRegistration`) wins, else the deadline decides (see Clock).
 - `Unregister` only in setup. `MovePlayer { player, to, reason? }` to any empty seat of a
   non-closed table.
 
@@ -113,17 +112,57 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
   re-entries will slot in. Invariant: busted places cover exactly `[alive + 1, N]`. Places
   are provisional while registration is open.
 
-## Clock (partial)
+## Clock
 
-`Clock::Paused { level, remaining_ms } | Running { level, ends_at_ms }`. `StartClock` and
-`PauseClock` only; the first start needs 2 players and moves setup to running. Level
-advance by time is not modelled yet.
+`Clock::Paused { level, remaining_ms } | Running { level, ends_at_ms }`: a running clock
+stores when its level ends; later levels follow back to back. Nothing is written as time
+passes, so there are no tick events and undo is never stuck behind an automatic level
+change.
+
+- `effective(clock, levels, now)`: paused -> `(level, remaining)`. Running: walk forward
+  while `now >= end` and a next level exists (`end += duration`); on the last level the
+  clock stays at 0 remaining and counts `overtime = now - end`. Pure and bounded by the
+  number of levels.
+- `normalize` re-expresses a running clock from its effective level; `schedule` lists the
+  upcoming level starts (`starts_in_ms`, plus `starts_at_ms` while running) and when the
+  structure ends; `elapsed_ms` is structure time elapsed (pauses excluded, adjustments and
+  overtime included).
+- Commands read the effective clock at `ctx.now` and record the absolute result:
+  - `StartClock`: `Paused { l, r }` -> `Running { l, now + r }`; the first start needs 2
+    players and moves setup to running (`NOT_ENOUGH_PLAYERS`).
+  - `PauseClock`: -> `Paused { j, remaining }`.
+  - `NextLevel`, `PrevLevel`, `JumpTo { level }`, `JumpToNextBreak`: target level with its
+    full duration, keeping the mode (`NO_NEXT_LEVEL`, `NO_PREV_LEVEL`,
+    `LEVEL_OUT_OF_RANGE`, `NO_NEXT_BREAK`).
+  - `AdjustTime { delta_ms }` (`0 < |delta| <= 24h`): running `end' = clamp(end + delta,
+    now, now + 24h)`, so going below zero starts the next level now; paused
+    `r' = clamp(r + delta, 0, 24h)`; no effect is `NO_CHANGE`.
+  - `SetRemaining { ms }` (`0..=24h`): same, absolute.
+- End of structure: the last level stays with 0 remaining and `overtime_ms` counting; blinds
+  never change without the director. Warnings `STRUCTURE_ENDING { levels_left }` (<= 2
+  levels after the current one) and `STRUCTURE_EXHAUSTED`. Appending levels in overtime
+  starts the first new level now.
+- Undo of a clock event restores the previous absolute clock: undoing a pause taken 5
+  minutes ago resumes as if it never happened (the UI should say so). Redo re-applies the
+  stored state.
+- The finish (last bust or `CloseRegistration` with one player left) pauses the clock.
+
+Late registration deadlines, evaluated at `now` when running without override:
+
+- `EndOfPlayLevel { n, through_break }`: `c` = index of the n-th play level + 1, plus one if
+  `through_break` and level `c` is a break. Open while the clock time before level `c`
+  starts is positive (with `c` past the end: until the structure ends).
+- `Elapsed { ms }`: open while `elapsed_ms < ms`.
+- `Manual`: open until `CloseRegistration`.
 
 ## View
 
 `view(state, now_ms)`: phase, winner, history (head, undo/redo labels with event kind and
-player names), config, levels with play numbers, clock (level, blinds, remaining, ends at),
-registration (open, override, deadline), counts (unique, entries, alive, busted), chips
+player names), config, levels with play numbers, clock (level index, play level, break,
+running, blinds and ante, duration, remaining, `ends_at_ms`, overtime, next level, next
+break, schedule, structure end, `recompute_at_ms` = next level change or registration
+close while running: the UI counts down locally and refetches then), registration (open,
+override, deadline, `closes_in_ms`, `closes_at_ms`), counts (unique, entries, alive, busted), chips
 (starting stack, in play = sum of stacks bought, average, average in big blinds x100 using
 the next play level during a break), places paid (capped by N), ITM status
 (`not_yet { to_money }` / `bubble` when alive == paid + 1 / `in_money`), ranking rows (alive
@@ -141,7 +180,9 @@ no `getrandom`. The host passes a fresh seed per command; outcomes are stored in
 - Property tests (`tests/invariants.rs`): random sequences of valid and invalid commands keep
   seating consistent (nobody in two seats, only open tables occupied, capacity respected),
   counts and places consistent, rejected commands leave the aggregate unchanged,
-  undo/redo are inverses, and the JSON log replays to the same aggregate.
+  undo/redo are inverses, the JSON log replays to the same aggregate, the effective level
+  never decreases with time, schedules are strictly increasing and pause/resume keeps the
+  remaining time.
 - JSON scenarios (`tests/scenarios/*.json`) with partial view matching:
   `{ name, seed, tournament, steps: [{ at_ms, cmd, expect?, view? }], checks: [{ now_ms, view }] }`.
 

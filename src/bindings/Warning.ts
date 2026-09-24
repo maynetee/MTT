@@ -3,4 +3,4 @@
 /**
  * Something the tournament director should look at; never blocks a command.
  */
-export type Warning = { "code": "ANTE_ABOVE_BIG_BLIND", "params": { index: number, } } | { "code": "BLINDS_DECREASE", "params": { index: number, } } | { "code": "FINISH_PENDING" };
+export type Warning = { "code": "ANTE_ABOVE_BIG_BLIND", "params": { index: number, } } | { "code": "BLINDS_DECREASE", "params": { index: number, } } | { "code": "FINISH_PENDING" } | { "code": "STRUCTURE_EXHAUSTED" } | { "code": "STRUCTURE_ENDING", "params": { levels_left: number, } };

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::clock;
+use crate::clock::{self, Boundary};
 use crate::config::{Config, Deadline};
 use crate::ids::{PlayerId, SeatNo, SeatRef, Seq, TableNo, TournamentId};
 use crate::money::Chips;
@@ -56,7 +56,8 @@ pub struct LevelRow {
     pub level: Level,
 }
 
-/// Clock at the time of the view.
+/// Clock at the time of the view. While running, the UI counts down to `ends_at_ms` on
+/// its own and asks for a fresh view at `recompute_at_ms`; nothing is written per tick.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct ClockView {
@@ -71,6 +72,17 @@ pub struct ClockView {
     pub remaining_ms: i64,
     /// Wall-clock end of the current level while running.
     pub ends_at_ms: Option<i64>,
+    /// Time spent past the end of the last level.
+    pub overtime_ms: i64,
+    pub next: Option<LevelRow>,
+    /// Clock time until the next break starts.
+    pub next_break_in_ms: Option<i64>,
+    /// Upcoming level starts.
+    pub schedule: Vec<Boundary>,
+    /// Clock time until the last level ends.
+    pub structure_ends_in_ms: i64,
+    /// When this view goes stale while running (level change or registration close).
+    pub recompute_at_ms: Option<i64>,
 }
 
 /// Registration status.
@@ -81,6 +93,10 @@ pub struct RegistrationView {
     /// Director override (`CloseRegistration` / `ReopenRegistration`), if any.
     pub override_open: Option<bool>,
     pub deadline: Deadline,
+    /// Clock time until the deadline closes registration.
+    pub closes_in_ms: Option<i64>,
+    /// Wall-clock close while the clock runs.
+    pub closes_at_ms: Option<i64>,
 }
 
 /// Player counts.
@@ -185,7 +201,11 @@ pub fn view(state: &State, now_ms: i64) -> View {
     let registration_open = registration::is_open(state, now_ms);
     let counts = counts(state);
     let places_paid = u32::from(state.config.places_paid).min(counts.unique);
-    let clock = clock_view(state, now_ms);
+    let mut clock = clock_view(state, now_ms);
+    let registration = registration_view(state, now_ms, registration_open, clock.running);
+    if let Some(close) = registration.closes_at_ms {
+        clock.recompute_at_ms = Some(clock.recompute_at_ms.map_or(close, |at| at.min(close)));
+    }
     View {
         generated_at_ms: now_ms,
         id: state.id.clone(),
@@ -200,51 +220,78 @@ pub fn view(state: &State, now_ms: i64) -> View {
         },
         history: History::default(),
         config: state.config.clone(),
-        levels: state
-            .structure
-            .iter()
-            .enumerate()
-            .map(|(i, level)| LevelRow {
-                index: i as u16,
-                play_level: structure::play_number(&state.structure, i),
-                level: level.clone(),
-            })
+        levels: (0..state.structure.len())
+            .filter_map(|i| level_row(&state.structure, i))
             .collect(),
         chips: chips(state, &counts, usize::from(clock.level_index)),
+        warnings: warnings(state, registration_open, &clock),
         clock,
-        registration: RegistrationView {
-            open: registration_open,
-            override_open: state.reg_override,
-            deadline: state.config.late_reg,
-        },
+        registration,
         places_paid,
         itm: itm(state.phase, counts.alive, places_paid),
         ranking: ranking_rows(state, registration_open, places_paid),
         tables: tables(state),
-        warnings: warnings(state, registration_open),
         counts,
     }
 }
 
+fn level_row(levels: &[Level], index: usize) -> Option<LevelRow> {
+    levels.get(index).map(|level| LevelRow {
+        index: index as u16,
+        play_level: structure::play_number(levels, index),
+        level: level.clone(),
+    })
+}
+
 fn clock_view(state: &State, now_ms: i64) -> ClockView {
-    let (index, remaining_ms) = clock::position(&state.clock, now_ms);
-    let level = state.structure.get(index);
+    let levels = &state.structure;
+    let eff = clock::effective(&state.clock, levels, now_ms);
+    let index = eff.level;
+    let level = levels.get(index);
     let (sb, bb, ante) = match level {
         Some(Level::Play { sb, bb, ante, .. }) => (Some(*sb), Some(*bb), *ante),
         _ => (None, None, Ante::None),
     };
-    let running = state.clock.is_running();
+    let schedule = clock::schedule(&state.clock, levels, now_ms);
+    let next_break_in_ms = schedule
+        .boundaries
+        .iter()
+        .find(|b| levels[usize::from(b.level_index)].is_break())
+        .map(|b| b.starts_in_ms);
+    let exhausted = eff.exhausted(levels);
     ClockView {
         level_index: index as u16,
-        play_level: structure::play_number(&state.structure, index),
+        play_level: structure::play_number(levels, index),
         is_break: level.is_some_and(Level::is_break),
-        running,
+        running: eff.running,
         sb,
         bb,
         ante,
-        duration_ms: structure::duration_at(&state.structure, index),
-        remaining_ms,
-        ends_at_ms: running.then(|| now_ms.saturating_add(remaining_ms)),
+        duration_ms: structure::duration_at(levels, index),
+        remaining_ms: eff.remaining_ms,
+        ends_at_ms: eff.ends_at_ms,
+        overtime_ms: eff.overtime_ms,
+        next: level_row(levels, index + 1),
+        next_break_in_ms,
+        structure_ends_in_ms: schedule.ends_in_ms,
+        schedule: schedule.boundaries,
+        recompute_at_ms: eff.ends_at_ms.filter(|_| !exhausted),
+    }
+}
+
+fn registration_view(state: &State, now_ms: i64, open: bool, running: bool) -> RegistrationView {
+    let closes_in_ms = match (state.phase, state.reg_override) {
+        (Phase::Finished { .. }, _) | (_, Some(_)) => None,
+        _ => registration::deadline_in_ms(state, now_ms).filter(|&left| left > 0 && open),
+    };
+    RegistrationView {
+        open,
+        override_open: state.reg_override,
+        deadline: state.config.late_reg,
+        closes_in_ms,
+        closes_at_ms: closes_in_ms
+            .filter(|_| running && state.phase == Phase::Running)
+            .map(|left| now_ms.saturating_add(left)),
     }
 }
 
@@ -350,10 +397,24 @@ fn tables(state: &State) -> Vec<TableView> {
         .collect()
 }
 
-fn warnings(state: &State, registration_open: bool) -> Vec<Warning> {
+/// Levels after the current one below which `STRUCTURE_ENDING` is raised.
+const ENDING_LEVELS: usize = 2;
+
+fn warnings(state: &State, registration_open: bool, clock: &ClockView) -> Vec<Warning> {
     let mut out = structure::validate(&state.structure).unwrap_or_default();
-    if state.phase == Phase::Running && registration_open && state.alive_count() == 1 {
+    if state.phase != Phase::Running {
+        return out;
+    }
+    if registration_open && state.alive_count() == 1 {
         out.push(Warning::FinishPending);
+    }
+    let levels_left = state.structure.len() - 1 - usize::from(clock.level_index);
+    if levels_left == 0 && clock.remaining_ms == 0 {
+        out.push(Warning::StructureExhausted);
+    } else if levels_left <= ENDING_LEVELS {
+        out.push(Warning::StructureEnding {
+            levels_left: levels_left as u16,
+        });
     }
     out
 }

@@ -1,21 +1,49 @@
 //! Registration: late registration window, name rules and immediate seating.
 
 use crate::clock;
+use crate::config::Deadline;
 use crate::error::DomainError;
 use crate::event::{Event, Finish};
 use crate::ids::{PlayerId, SeatRef, TableNo};
 use crate::name::{self, MAX_NAME_CHARS};
 use crate::rng::Rng;
 use crate::state::{Phase, State, TableStatus};
+use crate::structure::{self, Level};
 
-/// True when new players may register at `now_ms`.
-pub fn is_open(state: &State, _now_ms: i64) -> bool {
+/// Clock time left before the deadline closes registration (`<= 0`: closed), or `None`
+/// for a manual deadline. Ignores the phase and the director's override.
+pub fn deadline_in_ms(state: &State, now_ms: i64) -> Option<i64> {
+    let levels = &state.structure;
+    match state.config.late_reg {
+        Deadline::Manual => None,
+        Deadline::Elapsed { ms } => Some(ms - clock::elapsed_ms(&state.clock, levels, now_ms)),
+        Deadline::EndOfPlayLevel { n, through_break } => {
+            let mut close = structure::play_level_index(levels, n)? + 1;
+            if through_break && levels.get(close).is_some_and(Level::is_break) {
+                close += 1;
+            }
+            let eff = clock::effective(&state.clock, levels, now_ms);
+            if eff.level >= close {
+                return Some(0);
+            }
+            let between: i64 = levels[eff.level + 1..close]
+                .iter()
+                .map(Level::duration_ms)
+                .sum();
+            Some(eff.remaining_ms + between)
+        }
+    }
+}
+
+/// True when new players may register at `now_ms`: always during setup, then the
+/// director's override if any, else the configured deadline.
+pub fn is_open(state: &State, now_ms: i64) -> bool {
     match state.phase {
         Phase::Setup => true,
         Phase::Finished { .. } => false,
-        // Deadline windows need the clock timeline; until then only the director
-        // closes registration.
-        Phase::Running => state.reg_override.unwrap_or(true),
+        Phase::Running => state
+            .reg_override
+            .unwrap_or_else(|| deadline_in_ms(state, now_ms).is_none_or(|left| left > 0)),
     }
 }
 
@@ -155,7 +183,7 @@ pub(crate) fn decide_close(state: &State, now_ms: i64) -> Result<Event, DomainEr
     }
     let finish = state.sole_survivor().map(|winner| Finish {
         winner,
-        clock: clock::paused_at(&state.clock, now_ms),
+        clock: clock::paused_at(&state.clock, &state.structure, now_ms),
     });
     Ok(Event::RegistrationOverridden {
         open: false,
@@ -310,5 +338,85 @@ mod tests {
             kit.err(Command::ReopenRegistration {}),
             DomainError::RegistrationAlreadyOpen
         );
+    }
+
+    const MIN: i64 = 60_000;
+
+    /// Structure `[P1 20', P2 20', break 10', P3 20']`, started at `T0`.
+    fn started_with(late_reg: Deadline) -> Kit {
+        let mut kit = Kit::with_config(Config {
+            late_reg,
+            ..Config::new("Unit", 9, 2, 1000)
+        });
+        kit.register("A");
+        kit.register("B");
+        kit.ok(Command::StartClock {});
+        kit
+    }
+
+    fn open_after(kit: &mut Kit, minutes: i64) -> bool {
+        kit.now = crate::testkit::T0 + minutes * MIN;
+        is_open(kit.agg.state(), kit.now)
+    }
+
+    #[test]
+    fn end_of_play_level_closes_when_the_next_level_starts() {
+        let mut kit = started_with(Deadline::EndOfPlayLevel {
+            n: 2,
+            through_break: false,
+        });
+        assert!(open_after(&mut kit, 39));
+        let view = kit.agg.view(kit.now);
+        assert_eq!(view.registration.closes_in_ms, Some(MIN));
+        assert_eq!(view.registration.closes_at_ms, Some(kit.now + MIN));
+        assert!(!open_after(&mut kit, 40));
+        let mut kit = started_with(Deadline::EndOfPlayLevel {
+            n: 2,
+            through_break: true,
+        });
+        assert!(open_after(&mut kit, 49));
+        assert!(!open_after(&mut kit, 50));
+    }
+
+    #[test]
+    fn last_play_level_closes_at_the_end_of_the_structure() {
+        let mut kit = started_with(Deadline::EndOfPlayLevel {
+            n: 3,
+            through_break: true,
+        });
+        assert!(open_after(&mut kit, 69));
+        assert!(!open_after(&mut kit, 70));
+        assert!(!open_after(&mut kit, 500));
+    }
+
+    #[test]
+    fn elapsed_deadline_ignores_pauses() {
+        let mut kit = started_with(Deadline::Elapsed { ms: 30 * MIN });
+        kit.now += 10 * MIN;
+        kit.ok(Command::PauseClock {});
+        kit.now += 60 * MIN;
+        let view = kit.agg.view(kit.now);
+        assert!(view.registration.open);
+        assert_eq!(view.registration.closes_in_ms, Some(20 * MIN));
+        assert_eq!(view.registration.closes_at_ms, None);
+        kit.ok(Command::StartClock {});
+        kit.now += 20 * MIN - 1;
+        assert!(is_open(kit.agg.state(), kit.now));
+        kit.now += 1;
+        assert!(!is_open(kit.agg.state(), kit.now));
+    }
+
+    #[test]
+    fn override_beats_the_deadline() {
+        let mut kit = started_with(Deadline::EndOfPlayLevel {
+            n: 1,
+            through_break: false,
+        });
+        assert!(!open_after(&mut kit, 25));
+        kit.ok(Command::ReopenRegistration {});
+        assert!(is_open(kit.agg.state(), kit.now));
+        assert_eq!(kit.agg.view(kit.now).registration.closes_in_ms, None);
+        kit.ok(Command::CloseRegistration {});
+        assert!(!is_open(kit.agg.state(), kit.now));
     }
 }
