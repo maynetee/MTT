@@ -1,4 +1,4 @@
-import { createTournament, expect, test } from "./support";
+import { createTournament, expect, expectApart, test } from "./support";
 
 test("creates a tournament from the setup screen", async ({ page }) => {
   await page.goto("/");
@@ -44,4 +44,18 @@ test("typing in the structure editor keeps the focus and every character", async
   await seats.pressSequentially("8x", { delay: 20 });
   await expect(seats).toHaveValue("8");
   await expect(page.getByText("64 seats")).toBeVisible();
+});
+
+test("an error at creation leaves the Create button clear", async ({ page }) => {
+  await page.goto("/#/new");
+  await page.getByRole("textbox", { name: "Name", exact: true }).fill("");
+  const create = page.getByRole("button", { name: "Create tournament" });
+  await create.click();
+  const error = page.getByRole("region", { name: "Notifications" }).getByRole("alert");
+  await expect(error).toContainText("The tournament name must be");
+  await expectApart(error, create);
+
+  await page.getByRole("textbox", { name: "Name", exact: true }).fill("Second Try Series");
+  await create.click({ timeout: 2_000 });
+  await expect(page).toHaveURL(/#\/t\/[^/]+\/registration$/);
 });

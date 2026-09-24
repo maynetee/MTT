@@ -999,6 +999,15 @@ h1.section-title {
   pointer-events: none;
 }
 
+/*
+ * A page with an action bar (Save changes, Create tournament) keeps it clear: the toasts stack
+ * above it, where it sticks at the bottom of the window. The bar is one line at most as tall as
+ * a large button with the bar's padding and border.
+ */
+:root:has(.action-bar) .toast-region {
+  bottom: calc(var(--space-4) + var(--control-lg) + 22px + var(--space-3));
+}
+
 .toast-list {
   display: flex;
   flex-direction: column;

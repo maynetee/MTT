@@ -153,6 +153,15 @@ export function errorToast(page: Page): Locator {
   return page.getByRole("region", { name: "Notifications" }).getByRole("alert");
 }
 
+/** Asserts that two elements on screen do not overlap (a notification over a button). */
+export async function expectApart(a: Locator, b: Locator): Promise<void> {
+  const [first, second] = [await a.boundingBox(), await b.boundingBox()];
+  if (!first || !second) throw new Error("both elements must be visible");
+  const apart =
+    first.x + first.width <= second.x || second.x + second.width <= first.x || first.y + first.height <= second.y || second.y + second.height <= first.y;
+  expect(apart, `${JSON.stringify(first)} overlaps ${JSON.stringify(second)}`).toBe(true);
+}
+
 /** The value of a statistic (`<dt>` label, `<dd>` value) inside `scope`. */
 export function stat(scope: Locator | Page, label: string): Locator {
   return scope.locator("dt", { hasText: new RegExp(`^${label}$`) }).locator("xpath=following-sibling::dd[1]");
