@@ -74,7 +74,7 @@ export default function ExportsScreen() {
         <tbody>
           {view.ranking.map((row) => (
             <tr key={row.player}>
-              <td className="num place">{formatPlace(row)}</td>
+              <td className="num place">{formatPlace(i18n, row)}</td>
               <th scope="row" className="strong">
                 {row.name}
               </th>

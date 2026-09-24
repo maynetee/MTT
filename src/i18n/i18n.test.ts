@@ -44,15 +44,19 @@ describe("error messages", () => {
     expect(domainErrors.get("SEAT_OCCUPIED")).toEqual(["table", "seat"]);
   });
 
-  it.each([...domainErrors.keys(), "HOST_ERROR", "NOT_FOUND"])("has an English message for %s", (code) => {
+  /** Errors of the hosts, with their parameters. */
+  const host = new Map([
+    ["HOST_ERROR", ["message"]],
+    ["NOT_FOUND", ["id"]],
+    ["SAVE_FAILED", ["message"]],
+    ["IMPORT_UNAVAILABLE", []]
+  ]);
+
+  it.each([...domainErrors.keys(), ...host.keys()])("has an English message for %s", (code) => {
     expect(en.errors).toHaveProperty(code);
   });
 
   it("only uses parameters the error carries", () => {
-    const host = new Map([
-      ["HOST_ERROR", ["message"]],
-      ["NOT_FOUND", ["id"]]
-    ]);
     for (const [code, message] of Object.entries(en.errors)) {
       const params = domainErrors.get(code) ?? host.get(code);
       expect(params, `${code} is not an error code`).toBeDefined();
@@ -95,6 +99,8 @@ describe("error messages", () => {
     );
     expect(i18n.error({ code: "NOTHING_TO_UNDO" })).toBe("Nothing to undo.");
     expect(i18n.error({ code: "HOST_ERROR", params: { message: "disk full" } })).toBe("Something went wrong: disk full");
+    expect(i18n.error({ code: "SAVE_FAILED", params: { message: "quota exceeded" } })).toBe("Could not save the tournament: quota exceeded");
+    expect(i18n.error({ code: "IMPORT_UNAVAILABLE" })).toBe("Importing from the previous version is only available in the desktop app.");
     expect(i18n.error({ code: "FROM_THE_FUTURE" } as never)).toBe("Something went wrong: FROM_THE_FUTURE");
   });
 
@@ -149,6 +155,7 @@ describe("formatting", () => {
     expect(i18n.number(1234567)).toBe("1,234,567");
     expect(i18n.bigBlinds(6250)).toBe("62.5");
     expect(i18n.bigBlinds(4000)).toBe("40");
+    expect(i18n.percent(0.8)).toBe("80%");
     expect(i18n.durationWords(90 * 60_000)).toBe("90 min");
     expect(i18n.durationWords(2 * 3_600_000)).toBe("2 hr");
     expect(i18n.timeOfDay(new Date(2026, 0, 1, 21, 5).getTime())).toMatch(/^09:05\sPM$/);

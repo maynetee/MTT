@@ -62,7 +62,7 @@ export function StructureEditor({ rows, onChange, lockedBefore = 0, currentIndex
             const locked = index < lockedBefore;
             const current = index === currentIndex;
             const name = row.isBreak ? t("structure.breakRow") : t("structure.levelN", { n: numbers[index] ?? 0 });
-            const label = (column: string) => `${name} ${column}`;
+            const label = (column: string) => t("structure.cellLabel", { row: name, column });
             const classes = [
               "level-row",
               row.isBreak ? "is-break" : "",
@@ -166,7 +166,7 @@ export function StructureEditor({ rows, onChange, lockedBefore = 0, currentIndex
                   <IconButton
                     icon="trash"
                     size="sm"
-                    label={`${t("structure.remove")} ${name}`}
+                    label={t("structure.removeRow", { row: name })}
                     hint={locked ? t("structure.removeLocked") : undefined}
                     tooltipAlign="end"
                     onClick={() => remove(index)}

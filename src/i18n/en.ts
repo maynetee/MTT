@@ -98,6 +98,8 @@ const errors = {
   INVALID_DEAL_AMOUNT: "Deal amounts cannot be negative.",
   DEAL_SUM_MISMATCH: "The deal amounts must add up to the prize money left.",
   INTERNAL: "Internal error: {reason}",
+  SAVE_FAILED: "Could not save the tournament: {message}",
+  IMPORT_UNAVAILABLE: "Importing from the previous version is only available in the desktop app.",
   HOST_ERROR: "Something went wrong: {message}",
   NOT_FOUND: "This tournament does not exist anymore."
 } as const satisfies Record<EngineErrorCode, Message>;
@@ -130,11 +132,15 @@ export const en = {
     tableSeatShort: "T{table} S{seat}",
     selectPlayer: "Select player",
     selectSeat: "Select seat",
-    none: "—"
+    none: "—",
+    /** An accessible name that says which block a field belongs to (`Rebuys: price`). */
+    labelled: "{prefix}: {label}"
   },
   app: {
     brand: "MTT",
     tagline: "Tournament Director",
+    /** The window or browser tab title. */
+    title: "MTT Tournament Director",
     demo: "DEMO",
     demoHint: "Browser demo: tournaments are saved in this browser only.",
     engineFailed: "The tournament engine could not start: {message}",
@@ -242,13 +248,16 @@ export const en = {
     aliveColumn: "In play",
     updatedColumn: "Last change",
     open: "Open",
+    openNamed: "Open {name}",
     delete: "Delete",
+    deleteNamed: "Delete {name}",
     deleteTitle: "Delete “{name}”?",
     deleteMessage: "Its players, results and history are removed for good. This cannot be undone.",
     deleteConfirm: "Delete tournament",
     importLegacy: "Import from the previous version",
     importLegacyHint: "A tournament from the previous version of the app was found on this computer.",
     duplicate: "Duplicate",
+    duplicateNamed: "Duplicate {name}",
     duplicateHint: "A new tournament with the same settings and structure, without players.",
     duplicated: "“{name}” created",
     copyName: "{name} (copy)",
@@ -359,6 +368,8 @@ export const en = {
       closed: "Add-ons closed"
     },
     limitReached: "Limit reached for this player",
+    /** A purchase button's accessible name: `Rebuy Ann`. */
+    actionNamed: "{action} {name}",
     reenterTitle: "Re-enter {name}",
     reenterEntry: "Entry {entry}, {chips} chips.",
     reenterEntryPrice: "Entry {entry}: {price} for {chips} chips.",
@@ -512,6 +523,9 @@ export const en = {
     addLevel: "Add level",
     addBreak: "Add break",
     remove: "Remove level",
+    removeRow: "Remove level {row}",
+    /** A cell's accessible name: the row (`Level 3`, `Break`), then the column. */
+    cellLabel: "{row} {column}",
     removeLocked: "Levels already played cannot be removed",
     levelN: "Level {n}",
     breakRow: "Break",
@@ -558,6 +572,7 @@ export const en = {
     reopen: "Reopen registration",
     players: "Players in play",
     remove: "Remove",
+    removeNamed: "Remove {name}",
     empty: "Registered players appear here with their seat."
   },
   seating: {
@@ -618,9 +633,11 @@ export const en = {
     noMatch: "No player matches “{search}”.",
     noneInFilter: "No player in this list yet.",
     eliminate: "Eliminate",
+    eliminateNamed: "Eliminate {name}",
     sameHand: "Eliminated in the same hand…",
     sameHandHint: "Tick every player eliminated in this hand. Enter each starting stack to rank them (the bigger stack finishes higher), or none for a tie.",
     startStack: "Starting stack",
+    startStackOf: "Starting stack {name}",
     startStackOptional: "Optional",
     eliminateSelected: { one: "Eliminate {count} player", other: "Eliminate {count} players" },
     select: "Select {name}",
@@ -713,6 +730,7 @@ export const en = {
   },
   clock: {
     next: "Next",
+    nextBlinds: "Next {blinds}",
     overtime: "Overtime +{duration}",
     previous: "Previous",
     nextLevel: "Next",
@@ -782,7 +800,9 @@ export const en = {
     exitKey: "Esc",
     preview: "Display preview",
     previewHint: "What the players see on the TV.",
-    openWindow: "Open display window"
+    openWindow: "Open display window",
+    /** The display window's title. */
+    windowTitle: "MTT Display"
   },
   preferences: {
     label: "Preferences",
@@ -793,7 +813,6 @@ export const en = {
     sound: "Level sounds",
     soundDescription: "A chime at each new level and break, and a warning one minute before.",
     volume: "Volume",
-    percent: "{percent}%",
     test: "Test",
     output: "Play sounds on",
     output_auto: "Automatic",
@@ -810,6 +829,10 @@ export const en = {
     rankingAt: "Ranking — {timestamp}",
     provisionalHint: "Places are provisional while registration is open.",
     place: "Place",
+    /** A place in a ranking; `count` is the place, for languages that write it as an ordinal. */
+    placeN: "#{count}",
+    /** Tied players' places, from the best: `#3–4`. */
+    placeTie: "#{from}–{to}",
     player: "Player",
     status: "Status",
     statusWinner: "Winner",
@@ -819,7 +842,9 @@ export const en = {
     provisional: "provisional",
     prize: "Prize ({currency})",
     prizeColumn: "Prize",
-    failed: "{format} export failed: {reason}"
+    failed: "{format} export failed: {reason}",
+    /** After the tournament name in export file names: `Friday-ranking.csv`. */
+    fileSuffix: "ranking"
   },
   shortcuts: {
     title: "Keyboard shortcuts",

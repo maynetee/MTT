@@ -243,8 +243,8 @@ export default function TournamentListScreen() {
                           {t(`phase.${summary.phase}`)}
                         </Pill>
                       </td>
-                      <td className="num">{summary.players}</td>
-                      <td className="num">{summary.phase === "running" ? summary.alive : t("common.none")}</td>
+                      <td className="num">{i18n.number(summary.players)}</td>
+                      <td className="num">{summary.phase === "running" ? i18n.number(summary.alive) : t("common.none")}</td>
                       <td className="muted">
                         <time dateTime={new Date(summary.updatedAtMs).toISOString()} title={i18n.dateTime(summary.updatedAtMs)}>
                           {relativeTime(summary.updatedAtMs, now, i18n.locale)}
@@ -252,13 +252,13 @@ export default function TournamentListScreen() {
                       </td>
                       <td className="actions">
                         <span className="row-actions">
-                          <ButtonLink size="sm" to={`/t/${encodeURIComponent(summary.id)}`} aria-label={`${t("list.open")} ${summary.name}`}>
+                          <ButtonLink size="sm" to={`/t/${encodeURIComponent(summary.id)}`} aria-label={t("list.openNamed", { name: summary.name })}>
                             {t("list.open")}
                           </ButtonLink>
                           <IconButton
                             icon="copy"
                             size="sm"
-                            label={`${t("list.duplicate")} ${summary.name}`}
+                            label={t("list.duplicateNamed", { name: summary.name })}
                             hint={t("list.duplicateHint")}
                             tooltipAlign="end"
                             disabled={duplicating !== null}
@@ -267,7 +267,7 @@ export default function TournamentListScreen() {
                           <IconButton
                             icon="trash"
                             size="sm"
-                            label={`${t("list.delete")} ${summary.name}`}
+                            label={t("list.deleteNamed", { name: summary.name })}
                             tooltipAlign="end"
                             onClick={() => setConfirming(summary)}
                           />

@@ -7,6 +7,7 @@ import { Section } from "../components/Card";
 import { Icon } from "../components/Icon";
 import { useEngine } from "../EngineContext";
 import { useClock, type LocalClock } from "../hooks/useClock";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useTournamentView } from "../hooks/useTournamentView";
 import { useLevelSounds } from "../sound/useLevelSounds";
 import { useTournament } from "../TournamentContext";
@@ -492,6 +493,7 @@ function DisplayWindow({ id }: { id: string }) {
   const { t, error } = useI18n();
   const { view, offsetMs, loadError } = useTournamentView(id);
   const sound = useLevelSounds(view, offsetMs, "display");
+  useDocumentTitle(t("display.windowTitle"));
   if (!view)
     return (
       <div className="tv-frame" data-theme="dark">

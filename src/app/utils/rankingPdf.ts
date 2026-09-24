@@ -46,6 +46,7 @@ export async function buildRankingPdf(rows: readonly RankingRow[], options: Rank
 
   const title = rankingTitle(i18n, finished, generatedAt);
   pdfDoc.setTitle(`${title} - ${tournamentName}`);
+  pdfDoc.setLanguage(i18n.locale);
 
   let page = pdfDoc.addPage(A4);
   let y = TOP;
@@ -59,7 +60,7 @@ export async function buildRankingPdf(rows: readonly RankingRow[], options: Rank
       page = pdfDoc.addPage(A4);
       y = TOP;
     }
-    page.drawText(`${formatPlace(row)}  ${row.name}`, { x: MARGIN_LEFT, y, size: 12, font, color: rgb(0, 0, 0) });
+    page.drawText(`${formatPlace(i18n, row)}  ${row.name}`, { x: MARGIN_LEFT, y, size: 12, font, color: rgb(0, 0, 0) });
     page.drawText(rankingStatus(i18n, row, winner), { x: statusX, y, size: format ? 10 : 12, font, color: rgb(0.4, 0.4, 0.4) });
     if (format && row.prize !== undefined) {
       const prize = format(row.prize);

@@ -19,8 +19,9 @@ export function sanitizeFileName(name: string, fallback = "export"): string {
   return WINDOWS_RESERVED_NAME.test(cleaned) ? `_${cleaned}` : cleaned;
 }
 
-export function rankingFileName(tournamentName: string, extension: "csv" | "pdf"): string {
+/** `Friday-ranking.csv`; `suffix` is the translated word for the ranking. */
+export function rankingFileName(tournamentName: string, extension: "csv" | "pdf", suffix = "ranking"): string {
   // Truncate by code point so that no surrogate pair is split.
   const base = Array.from(sanitizeFileName(tournamentName, "MTT")).slice(0, MAX_BASE_NAME_LENGTH).join("").trim();
-  return `${base}-ranking.${extension}`;
+  return `${base}-${sanitizeFileName(suffix, "ranking")}.${extension}`;
 }

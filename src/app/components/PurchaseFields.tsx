@@ -73,7 +73,7 @@ function PurchaseBlock({ kind, config, onChange, firstBreakAfter }: Props & { ki
                 <Field label={t("purchases.price")} hint={t("money.buyInHint")}>
                   <MoneyInput
                     currency={money.currency}
-                    aria-label={`${title}: ${t("purchases.price")}`}
+                    aria-label={t("common.labelled", { prefix: title, label: t("purchases.price") })}
                     value={purchase.prize}
                     onChange={(value) => edit({ prize: value === null ? Number.NaN : value })}
                   />
@@ -81,7 +81,7 @@ function PurchaseBlock({ kind, config, onChange, firstBreakAfter }: Props & { ki
                 <Field label={t("money.fee")} hint={total ? t("purchases.playerPays", { amount: total }) : t("money.feeHint")}>
                   <MoneyInput
                     currency={money.currency}
-                    aria-label={`${title}: ${t("money.fee")}`}
+                    aria-label={t("common.labelled", { prefix: title, label: t("money.fee") })}
                     value={purchase.fee}
                     onChange={(value) => edit({ fee: value === null ? Number.NaN : value })}
                   />
@@ -92,7 +92,7 @@ function PurchaseBlock({ kind, config, onChange, firstBreakAfter }: Props & { ki
               <NumberInput
                 min={1}
                 step={1000}
-                aria-label={`${title}: ${t("purchases.chips")}`}
+                aria-label={t("common.labelled", { prefix: title, label: t("purchases.chips") })}
                 value={purchase.stack}
                 onChange={(value) => edit({ stack: number(value) })}
               />
@@ -101,7 +101,7 @@ function PurchaseBlock({ kind, config, onChange, firstBreakAfter }: Props & { ki
               <NumberInput
                 min={1}
                 max={255}
-                aria-label={`${title}: ${t(`purchases.${kind}.max`)}`}
+                aria-label={t("common.labelled", { prefix: title, label: t(`purchases.${kind}.max`) })}
                 placeholder={t("purchases.unlimited")}
                 value={purchase.max ?? null}
                 onChange={(value) => edit({ max: value === null ? undefined : number(value) })}
@@ -111,7 +111,7 @@ function PurchaseBlock({ kind, config, onChange, firstBreakAfter }: Props & { ki
           <div className="purchase-window">
             <span className="field-label">{t("purchases.window")}</span>
             <DeadlineFields
-              legend={`${title}: ${t("purchases.window")}`}
+              legend={t("common.labelled", { prefix: title, label: t("purchases.window") })}
               labelPrefix={title}
               value={windowChoice(purchase.window)}
               onChange={(choice) => edit({ window: purchaseWindow(choice) })}

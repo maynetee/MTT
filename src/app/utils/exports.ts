@@ -31,7 +31,7 @@ export async function exportCSV(engine: Engine, data: RankingExport, i18n: I18n 
   try {
     const content = buildRankingCsv(data.rows, data.winner, i18n, data.currency);
     return await engine.saveExport({
-      fileName: rankingFileName(data.tournamentName, "csv"),
+      fileName: rankingFileName(data.tournamentName, "csv", i18n.t("exports.fileSuffix")),
       bytes: new TextEncoder().encode(content),
       mimeType: "text/csv;charset=utf-8"
     });
@@ -46,7 +46,8 @@ export async function exportPDF(engine: Engine, data: RankingExport, i18n: I18n 
     // pdf-lib, fontkit and the fonts are only downloaded when a PDF is actually exported.
     const { buildRankingPdf } = await import("./rankingPdf");
     const bytes = await buildRankingPdf(data.rows, { ...data, i18n });
-    return await engine.saveExport({ fileName: rankingFileName(data.tournamentName, "pdf"), bytes, mimeType: "application/pdf" });
+    const fileName = rankingFileName(data.tournamentName, "pdf", i18n.t("exports.fileSuffix"));
+    return await engine.saveExport({ fileName, bytes, mimeType: "application/pdf" });
   } catch (error) {
     throw failure(i18n, "PDF", error);
   }

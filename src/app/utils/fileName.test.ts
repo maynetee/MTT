@@ -34,6 +34,11 @@ describe("rankingFileName", () => {
     expect(rankingFileName("???", "pdf")).toBe("MTT-ranking.pdf");
   });
 
+  it("ends with the word for the ranking in the export's language", () => {
+    expect(rankingFileName("Friday", "csv", "classement")).toBe("Friday-classement.csv");
+    expect(rankingFileName("Friday", "pdf", "a/b")).toBe("Friday-a b.pdf");
+  });
+
   it("truncates very long names without splitting characters", () => {
     expect(rankingFileName("🂡".repeat(150), "pdf")).toBe(`${"🂡".repeat(100)}-ranking.pdf`);
   });

@@ -2,6 +2,7 @@ import { useRef, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "../../i18n";
 import { useEngine } from "../EngineContext";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { PreferencesMenu } from "../preferences/PreferencesMenu";
 import { BrandMark } from "./BrandMark";
 import { DemoBanner } from "./DemoBanner";
@@ -29,6 +30,7 @@ export function AppShell({
   const { t } = useI18n();
   const engine = useEngine();
   const main = useRef<HTMLElement | null>(null);
+  useDocumentTitle(t("app.title"));
   return (
     <div className="app-shell">
       {/* A button, not a #main link: the hash holds the route. */}

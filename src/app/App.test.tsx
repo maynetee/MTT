@@ -16,6 +16,18 @@ describe("App", () => {
     expect(screen.getByText("DEMO")).toBeInTheDocument();
   });
 
+  it("titles the director's window and the display window", async () => {
+    const { engine, id } = await withTournament();
+    const director = renderApp(engine, "/");
+    await screen.findByRole("heading", { name: "Tournaments" });
+    expect(document.title).toBe("MTT Tournament Director");
+    director.unmount();
+
+    renderApp(engine, `/display/${id}`);
+    await screen.findByRole("timer");
+    expect(document.title).toBe("MTT Display");
+  });
+
   it("creates a tournament with the default structure and opens its registration", async () => {
     const user = userEvent.setup();
     const engine = createTestEngine();

@@ -37,7 +37,8 @@ function PlaceTable({
   total: string;
   disabled: boolean;
 }) {
-  const { t } = useI18n();
+  const i18n = useI18n();
+  const { t } = i18n;
   const set = (index: number, value: number) => onChange(values.map((current, i) => (i === index ? value : current)));
   return (
     <div className="place-table">
@@ -46,7 +47,7 @@ function PlaceTable({
           const label = t("payouts.placeN", { place: index + 1 });
           return (
             <li key={index} className="place-table-row">
-              <span className="place-table-place">{formatPlace({ place: index + 1, placeTo: null })}</span>
+              <span className="place-table-place">{formatPlace(i18n, { place: index + 1, placeTo: null })}</span>
               {input(value, (next) => set(index, next), label)}
             </li>
           );
@@ -313,7 +314,7 @@ export default function PayoutsScreen() {
                 {rows.map((row) => (
                   <tr key={row.place}>
                     <th scope="row" className="num place">
-                      {formatPlace({ place: row.place, placeTo: null })}
+                      {formatPlace(i18n, { place: row.place, placeTo: null })}
                     </th>
                     <td className="num strong">{format!(row.amount)}</td>
                     <td className="num muted">{formatBps(row.share, i18n.locale)}</td>

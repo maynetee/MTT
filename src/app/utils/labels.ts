@@ -26,9 +26,9 @@ export function levelLabel(i18n: I18n, level: Level, playLevel: number | null): 
 }
 
 /** `#3`, `#3–4` for a tie, `—` while in play. */
-export function formatPlace(row: Pick<RankingRow, "place" | "placeTo">): string {
-  if (row.place === null) return "—";
-  return row.placeTo !== null ? `#${row.place}–${row.placeTo}` : `#${row.place}`;
+export function formatPlace(i18n: I18n, row: Pick<RankingRow, "place" | "placeTo">): string {
+  if (row.place === null) return i18n.t("common.none");
+  return row.placeTo !== null ? i18n.t("exports.placeTie", { from: row.place, to: row.placeTo }) : i18n.t("exports.placeN", { count: row.place });
 }
 
 function pad(value: number): string {

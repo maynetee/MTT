@@ -76,7 +76,8 @@ function SeatTicket({ name, seat, onDismiss }: { name: string; seat: SeatRef; on
 }
 
 export default function RegistrationScreen() {
-  const { t } = useI18n();
+  const i18n = useI18n();
+  const { t } = i18n;
   const { view, offsetMs, run } = useTournament();
   const [name, setName] = useState("");
   const [feedback, setFeedback] = useState<{ name: string; seat: SeatRef } | null>(null);
@@ -180,8 +181,8 @@ export default function RegistrationScreen() {
             {registration.overrideOpen !== null && <Pill tone="neutral">{t("registration.overridden")}</Pill>}
           </div>
           <StatGroup>
-            <Stat label={t("registration.registeredCount")} value={view.counts.unique} />
-            <Stat label={t("registration.seatsLeft")} value={seatsLeft(view)} />
+            <Stat label={t("registration.registeredCount")} value={i18n.number(view.counts.unique)} />
+            <Stat label={t("registration.seatsLeft")} value={i18n.number(seatsLeft(view))} />
           </StatGroup>
         </Section>
 
@@ -213,7 +214,7 @@ export default function RegistrationScreen() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          aria-label={`${t("registration.remove")} ${row.name}`}
+                          aria-label={t("registration.removeNamed", { name: row.name })}
                           onClick={() => void run({ type: "unregister", player: row.player })}
                         >
                           {t("registration.remove")}

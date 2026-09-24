@@ -141,7 +141,7 @@ export function announceContent(i18n: I18n, view: View, announcement: Announceme
     };
   }
 
-  const rows = [...live].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) || a.player - b.player);
+  const rows = [...live].sort((a, b) => a.name.localeCompare(b.name, i18n.locale, { sensitivity: "base" }) || a.player - b.player);
   return {
     kind: announcement.kind,
     title: announcement.kind === "break" ? t("moves.announce.breakTitle", { table: announcement.table ?? "" }) : t("moves.announce.balanceTitle"),

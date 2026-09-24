@@ -1,13 +1,14 @@
 import init, { WasmTournament, quoteDeal as wasmQuoteDeal } from "../wasm/pkg/mtt_wasm.js";
 import wasmUrl from "../wasm/pkg/mtt_wasm_bg.wasm?url";
 import {
-  hostError,
   notFound,
+  saveFailed,
   toEngineError,
   type Command,
   type DealQuote,
   type DealRequest,
   type Engine,
+  type EngineError,
   type ExportFile,
   type NewTournamentInput,
   type TournamentSummary,
@@ -263,7 +264,7 @@ export class WasmEngine implements Engine {
   }
 
   async importLegacy(): Promise<string> {
-    throw hostError("Importing from the previous version is only available in the desktop app.");
+    throw { code: "IMPORT_UNAVAILABLE" } satisfies EngineError;
   }
 
   /** Stops listening to other tabs and frees every loaded tournament. */
@@ -329,7 +330,7 @@ export class WasmEngine implements Engine {
       } catch {
         // Keep reporting the original failure.
       }
-      throw hostError(`Could not save the tournament: ${error instanceof Error ? error.message : String(error)}`);
+      throw saveFailed(error instanceof Error ? error.message : String(error));
     }
   }
 

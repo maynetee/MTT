@@ -209,7 +209,7 @@ describe("WasmEngine", () => {
       throw new DOMException("quota exceeded", "QuotaExceededError");
     });
     const error = await rejection(engine.dispatch(id, { type: "register", name: "Ben" }));
-    expect(error).toEqual({ code: "HOST_ERROR", params: { message: expect.stringContaining("quota exceeded") } });
+    expect(error).toEqual({ code: "SAVE_FAILED", params: { message: expect.stringContaining("quota exceeded") } });
     setItem.mockRestore();
 
     expect(names(await engine.getView(id), true)).toEqual(["Ann"]);

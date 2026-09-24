@@ -69,9 +69,13 @@ export type NewTournamentInput = Omit<NewTournament, "id">;
 
 export type HostError = { code: "HOST_ERROR"; params: { message: string } };
 export type NotFoundError = { code: "NOT_FOUND"; params: { id: string } };
+/** The browser could not store a change (storage full or blocked); `message` is the browser's. */
+export type SaveFailedError = { code: "SAVE_FAILED"; params: { message: string } };
+/** Importing the previous version's data is a desktop feature. */
+export type ImportUnavailableError = { code: "IMPORT_UNAVAILABLE" };
 
 /** Every rejection an engine reports: the core's errors plus the host's own. */
-export type EngineError = DomainError | HostError | NotFoundError;
+export type EngineError = DomainError | HostError | NotFoundError | SaveFailedError | ImportUnavailableError;
 
 export type EngineErrorCode = EngineError["code"];
 
@@ -81,6 +85,10 @@ export function hostError(message: string): HostError {
 
 export function notFound(id: string): NotFoundError {
   return { code: "NOT_FOUND", params: { id } };
+}
+
+export function saveFailed(message: string): SaveFailedError {
+  return { code: "SAVE_FAILED", params: { message } };
 }
 
 export function isEngineError(value: unknown): value is EngineError {

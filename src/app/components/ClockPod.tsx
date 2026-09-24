@@ -64,7 +64,7 @@ export function ClockPod({ view, offsetMs, onStart, onPause }: { view: View; off
   if (!finished && !clock.isBreak && clock.sb !== null && clock.bb !== null) {
     detail = [blindsLabel(i18n, clock.sb, clock.bb), anteLabel(i18n, clock.ante)].filter(Boolean).join("  ");
   } else if (!finished && clock.isBreak && clock.next?.level.type === "play") {
-    detail = `${t("clock.next")} ${blindsLabel(i18n, clock.next.level.sb, clock.next.level.bb)}`;
+    detail = t("clock.nextBlinds", { blinds: blindsLabel(i18n, clock.next.level.sb, clock.next.level.bb) });
   } else if (finished && view.winner !== null) {
     detail = view.ranking.find((row) => row.player === view.winner)?.name ?? null;
   }

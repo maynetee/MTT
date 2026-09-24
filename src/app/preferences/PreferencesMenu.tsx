@@ -10,7 +10,8 @@ import { SOUND_OUTPUTS, setPreferences, usePreferences } from "./preferences";
  * small non-modal panel. Esc, a click outside or tabbing away closes it.
  */
 export function PreferencesMenu() {
-  const { t } = useI18n();
+  const i18n = useI18n();
+  const { t } = i18n;
   const preferences = usePreferences();
   const [open, setOpen] = useState(false);
   const panelId = useId();
@@ -44,6 +45,7 @@ export function PreferencesMenu() {
   };
 
   const percent = Math.round(preferences.volume * 100);
+  const volume = i18n.percent(percent / 100);
   return (
     <span className="menu-anchor">
       <IconButton
@@ -85,11 +87,11 @@ export function PreferencesMenu() {
               step={5}
               value={percent}
               disabled={!preferences.sound}
-              aria-valuetext={t("preferences.percent", { percent })}
+              aria-valuetext={volume}
               onChange={(event) => setPreferences({ volume: Number(event.target.value) / 100 })}
             />
             <span className="preferences-percent" aria-hidden="true">
-              {t("preferences.percent", { percent })}
+              {volume}
             </span>
             <Button size="sm" icon="play" disabled={!preferences.sound} onClick={() => previewCue("levelChange", preferences.volume)}>
               {t("preferences.test")}

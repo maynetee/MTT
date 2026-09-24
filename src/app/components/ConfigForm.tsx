@@ -173,7 +173,7 @@ export interface DeadlineFieldsProps {
 export function DeadlineFields({ legend, value, onChange, manualLabel, breakAfter = false, labelPrefix, disabled = false }: DeadlineFieldsProps) {
   const { t } = useI18n();
   const name = useId();
-  const label = (text: string) => (labelPrefix ? `${labelPrefix}: ${text.charAt(0).toLowerCase()}${text.slice(1)}` : text);
+  const label = (text: string) => (labelPrefix ? t("common.labelled", { prefix: labelPrefix, label: `${text.charAt(0).toLowerCase()}${text.slice(1)}` }) : text);
   // Remember the values of the other modes while switching.
   const level = value.type === "end_of_play_level" ? value : { n: value.type === "break_after" ? value.n : 6, throughBreak: true };
   const minutes = value.type === "elapsed" ? value.ms / MINUTE_MS : 120;

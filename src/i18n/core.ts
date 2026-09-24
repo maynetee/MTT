@@ -32,6 +32,8 @@ export interface I18n {
   tDynamic(key: string, params?: Params): string;
   has(key: string): boolean;
   number(value: number): string;
+  /** A ratio as a whole percentage: 0.8 is `80%`. */
+  percent(ratio: number): string;
   duration(ms: number): string;
   /** `90 min`, `2 hr`: a duration in words, for messages. */
   durationWords(ms: number): string;
@@ -49,6 +51,7 @@ export function createI18n(locale: Locale = "en"): I18n {
   const tree = dictionaries[locale];
   const translate = createTranslate(tree, locale);
   const numbers = new Intl.NumberFormat(locale);
+  const percents = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
   const bb = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
   const times = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" });
   const dates = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
@@ -89,6 +92,7 @@ export function createI18n(locale: Locale = "en"): I18n {
     tDynamic: (key, params) => translate(key, params),
     has: (key) => lookup(tree, key) !== undefined,
     number: (value) => numbers.format(value),
+    percent: (ratio) => percents.format(ratio),
     duration: formatDuration,
     durationWords,
     timeOfDay: (ms) => times.format(new Date(ms)),

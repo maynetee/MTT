@@ -54,9 +54,9 @@ export default function PlayersScreen() {
     const term = search.trim().toLowerCase();
     const list = [...view.ranking]
       .filter((row) => (filter === "alive" ? row.alive : filter === "out" ? !row.alive : true))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) || a.player - b.player);
+      .sort((a, b) => a.name.localeCompare(b.name, i18n.locale, { sensitivity: "base" }) || a.player - b.player);
     return term ? list.filter((row) => row.name.toLowerCase().includes(term)) : list;
-  }, [search, filter, view.ranking]);
+  }, [search, filter, view.ranking, i18n.locale]);
 
   const running = view.phase === "running";
   const canEliminate = running && view.counts.alive > 1;
@@ -129,7 +129,7 @@ export default function PlayersScreen() {
         size="sm"
         variant="ghost"
         icon={kind === "reentry" ? "userCheck" : "plus"}
-        aria-label={`${label} ${row.name}`}
+        aria-label={t("purchases.actionNamed", { action: label, name: row.name })}
         title={limited ? t("purchases.limitReached") : undefined}
         disabled={limited}
         onClick={() => (kind === "reentry" ? setReentering(row) : void buy(kind, row))}
@@ -276,7 +276,7 @@ export default function PlayersScreen() {
                     </th>
                     <td className="muted">{row.seat ? t("common.tableSeat", { table: row.seat.table, seat: row.seat.seat }) : t("common.none")}</td>
                     <td>{status(row)}</td>
-                    <td className="num place">{formatPlace(row)}</td>
+                    <td className="num place">{formatPlace(i18n, row)}</td>
                     <td className="actions">
                       {selection && selected && (
                         <NumberInput
@@ -284,7 +284,7 @@ export default function PlayersScreen() {
                           min={1}
                           className="stack-input"
                           placeholder={t("players.startStackOptional")}
-                          aria-label={`${t("players.startStack")} ${row.name}`}
+                          aria-label={t("players.startStackOf", { name: row.name })}
                           value={selection.get(row.player) ?? null}
                           onChange={(value) => setSelection(new Map(selection).set(row.player, value))}
                         />
@@ -295,7 +295,7 @@ export default function PlayersScreen() {
                             ? (["rebuy", "addon"] as const).filter((kind) => open[kind]).map((kind) => purchaseButton(kind, row))
                             : open.reentry && purchaseButton("reentry", row)}
                           {canEliminate && row.alive && (
-                            <Button size="sm" icon="userX" onClick={() => eliminate(row.player)} aria-label={`${t("players.eliminate")} ${row.name}`}>
+                            <Button size="sm" icon="userX" onClick={() => eliminate(row.player)} aria-label={t("players.eliminateNamed", { name: row.name })}>
                               {t("players.eliminate")}
                             </Button>
                           )}
