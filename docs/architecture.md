@@ -13,7 +13,7 @@ it is built that way, and what to touch when you add a feature. The tournament r
 | `src-tauri` | Desktop host (crate `mtt`): runs the core behind Tauri commands, stores event logs in SQLite, opens the display window, saves exports, imports the previous version's data. |
 | `crates/mtt-wasm` | Browser host: the same core compiled to WebAssembly with wasm-bindgen, JSON in and out. |
 | `src/engine` | The `Engine` interface the UI talks to, with one implementation per host (`TauriEngine`, `WasmEngine`). |
-| `src/app` | React screens, hooks and utilities (CSV and PDF exports, labels). No tournament rule lives here. |
+| `src/app` | React screens, hooks and utilities: exports, keyboard shortcuts, level sounds, the sample tournament, themes and preferences. No tournament rule lives here. |
 | `src/bindings` | TypeScript types generated from the Rust types by [ts-rs](https://github.com/Aleph-Alpha/ts-rs). Never edited by hand. |
 | `src/i18n` | Messages in English (`en.ts`) and French (`fr.ts`), including one message per error code (`errors.<CODE>`) and warning; the language of the device (`language.ts`). |
 | `scripts/wasm.mjs` | Builds `crates/mtt-wasm` into `src/wasm/pkg` with wasm-pack (`npm run wasm`). |
@@ -276,6 +276,13 @@ Tabs of the same origin tell each other about changes on the `BroadcastChannel` 
 (`{ type: "tournament_changed", id }`). Because the message can arrive before the other tab's
 write is visible, `storage` events on the index key are also watched, and listeners are
 notified once per stored revision.
+
+### Preferences of the device
+
+Settings of a computer rather than of a tournament stay out of the event log, in the web view's
+`localStorage` in both hosts: `mtt:theme`, `mtt:language` and `mtt:preferences` (level sounds on
+or off, volume, which window plays), plus `mtt:demo-banner-dismissed` in the browser demo. The
+language and the sound preferences reach every open window through `storage` events.
 
 ### One writer, no timers writing state
 
