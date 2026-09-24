@@ -7,15 +7,24 @@ license = "MIT"
 authors = ["Mendel Teichman"]
 repository = "https://github.com/maynetee/MTT"
 
+[lib]
+# The `_lib` suffix keeps the library name distinct from the binary's (see
+# https://github.com/rust-lang/cargo/issues/8519).
+name = "mtt_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
+tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
-tauri = { version = "1.5", features = [ "path-all", "window-all", "fs-all", "dialog-all"] }
+tauri = { version = "2.11.6", features = [] }
+tauri-plugin-dialog = "2.7.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rusqlite = { version = "0.30", features = ["bundled"] }
 rand = "0.8"
+percent-encoding = "2.3"
 
-[features]
-custom-protocol = ["tauri/custom-protocol"]
+[dev-dependencies]
+tauri = { version = "2.11.6", features = ["test"] }
+tempfile = "3"

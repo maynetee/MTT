@@ -1,7 +1,5 @@
-import { save } from "@tauri-apps/api/dialog";
-import { writeBinaryFile, writeTextFile } from "@tauri-apps/api/fs";
 import type { RankingEntry } from "../types";
-import { emitAppError, isTauriAvailable } from "../api";
+import { emitAppError, isTauriAvailable, saveExport } from "../api";
 import { buildRankingCsv } from "./csv";
 import { rankingFileName } from "./fileName";
 
@@ -45,12 +43,7 @@ export async function exportCSV(entries: RankingEntry[], tournamentName: string)
       return;
     }
 
-    const path = await save({
-      defaultPath: fileName,
-      filters: [{ name: "CSV", extensions: ["csv"] }]
-    });
-    if (!path) return;
-    await writeTextFile(path, content);
+    await saveExport(fileName, new TextEncoder().encode(content));
   } catch (error) {
     reportExportError("CSV", error);
   }
@@ -69,12 +62,7 @@ export async function exportPDF(entries: RankingEntry[], { tournamentName, finis
       return;
     }
 
-    const path = await save({
-      defaultPath: fileName,
-      filters: [{ name: "PDF", extensions: ["pdf"] }]
-    });
-    if (!path) return;
-    await writeBinaryFile(path, bytes);
+    await saveExport(fileName, bytes);
   } catch (error) {
     reportExportError("PDF", error);
   }

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/tauri";
+import { invoke, isTauri, type InvokeArgs, type InvokeOptions } from "@tauri-apps/api/core";
 import type { LevelDraft, MoveSuggestion, Seat, StateSnapshot, TournamentConfig } from "./types";
 import {
   adjustClockLocal,
@@ -24,8 +24,9 @@ import {
   updateLevelsLocal
 } from "./demoStore";
 
+/** Whether the app runs in the desktop shell; otherwise it runs in demo mode in a browser. */
 export function isTauriAvailable() {
-  return typeof window !== "undefined" && "__TAURI_IPC__" in window;
+  return isTauri();
 }
 
 /** Surfaces an error to the user through the app's error banner. */
@@ -42,11 +43,24 @@ function runDemo<T>(action: () => T): T {
   }
 }
 
-async function invokeTauri<T>(command: string, payload?: Record<string, unknown>): Promise<T> {
+async function invokeTauri<T>(command: string, payload?: InvokeArgs, options?: InvokeOptions): Promise<T> {
   if (!isTauriAvailable()) {
     throw new Error("Tauri IPC unavailable. Run the app via `npm run tauri dev` (not in a browser tab).");
   }
-  return invoke<T>(command, payload);
+  return invoke<T>(command, payload, options);
+}
+
+/** Header carrying the URL-encoded suggested file name (EXPORT_FILE_NAME_HEADER in commands.rs). */
+const EXPORT_FILE_NAME_HEADER = "x-file-name";
+
+/**
+ * Desktop only: asks where to save an export with the native save dialog, then writes it.
+ * The bytes travel as the raw IPC body. Resolves to false when the user cancels the dialog.
+ */
+export async function saveExport(fileName: string, content: Uint8Array): Promise<boolean> {
+  return invokeTauri("save_export", content, {
+    headers: { [EXPORT_FILE_NAME_HEADER]: encodeURIComponent(fileName) }
+  });
 }
 
 export async function getState(): Promise<StateSnapshot> {

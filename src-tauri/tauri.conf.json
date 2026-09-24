@@ -1,17 +1,18 @@
 {
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "MTT",
+  "version": "0.1.0",
+  "identifier": "com.mtt.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist"
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
   },
-  "package": {
-    "productName": "MTT",
-    "version": "0.1.0"
-  },
-  "tauri": {
+  "app": {
     "windows": [
       {
+        "label": "main",
         "title": "MTT",
         "width": 1400,
         "height": 900,
@@ -19,17 +20,16 @@
         "minHeight": 800,
         "resizable": true
       }
-    ],
-    "bundle": {
-      "identifier": "com.mtt.app",
-      "active": true
-    },
-    "allowlist": {
-      "all": false,
-      "dialog": { "all": true },
-      "fs": { "all": true },
-      "path": { "all": true },
-      "window": { "all": true }
-    }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
   }
 }

@@ -67,6 +67,27 @@ describe("exportCSV (browser)", () => {
   });
 });
 
+describe("exportCSV (desktop)", () => {
+  it("sends the bytes as the raw body of save_export, with the URL-encoded file name in a header", async () => {
+    const invoke = vi.fn(async (_cmd: string, _args: unknown, _options: unknown) => true);
+    vi.stubGlobal("isTauri", true);
+    vi.stubGlobal("__TAURI_INTERNALS__", { invoke });
+
+    await exportCSV(entries, "Main Event: Día 1");
+
+    expect(invoke).toHaveBeenCalledTimes(1);
+    const [command, body, options] = invoke.mock.calls[0];
+    expect(command).toBe("save_export");
+    expect(options).toEqual({ headers: { "x-file-name": "Main%20Event%20D%C3%ADa%201-ranking.csv" } });
+    const bytes = body as Uint8Array;
+    expect(Array.from(bytes.subarray(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+    expect(new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes.subarray(3))).toBe(
+      "Place,Player,Status\r\n1,Łukasz,Winner\r\n2,'=1+1,Eliminated\r\n"
+    );
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+});
+
 describe("exportPDF (browser)", () => {
   it("reports a failure through the app_error event instead of rejecting", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
