@@ -298,7 +298,7 @@ export const fr = {
     noPlacesPaid: "Aucune",
     money: {
       label: "Suivi de l’argent",
-      currency: "Devise",
+      currency: { exponent: "Décimales des montants" },
       buyIn: "Buy-in"
     },
     lateReg: {
@@ -319,7 +319,12 @@ export const fr = {
     trackLocked: "Fixé dès qu’un joueur est inscrit.",
     currency: "Devise",
     currencyOption: "{code} — {name}",
-    currencyLocked: "Fixée dès qu’un joueur est inscrit.",
+    currencyRelabel: "Rien n’est converti : les montants gardent leur valeur.",
+    currencyDecimals: {
+      zero: "Rien n’est converti : les montants gardent leur valeur, en unités entières, tels qu’ils ont été enregistrés.",
+      one: "Rien n’est converti : les montants gardent leur valeur et leur {count} décimale, tels qu’ils ont été enregistrés.",
+      other: "Rien n’est converti : les montants gardent leur valeur et leurs {count} décimales, tels qu’ils ont été enregistrés."
+    },
     buyIn: "Buy-in",
     buyInHint: "Va au prize pool.",
     buyInLocked: "Fixé une fois le tournoi commencé : les entrées gardent ce qu’elles ont payé.",

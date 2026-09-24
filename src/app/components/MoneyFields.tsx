@@ -1,7 +1,7 @@
 import type { Config } from "../../engine/types";
 import type { MoneyConfig } from "../../bindings/MoneyConfig";
 import { useI18n } from "../../i18n";
-import { CURRENCY_CODES, DEFAULT_CURRENCY, currencyName, currencyOf, majorUnit, moneyFormatter, rescale } from "../utils/money";
+import { CURRENCY_CODES, DEFAULT_CURRENCY, currencyExponent, currencyName, currencyOf, majorUnit, moneyFormatter, rescale } from "../utils/money";
 import { paysPrizes } from "../utils/payouts";
 import { Checkbox, Field, Select } from "./Field";
 import { MoneyInput } from "./MoneyInput";
@@ -10,7 +10,7 @@ import { MoneyInput } from "./MoneyInput";
 export interface ConfigLocks {
   /** Seats per table, starting stack and buy-in: fixed once the tournament has started. */
   started: boolean;
-  /** Money tracking and the currency: fixed once a player has registered. */
+  /** Money tracking and the currency's decimals: fixed once a player has registered (and paid). */
   registered: boolean;
   /** Places paid, payouts, rounding unit and minimum cash: fixed while the payouts are locked. */
   payoutsLocked: boolean;
@@ -33,10 +33,16 @@ function withoutMoney(config: Config): Config {
   return { ...rest, payout, reentry: free(config.reentry), rebuy: free(config.rebuy), addon: free(config.addon) };
 }
 
-/** Switches currency keeping the amounts as typed (100 EUR becomes 100 USD, not 10000 JPY). */
-function withCurrency(config: Config, code: string): Config {
+/**
+ * Switches currency. Before anyone has paid, the currency comes with its usual decimals and the
+ * amounts stay as typed (100 EUR becomes 100 USD, not 10000 JPY). Once someone has paid
+ * (`keepExponent`), amounts are recorded in minor units of the current exponent: only the code
+ * changes, so EUR 100.50 becomes JPY 100.50, nothing converted or rounded away.
+ */
+export function withCurrency(config: Config, code: string, keepExponent = false): Config {
   const money = config.money;
   if (!money) return config;
+  if (keepExponent) return { ...config, money: { ...money, currency: { code, exponent: money.currency.exponent } } };
   const currency = currencyOf(code);
   const scale = (amount: number) => rescale(amount, money.currency.exponent, currency.exponent);
   const optional = (amount: number | undefined) => (amount === undefined ? undefined : scale(amount));
@@ -84,6 +90,12 @@ export function MoneyFields({ config, onChange, locks = NO_LOCKS }: Props) {
   const format = money ? moneyFormatter(locale, money.currency) : null;
   const total = money && Number.isFinite(money.buyIn.prize) && Number.isFinite(money.buyIn.fee) ? money.buyIn.prize + money.buyIn.fee : null;
   const payoutHint = locks.payoutsLocked ? t("money.payoutsLockedHint") : undefined;
+  // Once someone has paid, a new currency relabels the amounts, in the decimals they were recorded with.
+  const currencyHint = !money || !locks.registered
+    ? undefined
+    : money.currency.exponent === currencyExponent(money.currency.code)
+      ? t("money.currencyRelabel")
+      : t("money.currencyDecimals", { count: money.currency.exponent });
 
   return (
     <div className="stack">
@@ -96,8 +108,8 @@ export function MoneyFields({ config, onChange, locks = NO_LOCKS }: Props) {
       />
       {money && format && (
         <div className="form-grid">
-          <Field label={t("money.currency")} hint={locks.registered ? t("money.currencyLocked") : undefined} className="span-2">
-            <Select value={money.currency.code} disabled={locks.registered} onChange={(event) => onChange(withCurrency(config, event.target.value))}>
+          <Field label={t("money.currency")} hint={currencyHint} className="span-2">
+            <Select value={money.currency.code} onChange={(event) => onChange(withCurrency(config, event.target.value, locks.registered))}>
               {codes.map((code) => (
                 <option key={code} value={code}>
                   {t("money.currencyOption", { code, name: currencyName(code, locale) })}

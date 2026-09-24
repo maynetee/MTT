@@ -512,15 +512,17 @@ pub fn validate_late_reg(config: &Config, levels: &[Level]) -> Result<(), Domain
 
 /// First field of `config` that cannot change in the current state, if any.
 ///
-/// Money tracking and the currency are frozen once someone has paid (recorded amounts
-/// would change meaning); seats, starting stack and buy-in once started.
+/// Money tracking is frozen once someone has paid, and so is the currency's exponent:
+/// recorded amounts are integers of its minor units and would change value. The currency
+/// code may change at any time: amounts keep their value (a relabel, not a conversion).
+/// Seats, starting stack and buy-in are frozen once started.
 fn locked_field(state: &State, config: &Config) -> Option<&'static str> {
     let (old, new) = (&state.config.money, &config.money);
     if !state.players.is_empty() {
         match (old, new) {
             (Some(_), None) | (None, Some(_)) => return Some("money"),
-            (Some(old), Some(new)) if old.currency != new.currency => {
-                return Some("money.currency");
+            (Some(old), Some(new)) if old.currency.exponent != new.currency.exponent => {
+                return Some("money.currency.exponent");
             }
             _ => {}
         }
@@ -885,19 +887,35 @@ mod tests {
             }
         }
 
+        fn currency(kit: &Kit, code: &str, exponent: u8) -> Command {
+            update(kit, |c| {
+                if let Some(m) = c.money.as_mut() {
+                    m.currency = Currency {
+                        code: code.to_owned(),
+                        exponent,
+                    };
+                }
+            })
+        }
+
         #[test]
-        fn money_and_currency_are_frozen_once_someone_paid() {
+        fn money_tracking_and_the_exponent_are_frozen_once_someone_paid() {
             let mut kit = Kit::new(9, 2);
             let cmd = update(&kit, |c| c.money = Some(money()));
             kit.ok(cmd);
+            // Before anyone paid, code and exponent change together.
+            kit.ok(currency(&kit, "JPY", 0));
+            kit.ok(currency(&kit, "EUR", 2));
             let a = kit.register("A");
             assert_eq!(kit.err(update(&kit, |c| c.money = None)), locked("money"));
-            let cmd = update(&kit, |c| {
-                if let Some(m) = c.money.as_mut() {
-                    m.currency.exponent = 0;
-                }
-            });
-            assert_eq!(kit.err(cmd), locked("money.currency"));
+            assert_eq!(
+                kit.err(currency(&kit, "JPY", 0)),
+                locked("money.currency.exponent")
+            );
+            assert_eq!(
+                kit.err(currency(&kit, "EUR", 0)),
+                locked("money.currency.exponent")
+            );
             // The buy-in may change before the start; paid entries keep their price.
             let cmd = update(&kit, |c| {
                 if let Some(m) = c.money.as_mut() {
@@ -906,8 +924,47 @@ mod tests {
             });
             kit.ok(cmd);
             kit.ok(Command::Unregister { player: a });
+            // Nobody has paid any more: the exponent is free again.
+            kit.ok(currency(&kit, "JPY", 0));
             let cmd = update(&kit, |c| c.money = None);
             kit.ok(cmd);
+        }
+
+        #[test]
+        fn the_currency_code_changes_after_the_first_entry() {
+            let mut kit = Kit::with_config(Config {
+                money: Some(money()),
+                ..Config::new("Unit", 9, 2, 10_000)
+            });
+            kit.register("A");
+            kit.register("B");
+            kit.ok(Command::StartClock {});
+            let pool = crate::payouts::pool(kit.agg.state());
+            // A relabel: EUR 50.00 becomes USD 50.00, then JPY with the cents kept.
+            kit.ok(currency(&kit, "USD", 2));
+            kit.ok(currency(&kit, "JPY", 2));
+            let view = kit.agg.view(kit.now);
+            let money = view.money.unwrap();
+            assert_eq!(
+                money.currency,
+                Currency {
+                    code: "JPY".into(),
+                    exponent: 2
+                }
+            );
+            assert_eq!(
+                (money.pool, money.fees),
+                (pool.prize, pool.fees),
+                "amounts keep their value"
+            );
+            kit.ok(Command::Undo {});
+            let code = |kit: &Kit| {
+                let money = kit.agg.state().config.money.as_ref().unwrap();
+                money.currency.code.clone()
+            };
+            assert_eq!(code(&kit), "USD");
+            kit.ok(Command::Redo {});
+            assert_eq!(code(&kit), "JPY");
         }
 
         #[test]

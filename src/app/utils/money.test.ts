@@ -115,6 +115,18 @@ describe("currencies", () => {
     expect(moneyFormatter("en", KWD)(1005)).toMatch(/^KWD\s1\.005$/);
   });
 
+  it("keeps the recorded decimals of a relabelled currency, rounding nothing away", () => {
+    // EUR 100.50 relabelled to yen once paid: two decimals stay.
+    const yenInCents = moneyFormatter("en", { code: "JPY", exponent: 2 });
+    expect(yenInCents(10_050)).toBe("¥100.50");
+    expect(yenInCents(10_000, { whole: true })).toBe("¥100");
+    // French writes the yen as JPY or ¥ depending on the CLDR data.
+    expect(moneyFormatter("fr", { code: "JPY", exponent: 2 })(123_456)).toMatch(/^1 234,56 (JPY|¥)$/);
+    // JPY 5000 relabelled to euros: whole units stay whole.
+    expect(moneyFormatter("en", { code: "EUR", exponent: 0 })(5_000)).toBe("€5,000");
+    expect(currencySymbol("en", { code: "JPY", exponent: 2 })).toEqual({ symbol: "¥", before: true });
+  });
+
   it("places the symbol where the locale writes it", () => {
     expect(currencySymbol("en", EUR)).toEqual({ symbol: "€", before: true });
     expect(currencySymbol("fr", EUR)).toEqual({ symbol: "€", before: false });

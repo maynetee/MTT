@@ -293,10 +293,10 @@ export const en = {
     payouts: "This tournament pays prizes",
     payoutsHint: "Off for a freeroll for points, a league night or a practice event: no places paid, no bubble, no payouts.",
     noPlacesPaid: "None",
-    /** Field names in CONFIG_LOCKED errors (`money`, `money.currency`, `money.buyIn`). */
+    /** Field names in CONFIG_LOCKED errors (`money`, `money.currency.exponent`, `money.buyIn`). */
     money: {
       label: "Money tracking",
-      currency: "The currency",
+      currency: { exponent: "The number of decimals of amounts" },
       buyIn: "The buy-in"
     },
     lateReg: {
@@ -317,7 +317,12 @@ export const en = {
     trackLocked: "Fixed once a player has registered.",
     currency: "Currency",
     currencyOption: "{code} — {name}",
-    currencyLocked: "Fixed once a player has registered.",
+    currencyRelabel: "Nothing is converted: amounts keep their value.",
+    currencyDecimals: {
+      zero: "Nothing is converted: amounts keep their value, in whole units as recorded.",
+      one: "Nothing is converted: amounts keep their value and their {count} decimal, as recorded.",
+      other: "Nothing is converted: amounts keep their value and their {count} decimals, as recorded."
+    },
     buyIn: "Buy-in",
     buyInHint: "Goes to the prize pool.",
     buyInLocked: "Fixed once the tournament has started: entries keep what they paid.",

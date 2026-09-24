@@ -869,6 +869,48 @@ fn tie_split_across_paid_boundary() {
     );
 }
 
+/// A director who picked the wrong currency could not fix it once someone had paid (#87).
+/// The code now changes at any time, amounts keeping their value; the exponent stays the
+/// one the recorded amounts use.
+#[test]
+fn currency_relabel_after_the_first_entry() {
+    let mut h = Harness::new(money_config(9, 1), levels());
+    h.register_many(5);
+    h.start();
+    h.ok(Command::LockPayouts {});
+    let before = h.view().money.unwrap();
+    let with_currency = |h: &Harness, code: &str, exponent: u8| {
+        let mut config = h.agg.state().config.clone();
+        if let Some(money) = config.money.as_mut() {
+            money.currency = mtt_core::config::Currency {
+                code: code.to_owned(),
+                exponent,
+            };
+        }
+        Command::UpdateConfig { config }
+    };
+    assert_eq!(
+        h.err(with_currency(&h, "JPY", 0)),
+        DomainError::ConfigLocked {
+            field: "money.currency.exponent".into()
+        }
+    );
+    // Even with the payouts locked: the currency does not shape them.
+    h.ok(with_currency(&h, "GBP", 2));
+    h.ok(with_currency(&h, "JPY", 2));
+    let after = h.view().money.unwrap();
+    assert_eq!(
+        (after.currency.code.as_str(), after.currency.exponent),
+        ("JPY", 2)
+    );
+    assert_eq!(
+        (after.pool, after.fees, &after.payouts, after.locked),
+        (before.pool, before.fees, &before.payouts, true)
+    );
+    let replayed = Aggregate::from_json(&h.agg.to_json().unwrap()).unwrap();
+    assert_eq!(replayed, h.agg);
+}
+
 // Tournaments without payouts (#86).
 
 /// A freeroll for points pays nobody: no bubble, no money line, no prize, even with the

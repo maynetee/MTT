@@ -88,8 +88,8 @@ describe("error messages", () => {
     expect(i18n.error({ code: "CONFIG_LOCKED", params: { field: "seatsPerTable" } })).toBe(
       "Seats per table can no longer change at this stage of the tournament."
     );
-    expect(i18n.error({ code: "CONFIG_LOCKED", params: { field: "money.currency" } })).toBe(
-      "The currency can no longer change at this stage of the tournament."
+    expect(i18n.error({ code: "CONFIG_LOCKED", params: { field: "money.currency.exponent" } })).toBe(
+      "The number of decimals of amounts can no longer change at this stage of the tournament."
     );
     expect(i18n.error({ code: "CONFIG_LOCKED", params: { field: "money" } })).toBe(
       "Money tracking can no longer change at this stage of the tournament."

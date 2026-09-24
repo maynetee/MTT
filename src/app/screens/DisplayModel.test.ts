@@ -14,6 +14,12 @@ describe("formatMoney", () => {
     expect(formatMoney("en", 50_000, { code: "JPY", exponent: 0 })).toBe("¥50,000");
   });
 
+  it("keeps the decimals a relabelled currency was recorded with", () => {
+    expect(formatMoney("en", 10_050, { code: "JPY", exponent: 2 })).toBe("¥100.50");
+    expect(formatMoney("en", 10_000, { code: "JPY", exponent: 2 })).toBe("¥100");
+    expect(formatMoney("en", 5_000, { code: "EUR", exponent: 0 })).toBe("€5,000");
+  });
+
   it("falls back to the code for a currency the runtime does not know", () => {
     expect(formatMoney("en", 12_300, { code: "ZZZ", exponent: 2 })).toMatch(/^(ZZZ\s?123|123 ZZZ)$/);
   });

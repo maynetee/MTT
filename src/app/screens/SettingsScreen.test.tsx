@@ -23,7 +23,7 @@ describe("SettingsScreen money", () => {
     await waitFor(async () => expect((await engine.getView(id)).config.money).toMatchObject({ buyIn: { prize: 5_000, fee: 50 } }));
   });
 
-  it("locks money tracking and the currency once a player has registered, and says why", async () => {
+  it("locks money tracking once a player has registered, and says why, but not the currency", async () => {
     const { engine, id } = await withTournament({ config: { money } });
     await register(engine, id, ["Ann"]);
     renderApp(engine, `/t/${id}/settings`);
@@ -31,10 +31,48 @@ describe("SettingsScreen money", () => {
     const track = await screen.findByRole("checkbox", { name: /Track buy-ins and the prize pool/ });
     expect(track).toBeChecked();
     expect(track).toBeDisabled();
-    expect(screen.getByLabelText("Currency")).toBeDisabled();
-    expect(screen.getAllByText("Fixed once a player has registered.")).toHaveLength(2);
+    expect(screen.getByText("Fixed once a player has registered.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Currency")).toBeEnabled();
+    expect(screen.getByText("Nothing is converted: amounts keep their value.")).toBeInTheDocument();
     // The buy-in can still change until the start.
     expect(screen.getByLabelText("Buy-in")).toBeEnabled();
+  });
+
+  it("relabels the currency after the first entry, amounts kept to the cent, and undoes it", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await withTournament({ config: { money: { ...money, buyIn: { prize: 10_050, fee: 0 } } } });
+    await register(engine, id, ["Ann", "Ben"]);
+    await engine.dispatch(id, { type: "start_clock" });
+    renderApp(engine, `/t/${id}/settings`);
+
+    await user.selectOptions(await screen.findByLabelText("Currency"), "JPY");
+    // Yen normally have no decimals: the amounts keep the two they were recorded with.
+    expect(screen.getByText("Nothing is converted: amounts keep their value and their 2 decimals, as recorded.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Buy-in")).toHaveValue("100.50");
+    expect(screen.getByText("Player pays").nextSibling).toHaveTextContent("¥100.50");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    await waitFor(async () => expect((await engine.getView(id)).config.money?.currency).toEqual({ code: "JPY", exponent: 2 }));
+    expect((await engine.getView(id)).money).toMatchObject({ currency: { code: "JPY", exponent: 2 }, pool: 20_100 });
+
+    await user.click(screen.getByRole("button", { name: /^Undo/ }));
+    await waitFor(async () => expect((await engine.getView(id)).config.money?.currency).toEqual({ code: "EUR", exponent: 2 }));
+    expect(screen.getByLabelText("Currency")).toHaveValue("EUR");
+    expect(screen.getByText("Nothing is converted: amounts keep their value.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Redo/ }));
+    await waitFor(() => expect(screen.getByLabelText("Currency")).toHaveValue("JPY"));
+  });
+
+  it("adopts the new currency's decimals before anyone has paid", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await withTournament({ config: { money } });
+    renderApp(engine, `/t/${id}/settings`);
+
+    await user.selectOptions(await screen.findByLabelText("Currency"), "JPY");
+    expect(screen.queryByText(/Nothing is converted/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    await waitFor(async () => expect((await engine.getView(id)).config.money).toMatchObject({ currency: { code: "JPY", exponent: 0 }, buyIn: { prize: 100 } }));
   });
 
   it("locks the buy-in once started but still accepts a new guarantee", async () => {

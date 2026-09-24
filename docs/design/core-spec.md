@@ -106,11 +106,17 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
 - Play-level numbers skip breaks (`[P, P, B, P]` is 1, 2, -, 3).
 - `UpdateConfig`: while payouts are locked (so also while a deal stands), changing
   `payouts`, `placesPaid`, `payout`, `money.roundingUnit` or `money.minCash` is
-  `PAYOUTS_LOCKED`; otherwise payouts can be turned off or on at any time. Seats per table, starting
-  stack and `money.buyIn` are locked once started;
-  enabling/disabling money tracking and the currency are locked as soon as a player is
-  registered (`CONFIG_LOCKED { field }`, e.g. `money.currency`); `max_tables` cannot drop
-  below a table in use; identical config is `NO_CHANGE`.
+  `PAYOUTS_LOCKED`; otherwise payouts can be turned off or on at any time. Seats per
+  table, starting stack and `money.buyIn` are locked once started; enabling/disabling
+  money tracking is locked as soon as a player is registered (`CONFIG_LOCKED { field }`,
+  e.g. `money`); `max_tables` cannot drop below a table in use; identical config is
+  `NO_CHANGE`.
+- The currency code can change at any time, payouts locked or not: amounts keep their
+  value (EUR 100.00 becomes USD 100.00), a relabel, not a conversion. Its exponent is the
+  unit of every recorded amount, so once a player is registered it cannot change
+  (`CONFIG_LOCKED { field: "money.currency.exponent" }`) and a currency that normally has
+  other digits keeps it (JPY with exponent 2 shows ¥100.50); before that, code and exponent
+  change freely.
 - `UpdateStructure`: once started, levels before the current one are frozen
   (`PAST_LEVEL_MODIFIED`), the current level cannot be removed; changing the current
   level's duration keeps the elapsed time (`remaining += new - old`, clamped at 0).
