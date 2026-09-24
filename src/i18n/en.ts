@@ -2,8 +2,8 @@ import type { EngineErrorCode } from "../engine/types";
 import type { Warning } from "../bindings/Warning";
 import type { Message } from "./translate";
 
-// Parameters in braces; `{row}` is a 1-based structure row, `{max}` etc. derived from `*Ms`
-// params are formatted durations (see errorMessage in ./index.ts).
+// Parameters in braces. Some are derived for display (displayParams in ./core.ts): `{row}` is
+// a 1-based structure row, `{max}` from `maxMs` a formatted duration, `{player}` a name.
 const errors = {
   INVALID_TOURNAMENT_ID: "The tournament id must be 1 to {max} characters.",
   INVALID_TOURNAMENT_NAME: "The tournament name must be 1 to {max} characters.",
@@ -90,10 +90,8 @@ const warnings = {
 export const en = {
   common: {
     cancel: "Cancel",
-    confirm: "Confirm",
     dismiss: "Dismiss",
     loading: "Loading…",
-    save: "Save",
     table: "Table",
     seat: "Seat",
     player: "Player",
@@ -153,7 +151,9 @@ export const en = {
     table_opened: "open table {table}",
     table_broken: "break table {table}",
     final_table_formed: "final table draw",
-    unknown: "{kind}"
+    unknown: "{kind}",
+    /** Stands for the names when the log no longer knows them (an unregistered player). */
+    somePlayer: "a player"
   },
   list: {
     title: "Tournaments",
@@ -178,7 +178,7 @@ export const en = {
     finalTableSizeHint: "Empty: seats per table",
     balanceTrigger: "Rebalance when tables differ by",
     capacity: "Capacity: {count} seats",
-    lockedHint: "Locked once the tournament has started.",
+    lockedHint: "Seats per table and the starting stack are locked once the tournament has started.",
     lateReg: {
       title: "Late registration",
       endOfLevel: "Until the end of play level",
@@ -194,8 +194,7 @@ export const en = {
   },
   settings: {
     title: "Settings",
-    save: "Save settings",
-    saved: "Settings saved."
+    save: "Save settings"
   },
   structure: {
     title: "Levels & breaks",
@@ -254,6 +253,7 @@ export const en = {
   },
   seating: {
     tableTitle: "Table {table}",
+    seatN: "Seat {seat}",
     players: { one: "{count} player", other: "{count} players" },
     setButton: "Set button",
     setButtonHint: "Click the seat that has the button.",
@@ -333,10 +333,8 @@ export const en = {
     minutes: "{count} min"
   },
   display: {
-    clock: "Clock",
     paused: "PAUSED",
     break: "BREAK",
-    finished: "FINISHED",
     notStarted: "NOT STARTED",
     level: "Level {n}",
     blinds: "Blinds {sb}/{bb}",
@@ -359,6 +357,7 @@ export const en = {
     ranking: "Live ranking",
     winner: "Winner: {name}",
     exit: "Exit display",
+    exitKey: "Esc",
     preview: "Display preview",
     openWindow: "Open display window"
   },

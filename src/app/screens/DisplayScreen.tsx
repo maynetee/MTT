@@ -1,27 +1,24 @@
-import { useEffect, useRef, useState } from "react";
-import { closeDisplayWindow, openDisplayWindow } from "../api";
-import type { Player, StateSnapshot } from "../types";
-import { formatTime, moneyStatus, playLevelNumber } from "../utils/tournament";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
+import type { Ante, LevelRow, View } from "../../engine/types";
+import { useI18n, type I18n } from "../../i18n";
+import { useEngine } from "../EngineContext";
+import { useClock } from "../hooks/useClock";
+import { useTournamentView } from "../hooks/useTournamentView";
+import { useTournament } from "../TournamentContext";
+import { formatPlace } from "../utils/labels";
 
 /** How long the exit control stays visible after the mouse stops moving. */
 export const EXIT_CONTROL_HIDE_DELAY_MS = 3000;
-
-function sortEliminated(players: Player[]) {
-  return [...players]
-    .filter((p) => p.status === "eliminated")
-    .sort((a, b) => (b.eliminatedAt ?? 0) - (a.eliminatedAt ?? 0));
-}
-
-function closeDisplay() {
-  closeDisplayWindow().catch((error) => console.error("Could not close the display", error));
-}
 
 /**
  * The fullscreen display has no window controls: Esc closes it, and moving the mouse shows
  * an exit button for a few seconds. Returns whether that button is visible.
  */
-function useExitControl(enabled: boolean) {
+function useExitControl(enabled: boolean, close: () => void) {
   const [visible, setVisible] = useState(false);
+  const closeRef = useRef(close);
+  closeRef.current = close;
 
   useEffect(() => {
     if (!enabled) return;
@@ -39,7 +36,7 @@ function useExitControl(enabled: boolean) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      closeDisplay();
+      closeRef.current();
     };
 
     window.addEventListener("mousemove", onMouseMove);
@@ -54,9 +51,35 @@ function useExitControl(enabled: boolean) {
   return visible;
 }
 
-export default function DisplayScreen({ state, preview }: { state: StateSnapshot; preview?: boolean }) {
+function anteSuffix(i18n: I18n, ante: Ante): string {
+  if (ante.type === "none") return "";
+  return i18n.t(ante.type === "classic" ? "display.anteSuffix_classic" : "display.anteSuffix_big_blind", { amount: i18n.number(ante.amount) });
+}
+
+function nextLevelText(i18n: I18n, next: LevelRow): string {
+  const { level } = next;
+  const text =
+    level.type === "break"
+      ? i18n.t("display.nextBreak", { minutes: Math.round(level.durationMs / 60_000) })
+      : i18n.t("display.nextLevel", { n: next.playLevel ?? 0, sb: i18n.number(level.sb), bb: i18n.number(level.bb), ante: anteSuffix(i18n, level.ante) });
+  return i18n.t("display.next", { level: text });
+}
+
+interface DisplayProps {
+  view: View;
+  offsetMs: number;
+  preview?: boolean;
+}
+
+export default function DisplayScreen({ view, offsetMs, preview = false }: DisplayProps) {
+  const i18n = useI18n();
+  const { t } = i18n;
+  const engine = useEngine();
   const listRef = useRef<HTMLDivElement | null>(null);
-  const exitVisible = useExitControl(!preview);
+  const exitVisible = useExitControl(!preview, () => {
+    engine.closeCurrentWindow().catch((error: unknown) => console.error("Could not close the display", error));
+  });
+  const local = useClock(view, offsetMs);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -67,71 +90,100 @@ export default function DisplayScreen({ state, preview }: { state: StateSnapshot
       const next = container.scrollTop + 120;
       container.scrollTo({ top: next >= maxScroll ? 0 : next, behavior: "smooth" });
     }, 5000);
-
     return () => clearInterval(interval);
   }, []);
 
-  const tournament = state.tournament;
-  const currentLevel = state.levels.find((level) => level.index === tournament?.currentLevelIndex);
-  const nextLevel = state.levels.find((level) => level.index === (tournament?.currentLevelIndex ?? 0) + 1);
-  const remainingPlayers = state.players.filter((p) => p.status === "active").length;
-  const eliminatedPlayers = state.players.filter((p) => p.status === "eliminated").length;
-  const activeTables = state.tables.filter((t) => !t.isClosed).length;
-  const money = tournament ? moneyStatus(remainingPlayers, tournament.itmCount) : null;
-  const eliminatedList = sortEliminated(state.players);
+  const { clock, counts, chips, itm } = view;
+  const finished = view.phase === "finished";
+  const winner = view.winner === null ? null : view.ranking.find((row) => row.player === view.winner);
+  // The clock re-renders the display four times a second; the ranking only changes with the view.
+  const rankingRows = useMemo(
+    () =>
+      view.ranking
+        .filter((row) => !row.alive)
+        .map((row) => (
+          <div key={row.player} className="display-row">
+            {formatPlace(row)} {row.name}
+          </div>
+        )),
+    [view.ranking]
+  );
+  const activeTables = view.tables.filter((table) => table.status === "open").length;
+  const breakInMs = clock.nextBreakInMs === null || clock.isBreak ? null : Math.max(0, clock.nextBreakInMs - local.elapsedMs);
+  const status = finished ? null : view.phase === "setup" ? t("display.notStarted") : clock.running ? null : t("display.paused");
+
+  const averageStack =
+    chips.avgStack === null
+      ? null
+      : chips.avgStackBbX100 === null
+        ? t("display.averageStack", { chips: i18n.number(chips.avgStack) })
+        : t("display.averageStackBb", { chips: i18n.number(chips.avgStack), bb: i18n.bigBlinds(chips.avgStackBbX100) });
+
+  const money =
+    itm.status === "in_money"
+      ? { className: "display-success", text: t("display.inMoney") }
+      : itm.status === "bubble"
+        ? { className: "display-warning", text: t("display.bubble") }
+        : { className: "display-warning", text: t("display.toMoney", { count: itm.toMoney }) };
 
   const content = (
     <div className={preview ? "display-preview" : "display"}>
       {exitVisible && (
-        <button type="button" className="display-exit" onClick={closeDisplay}>
-          Exit display <kbd>Esc</kbd>
+        <button
+          type="button"
+          className="display-exit"
+          onClick={() => engine.closeCurrentWindow().catch((error: unknown) => console.error("Could not close the display", error))}
+        >
+          {t("display.exit")} <kbd>{t("display.exitKey")}</kbd>
         </button>
       )}
       <div className="display-left">
         <div className="display-card">
-          <h2>Clock</h2>
-          {tournament?.clockState === "paused" && <div className="display-paused">PAUSED</div>}
-          <div className="display-time">{formatTime(tournament?.clockRemainingSeconds ?? 0)}</div>
-          {currentLevel?.isBreak ? (
-            <div className="display-break">BREAK</div>
+          <h2>{view.config.name}</h2>
+          {status && <div className="display-paused">{status}</div>}
+          {winner ? (
+            <div className="display-break">{t("display.winner", { name: winner.name })}</div>
           ) : (
             <>
-              <div className="display-level">Level {currentLevel ? playLevelNumber(state.levels, currentLevel) : "—"}</div>
-              {currentLevel && (
-                <div className="display-blinds">Blinds {currentLevel.smallBlind}/{currentLevel.bigBlind} Ante {currentLevel.ante}</div>
+              <div className="display-time">{i18n.duration(local.remainingMs)}</div>
+              {local.overtimeMs > 0 && <div className="display-warning">{t("clock.overtime", { duration: i18n.duration(local.overtimeMs) })}</div>}
+              {clock.isBreak ? (
+                <div className="display-break">{t("display.break")}</div>
+              ) : (
+                <>
+                  <div className="display-level">{t("display.level", { n: clock.playLevel ?? 0 })}</div>
+                  {clock.sb !== null && clock.bb !== null && (
+                    <div className="display-blinds">
+                      {t("display.blinds", { sb: i18n.number(clock.sb), bb: i18n.number(clock.bb) })}
+                      {anteSuffix(i18n, clock.ante)}
+                    </div>
+                  )}
+                </>
               )}
+              {clock.next && <div className="display-next">{nextLevelText(i18n, clock.next)}</div>}
+              {breakInMs !== null && <div className="display-next">{t("display.breakIn", { duration: i18n.duration(breakInMs) })}</div>}
             </>
           )}
-          {nextLevel && (
-            <div className="display-next">
-              Next: {nextLevel.isBreak ? "Break" : `L${playLevelNumber(state.levels, nextLevel)} ${nextLevel.smallBlind}/${nextLevel.bigBlind} A${nextLevel.ante}`}
-            </div>
-          )}
         </div>
 
         <div className="display-card">
-          <h2>Stats</h2>
-          <div className="display-stat">Registered: {state.players.length}</div>
-          <div className="display-stat">Remaining: {remainingPlayers}</div>
-          <div className="display-stat">Eliminated: {eliminatedPlayers}</div>
-          <div className="display-stat">Active Tables: {activeTables}</div>
+          <h2>{t("display.stats")}</h2>
+          <div className="display-stat">{t("display.playersLeft", { alive: counts.alive, entries: counts.entries })}</div>
+          {averageStack && <div className="display-stat">{averageStack}</div>}
+          <div className="display-stat">{t("display.tables", { count: activeTables })}</div>
         </div>
 
         <div className="display-card">
-          <h2>ITM / Bubble</h2>
-          <div className="display-stat">ITM: {tournament?.itmCount ?? 0}</div>
-          {money && <div className={money.kind === "itm" ? "display-success" : "display-warning"}>{money.text}</div>}
+          <h2>{t("display.itmTitle")}</h2>
+          <div className="display-stat">{t("display.placesPaid", { count: view.placesPaid })}</div>
+          {view.phase !== "setup" && <div className={money.className}>{money.text}</div>}
         </div>
       </div>
 
       <div className="display-card display-right">
-        <h2>Live Ranking</h2>
+        <h2>{t("display.ranking")}</h2>
         <div className="display-list" ref={listRef}>
-          {eliminatedList.map((player) => (
-            <div key={player.id} className="display-row">
-              {player.name}
-            </div>
-          ))}
+          {rankingRows}
         </div>
       </div>
     </div>
@@ -141,8 +193,10 @@ export default function DisplayScreen({ state, preview }: { state: StateSnapshot
     return (
       <div className="card">
         <div className="card-header">
-          <h2>Display Preview</h2>
-          <button className="btn" onClick={() => openDisplayWindow()}>Open Display Window</button>
+          <h2>{t("display.preview")}</h2>
+          <button className="btn" onClick={() => void engine.openDisplayWindow(view.id).catch(() => undefined)}>
+            {t("display.openWindow")}
+          </button>
         </div>
         <div className="display-wrapper">{content}</div>
       </div>
@@ -150,4 +204,24 @@ export default function DisplayScreen({ state, preview }: { state: StateSnapshot
   }
 
   return content;
+}
+
+/** The Display tab of the director window. */
+export function DisplayPreview() {
+  const { view, offsetMs } = useTournament();
+  return <DisplayScreen view={view} offsetMs={offsetMs} preview />;
+}
+
+function DisplayWindow({ id }: { id: string }) {
+  const { t, error } = useI18n();
+  const { view, offsetMs, loadError } = useTournamentView(id);
+  if (!view) return <div className="display">{loadError ? error(loadError) : t("common.loading")}</div>;
+  return <DisplayScreen view={view} offsetMs={offsetMs} />;
+}
+
+/** `/display/:id`: the public display window. Read-only: it never dispatches. */
+export function DisplayRoute() {
+  const { id = "" } = useParams();
+  // The desktop host may point an open display at another tournament: start over then.
+  return <DisplayWindow key={id} id={id} />;
 }

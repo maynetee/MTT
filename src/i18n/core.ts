@@ -105,7 +105,8 @@ export function createI18n(locale: Locale = "en"): I18n {
     },
     action(label) {
       const key = lookup(tree, `actions.${label.kind}`) ? `actions.${label.kind}` : "actions.unknown";
-      return translate(key, { kind: label.kind, names: lists.format(label.names), table: label.table ?? undefined });
+      const names = label.names.length > 0 ? lists.format(label.names) : translate("actions.somePlayer");
+      return translate(key, { kind: label.kind, names, table: label.table ?? undefined });
     }
   };
 }

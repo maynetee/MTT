@@ -1,15 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { eliminatePlayer, revivePlayerAtSeat, updateItmCount } from "../api";
-import type { StateSnapshot } from "../types";
-import { freeSeatsAtOpenTables } from "../utils/seating";
+import type { BustInput, RankingRow } from "../../engine/types";
+import { useI18n } from "../../i18n";
+import { useTournament } from "../TournamentContext";
+import { formatPlace } from "../utils/labels";
+import { freeSeatsAtOpenTables, seatKey } from "../utils/view";
 
-export default function PlayersScreen({ state }: { state: StateSnapshot }) {
+/** Selected players of a same-hand elimination, with the starting stack typed for each. */
+type Selection = Map<number, string>;
+
+export default function PlayersScreen() {
+  const i18n = useI18n();
+  const { t } = i18n;
+  const { view, run } = useTournament();
   const [search, setSearch] = useState("");
-  const [itm, setItm] = useState(state.tournament?.itmCount ?? 0);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [revivePlayerId, setRevivePlayerId] = useState<number | "">("");
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [revivePlayer, setRevivePlayer] = useState<number | "">("");
   // null follows the first free seat, "" is an explicit empty choice.
-  const [reviveSeatChoice, setReviveSeatChoice] = useState<number | "" | null>(null);
+  const [reviveSeatChoice, setReviveSeatChoice] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -24,104 +32,156 @@ export default function PlayersScreen({ state }: { state: StateSnapshot }) {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const list = [...state.players].sort((a, b) => a.name.localeCompare(b.name));
-    if (!term) return list;
-    return list.filter((player) => player.name.toLowerCase().includes(term));
-  }, [search, state.players]);
+    const list = [...view.ranking].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) || a.player - b.player);
+    return term ? list.filter((row) => row.name.toLowerCase().includes(term)) : list;
+  }, [search, view.ranking]);
 
-  const eliminatedPlayers = useMemo(() => state.players.filter((p) => p.status === "eliminated"), [state.players]);
-
-  const availableSeats = useMemo(() => freeSeatsAtOpenTables(state), [state]);
-
+  const running = view.phase === "running";
+  const canEliminate = running && view.counts.alive > 1;
+  const eliminated = view.ranking.filter((row) => !row.alive);
+  const availableSeats = freeSeatsAtOpenTables(view);
   // A chosen seat that is no longer free is dropped rather than submitted.
-  const reviveSeatId = reviveSeatChoice ?? availableSeats[0]?.seatId ?? "";
-  const reviveSeat = availableSeats.find((seat) => seat.seatId === reviveSeatId) ?? null;
+  const reviveSeatKey = reviveSeatChoice ?? (availableSeats[0] ? seatKey(availableSeats[0]) : "");
+  const reviveSeat = availableSeats.find((seat) => seatKey(seat) === reviveSeatKey) ?? null;
+  const winner = view.winner === null ? null : view.ranking.find((row) => row.player === view.winner);
 
-  const handleUpdateItm = async () => {
-    if (!Number.isFinite(itm)) return;
-    await updateItmCount(itm);
+  const eliminate = (player: number) => void run({ type: "bust_players", busts: [{ player }] });
+
+  const toggle = (player: number, selected: boolean) => {
+    const next = new Map(selection ?? []);
+    if (selected) next.set(player, "");
+    else next.delete(player);
+    setSelection(next);
+  };
+
+  const eliminateSelected = async () => {
+    if (!selection || selection.size === 0) return;
+    const busts: BustInput[] = [...selection].map(([player, stack]) =>
+      stack.trim() === "" ? { player } : { player, startStack: Math.trunc(Number(stack)) }
+    );
+    if (await run({ type: "bust_players", busts })) setSelection(null);
   };
 
   const handleRevive = async () => {
-    if (revivePlayerId === "" || !reviveSeat) return;
-    await revivePlayerAtSeat(revivePlayerId, reviveSeat.tableNo, reviveSeat.seatNo);
-    setRevivePlayerId("");
-    setReviveSeatChoice(null);
+    if (revivePlayer === "" || !reviveSeat) return;
+    if (await run({ type: "revive_player", player: revivePlayer, seat: reviveSeat })) {
+      setRevivePlayer("");
+      setReviveSeatChoice(null);
+    }
+  };
+
+  const subtitle = (row: RankingRow) => {
+    if (row.player === view.winner) return t("players.winner");
+    if (row.alive) {
+      return t("players.inPlay", { seat: row.seat ? t("common.tableSeat", { table: row.seat.table, seat: row.seat.seat }) : t("common.none") });
+    }
+    return t("players.eliminated", { place: formatPlace(row) });
   };
 
   return (
     <div className="card">
       <div className="card-header">
-        <h2>Players</h2>
-        <div className="inline-form">
-          <input
-            type="number"
-            value={itm}
-            onChange={(event) => setItm(Number(event.target.value))}
-            className="small-input"
-          />
-          <button className="btn" onClick={handleUpdateItm}>Update ITM</button>
-        </div>
+        <h2>{t("players.title")}</h2>
+        {canEliminate && !selection && (
+          <button className="btn" onClick={() => setSelection(new Map())}>
+            {t("players.sameHand")}
+          </button>
+        )}
       </div>
 
-      <div className="card">
-        <div className="card-header">
-          <h3>Revive Eliminated Player</h3>
-        </div>
-        <div className="grid-2">
-          <label>
-            Player
-            <select
-              value={revivePlayerId}
-              onChange={(event) => setRevivePlayerId(event.target.value === "" ? "" : Number(event.target.value))}
-            >
-              <option value="">Select eliminated player</option>
-              {eliminatedPlayers.map((player) => (
-                <option key={player.id} value={player.id}>{player.name}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Seat
-            <select
-              value={reviveSeat?.seatId ?? ""}
-              onChange={(event) => setReviveSeatChoice(event.target.value === "" ? "" : Number(event.target.value))}
-            >
-              <option value="">Select seat</option>
-              {availableSeats.map((seat) => (
-                <option key={seat.seatId} value={seat.seatId}>
-                  Table {seat.tableNo} Seat {seat.seatNo}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <button className="btn" onClick={handleRevive} disabled={revivePlayerId === "" || !reviveSeat}>
-          Revive Player
-        </button>
-      </div>
+      {winner && <div className="feedback-box">{t("players.won", { name: winner.name })}</div>}
 
-      <input
-        ref={inputRef}
-        placeholder="Search player (Cmd+F)"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
+      {selection && (
+        <div className="card same-hand">
+          <div className="muted">{t("players.sameHandHint")}</div>
+          <div className="button-row">
+            <button className="btn primary" onClick={() => void eliminateSelected()} disabled={selection.size === 0}>
+              {t("players.eliminateSelected", { count: selection.size })}
+            </button>
+            <button className="btn" onClick={() => setSelection(null)}>
+              {t("common.cancel")}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {running && eliminated.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <h3>{t("players.reviveTitle")}</h3>
+          </div>
+          <div className="muted">{t("players.reviveHint")}</div>
+          <div className="grid-2">
+            <label>
+              {t("common.player")}
+              <select value={revivePlayer} onChange={(event) => setRevivePlayer(event.target.value === "" ? "" : Number(event.target.value))}>
+                <option value="">{t("players.selectEliminated")}</option>
+                {eliminated.map((row) => (
+                  <option key={row.player} value={row.player}>
+                    {row.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {t("common.seat")}
+              <select value={reviveSeat ? seatKey(reviveSeat) : ""} onChange={(event) => setReviveSeatChoice(event.target.value)}>
+                <option value="">{t("common.selectSeat")}</option>
+                {availableSeats.map((seat) => (
+                  <option key={seatKey(seat)} value={seatKey(seat)}>
+                    {t("common.tableSeat", { table: seat.table, seat: seat.seat })}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <button className="btn" onClick={() => void handleRevive()} disabled={revivePlayer === "" || !reviveSeat}>
+            {t("players.revive")}
+          </button>
+        </div>
+      )}
+
+      <input ref={inputRef} placeholder={t("players.search")} aria-label={t("players.search")} value={search} onChange={(event) => setSearch(event.target.value)} />
 
       <div className="list">
-        {filtered.map((player) => (
-          <div key={player.id} className="list-row">
-            <div>
-              <div className="list-title">{player.name}</div>
-              <div className="list-subtitle">
-                {player.status === "active" ? "Active" : "Eliminated"}
+        {filtered.map((row) => {
+          const selected = selection?.has(row.player) ?? false;
+          return (
+            <div key={row.player} className={`list-row ${selected ? "selected" : ""}`}>
+              <div className="player-cell">
+                {selection && row.alive && (
+                  <input
+                    type="checkbox"
+                    className="row-check"
+                    aria-label={t("players.select", { name: row.name })}
+                    checked={selected}
+                    onChange={(event) => toggle(row.player, event.target.checked)}
+                  />
+                )}
+                <div>
+                  <div className="list-title">{row.name}</div>
+                  <div className="list-subtitle">{subtitle(row)}</div>
+                </div>
               </div>
+              {selection && selected && (
+                <input
+                  type="number"
+                  min={1}
+                  className="stack-input"
+                  placeholder={t("players.startStackOptional")}
+                  aria-label={`${t("players.startStack")} ${row.name}`}
+                  value={selection.get(row.player) ?? ""}
+                  onChange={(event) => setSelection(new Map(selection).set(row.player, event.target.value))}
+                />
+              )}
+              {!selection && canEliminate && row.alive && (
+                <button className="btn" onClick={() => eliminate(row.player)} aria-label={`${t("players.eliminate")} ${row.name}`}>
+                  {t("players.eliminate")}
+                </button>
+              )}
             </div>
-            {player.status === "active" && (
-              <button className="btn" onClick={() => eliminatePlayer(player.id)}>Eliminate</button>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

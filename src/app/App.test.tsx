@@ -1,32 +1,73 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HashRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
-import App from "./App";
+import { describe, expect, it, vi } from "vitest";
+import { register, renderApp, withTournament } from "../test/app";
+import { createTestEngine, tournamentInput } from "../test/wasm";
 
-function renderApp() {
-  return render(
-    <HashRouter>
-      <App />
-    </HashRouter>
-  );
-}
+const playerRow = { selector: ".list-row span" };
 
 describe("App", () => {
-  it("opens on the setup form when no tournament exists", async () => {
-    renderApp();
-    expect(await screen.findByText("Setup Tournament")).toBeInTheDocument();
+  it("opens on the tournament list, in demo mode in a browser", async () => {
+    renderApp(createTestEngine(), "/");
+    expect(await screen.findByRole("heading", { name: "Tournaments" })).toBeInTheDocument();
+    expect(screen.getByText("No tournament yet. Create one to get started.")).toBeInTheDocument();
     expect(screen.getByText("DEMO")).toBeInTheDocument();
+  });
+
+  it("creates a tournament with the default structure and opens its registration", async () => {
+    const user = userEvent.setup();
+    const engine = createTestEngine();
+    renderApp(engine, "/");
+
+    await user.click(await screen.findByRole("link", { name: "New tournament" }));
+    const name = await screen.findByLabelText("Name");
+    await user.clear(name);
+    await user.type(name, "Sunday Major");
+    await user.click(screen.getByRole("button", { name: "Create tournament" }));
+
+    expect(await screen.findByRole("heading", { name: "Register player" })).toBeInTheDocument();
+    const [summary] = await engine.listTournaments();
+    expect(summary).toMatchObject({ name: "Sunday Major", phase: "setup" });
+    const view = await engine.getView(summary.id);
+    expect(view.levels.filter((row) => row.level.type === "play").length).toBeGreaterThanOrEqual(20);
+    expect(view.levels.some((row) => row.level.type === "break")).toBe(true);
+  });
+
+  it("shows the core's validation error for an invalid structure row", async () => {
+    const user = userEvent.setup();
+    renderApp(createTestEngine(), "/new");
+
+    const bigBlind = await screen.findByLabelText("Level 2 BB");
+    await user.clear(bigBlind);
+    await user.type(bigBlind, "10");
+    await user.click(screen.getByRole("button", { name: "Create tournament" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Row 2: the small blind must be more than 0 and the big blind at least the small blind."
+    );
+    expect(bigBlind.closest(".level-row")).toHaveClass("invalid");
+  });
+
+  it("deletes a tournament after confirmation", async () => {
+    const user = userEvent.setup();
+    const { engine } = await withTournament();
+    renderApp(engine, "/");
+
+    await user.click(await screen.findByRole("button", { name: "Delete Test event" }));
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("Delete “Test event”?");
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+
+    expect(await screen.findByText("No tournament yet. Create one to get started.")).toBeInTheDocument();
+    expect(await engine.listTournaments()).toEqual([]);
   });
 
   it("ignores the undo shortcut while typing in a field", async () => {
     const user = userEvent.setup();
-    renderApp();
+    const { engine, id } = await withTournament();
+    renderApp(engine, `/t/${id}/registration`);
 
-    await user.click(await screen.findByRole("button", { name: "Create Tournament" }));
     const nameInput = await screen.findByPlaceholderText("Player name");
     await user.type(nameInput, "Alice{Enter}");
-    const playerRow = { selector: ".list-row span" };
     expect(await screen.findByText("Alice", playerRow)).toBeInTheDocument();
 
     await user.type(nameInput, "Bo");
@@ -37,5 +78,58 @@ describe("App", () => {
     expect(document.body).toHaveFocus();
     await user.keyboard("{Meta>}z{/Meta}");
     await waitFor(() => expect(screen.queryByText("Alice", playerRow)).not.toBeInTheDocument());
+
+    // Shift+Cmd+Z redoes.
+    await user.keyboard("{Meta>}{Shift>}z{/Shift}{/Meta}");
+    expect(await screen.findByText("Alice", playerRow)).toBeInTheDocument();
+  });
+
+  it("labels Undo and Redo with the action from the history", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await withTournament();
+    await register(engine, id, ["Alice", "Bob"]);
+    renderApp(engine, `/t/${id}/registration`);
+
+    await user.click(await screen.findByRole("button", { name: "Undo register Bob" }));
+    expect(await screen.findByRole("button", { name: "Redo register Bob" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Undo register Alice" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Redo register Bob" }));
+    expect(await screen.findByRole("button", { name: "Redo" })).toBeDisabled();
+  });
+
+  it("shows a rejected command's translated error in the banner", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await withTournament();
+    await register(engine, id, ["Alice"]);
+    renderApp(engine, `/t/${id}/registration`);
+
+    await user.type(await screen.findByPlaceholderText("Player name"), "alice{Enter}");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Alice is already registered.");
+    expect(screen.getByPlaceholderText("Player name")).toHaveValue("alice");
+  });
+
+  it("offers the previous version's tournament on an empty list, once", async () => {
+    const user = userEvent.setup();
+    const engine = createTestEngine();
+    vi.spyOn(engine, "legacyImportStatus").mockResolvedValue({ available: true });
+    vi.spyOn(engine, "importLegacy").mockImplementation(() => engine.createTournament(tournamentInput({ name: "Imported" })));
+    const { unmount } = renderApp(engine, "/");
+
+    await user.click(await screen.findByRole("button", { name: "Import from the previous version" }));
+    expect(await screen.findByRole("heading", { name: "Register player" })).toBeInTheDocument();
+    unmount();
+
+    // The host still reports the old data: the offer does not come back.
+    await engine.deleteTournament((await engine.listTournaments())[0].id);
+    renderApp(engine, "/");
+    expect(await screen.findByText("No tournament yet. Create one to get started.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Import from the previous version" })).not.toBeInTheDocument();
+  });
+
+  it("shows when a tournament no longer exists", async () => {
+    renderApp(createTestEngine(), "/t/missing/players");
+    expect(await screen.findByText("This tournament does not exist anymore.")).toBeInTheDocument();
   });
 });

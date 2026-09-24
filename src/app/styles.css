@@ -592,3 +592,191 @@ label {
   background: white;
   border: 1px solid #bbf7d0;
 }
+/* Tournament list, header and shared pieces of the core-driven UI. */
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+}
+
+.brand-link {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand {
+  gap: 24px;
+}
+
+.header-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.header-title a,
+.brand > a:not(.brand-link) {
+  font-size: 12px;
+  color: #64748b;
+  text-decoration: none;
+}
+
+.header-title strong {
+  font-size: 18px;
+}
+
+.clock-toggle {
+  min-width: 100px;
+  border: 1px solid currentColor;
+}
+
+.clock-toggle.running {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.clock-toggle.paused {
+  background: #dcfce7;
+  color: #166534;
+}
+
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  /* The size browsers give buttons, so links styled as buttons match them. */
+  font-size: 13.3333px;
+}
+
+.warning-banner {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 10px 14px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.warning-text {
+  color: #b45309;
+}
+
+.tournament-list,
+.seating,
+.moves,
+.clock-screen,
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.engine-error {
+  padding: 32px;
+  color: #991b1b;
+}
+
+.levels-header.structure,
+.level-row.structure {
+  grid-template-columns: 110px 80px 90px 90px 110px 90px 60px 40px;
+}
+
+.level-row.active-level {
+  background: #f1f5f9;
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px #f1f5f9;
+}
+
+.level-row.active-level > .pill {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.card > .pill {
+  align-self: flex-start;
+}
+
+.level-row.invalid input,
+.level-row.invalid select {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.levels-scroll {
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+}
+
+.btn.small.remove-level {
+  color: #ef4444;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+}
+
+.late-reg {
+  display: grid;
+  gap: 10px;
+}
+
+.late-reg .small-input {
+  width: 90px;
+}
+
+.toggle.nested {
+  margin-left: 28px;
+}
+
+.seat-markers {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+  margin-right: 10px;
+}
+
+.seat-marker {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.seat-marker.dealer {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.seat-button {
+  width: 100%;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-weight: 400;
+  text-align: left;
+}
+
+.seat-button:hover {
+  background: #e2e8f0;
+}
+
+.player-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.list-row.selected {
+  background: #fee2e2;
+}
+
+.stack-input {
+  max-width: 220px;
+}

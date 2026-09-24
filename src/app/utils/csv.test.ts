@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RankingEntry } from "../types";
+import type { RankingRow } from "../../engine/types";
 import { buildRankingCsv, escapeCsvField, toCsvRow } from "./csv";
 
 describe("escapeCsvField", () => {
@@ -36,21 +36,47 @@ describe("escapeCsvField", () => {
   });
 });
 
-describe("buildRankingCsv", () => {
-  it("writes a header and one escaped row per entry, with a BOM and CRLF line endings", () => {
-    const entries: RankingEntry[] = [
-      { place: null, playerId: 1, playerName: "Zoë", status: "active", eliminatedAt: null },
-      { place: 2, playerId: 2, playerName: "Doe, John", status: "eliminated", eliminatedAt: 2 },
-      { place: 3, playerId: 3, playerName: "=cmd|' /C calc'!A0", status: "eliminated", eliminatedAt: 1 }
-    ];
+function row(player: number, name: string, place: number | null, extra: Partial<RankingRow> = {}): RankingRow {
+  return {
+    player,
+    name,
+    alive: place === null,
+    seat: place === null ? { table: 1, seat: player } : null,
+    place,
+    placeTo: null,
+    provisional: false,
+    inMoney: false,
+    entries: 1,
+    ...extra
+  };
+}
 
-    expect(buildRankingCsv(entries)).toBe(
-      "﻿" +
+describe("buildRankingCsv", () => {
+  it("writes a header and one escaped row per player, with a BOM and CRLF line endings", () => {
+    const rows = [row(1, "Zoë", null), row(2, "Doe, John", 2), row(3, "=cmd|' /C calc'!A0", 3)];
+
+    expect(buildRankingCsv(rows, null)).toBe(
+      "\uFEFF" +
         "Place,Player,Status\r\n" +
         ",Zoë,In play\r\n" +
         '2,"Doe, John",Eliminated\r\n' +
         "3,'=cmd|' /C calc'!A0,Eliminated\r\n"
     );
+  });
+
+  it("names the winner and says ties and provisional places", () => {
+    const rows = [
+      row(1, "Ann", 1, { alive: true }),
+      row(2, "Ben", 2, { placeTo: 3 }),
+      row(3, "Cat", 2, { placeTo: 3, provisional: true })
+    ];
+
+    expect(buildRankingCsv(rows, 1).split("\r\n").slice(1)).toEqual([
+      "1,Ann,Winner",
+      "2,Ben,Eliminated (tie 2–3)",
+      "2,Cat,\"Eliminated (tie 2–3, provisional)\"",
+      ""
+    ]);
   });
 
   it("joins rows of mixed fields", () => {

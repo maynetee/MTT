@@ -1,72 +1,94 @@
-import { useState } from "react";
-import { registerPlayer, registerPlayerAtSeat } from "../api";
-import type { StateSnapshot } from "../types";
-import { openSeatsLeft } from "../utils/seating";
+import { useRef, useState } from "react";
+import type { SeatRef, View } from "../../engine/types";
+import { useI18n } from "../../i18n";
+import { useClock } from "../hooks/useClock";
+import { useTournament } from "../TournamentContext";
+import { seatsLeft } from "../utils/view";
 
-function lateRegOpen(state: StateSnapshot) {
-  const tournament = state.tournament;
-  if (!tournament) return false;
-  if (tournament.status === "setup") return true;
-  if (!tournament.lateRegEnabled) return false;
-  if (tournament.lateRegEndLevel !== null && tournament.currentLevelIndex > tournament.lateRegEndLevel) {
-    return false;
-  }
-  if (tournament.lateRegEndTimeSeconds !== null) {
-    const past = state.levels
-      .filter((level) => level.index < tournament.currentLevelIndex)
-      .reduce((acc, level) => acc + level.durationSeconds, 0);
-    const currentDuration = state.levels.find((level) => level.index === tournament.currentLevelIndex)?.durationSeconds ?? 0;
-    const elapsedCurrent = Math.max(0, currentDuration - tournament.clockRemainingSeconds);
-    if (past + elapsedCurrent > tournament.lateRegEndTimeSeconds) return false;
-  }
-  return true;
+/** The player registered last: ids are allocated in order and never reused. */
+function newestPlayer(view: View) {
+  return view.ranking.reduce<View["ranking"][number] | null>((newest, row) => (!newest || row.player > newest.player ? row : newest), null);
 }
 
-export default function RegistrationScreen({ state }: { state: StateSnapshot }) {
+/** When registration closes; its own component so the countdown does not re-render the page. */
+function RegistrationDeadline({ view, offsetMs }: { view: View; offsetMs: number }) {
+  return <>{useDeadlineText(view, offsetMs)}</>;
+}
+
+function useDeadlineText(view: View, offsetMs: number): string {
+  const i18n = useI18n();
+  const { t } = i18n;
+  const clock = useClock(view, offsetMs);
+  const { registration } = view;
+  if (registration.closesAtMs !== null) {
+    const hostNow = view.generatedAtMs + clock.elapsedMs;
+    return t("registration.closesAt", {
+      time: i18n.timeOfDay(registration.closesAtMs - offsetMs),
+      duration: i18n.duration(registration.closesAtMs - hostNow)
+    });
+  }
+  if (view.phase === "running" && registration.open && registration.closesInMs !== null) {
+    return t("registration.closesIn", { duration: i18n.duration(registration.closesInMs) });
+  }
+  const deadline = registration.deadline;
+  switch (deadline.type) {
+    case "end_of_play_level":
+      return t(deadline.throughBreak ? "registration.deadlineLevelBreak" : "registration.deadlineLevel", { n: deadline.n });
+    case "elapsed":
+      return t("registration.deadlineElapsed", { duration: i18n.durationWords(deadline.ms) });
+    case "manual":
+      return t("registration.deadlineManual");
+  }
+}
+
+export default function RegistrationScreen() {
+  const { t } = useI18n();
+  const { view, offsetMs, run } = useTournament();
   const [name, setName] = useState("");
-  const [strategy, setStrategy] = useState<"random" | "balanced">("balanced");
-  const [feedback, setFeedback] = useState<{ tableNo: number; seatNo: number; playerName: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ name: string; seat: SeatRef } | null>(null);
   const [forceSeat, setForceSeat] = useState(false);
-  const [tableNo, setTableNo] = useState(2);
+  const [tableNo, setTableNo] = useState(1);
   const [seatNo, setSeatNo] = useState(1);
-  const lateRegStatus = lateRegOpen(state);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const { registration, phase } = view;
 
   const handleAdd = async () => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    try {
-      const seat = forceSeat
-        ? await registerPlayerAtSeat(trimmed, tableNo, seatNo)
-        : await registerPlayer(trimmed, strategy);
-      const table = state.tables.find(t => t.id === seat.tableId);
-      if (table) {
-        setFeedback({ tableNo: table.tableNo, seatNo: seat.seatNo, playerName: trimmed });
-      }
-      setName("");
-    } catch (err) {
-      // The API layer already reports the failure through app_error.
-      console.error(err);
-    }
+    const next = await run({
+      type: "register",
+      name: trimmed,
+      ...(forceSeat ? { seat: { table: tableNo, seat: seatNo } } : {})
+    });
+    if (!next) return;
+    const player = newestPlayer(next);
+    if (player?.seat) setFeedback({ name: player.name, seat: player.seat });
+    setName("");
+    inputRef.current?.focus();
   };
 
-  const remainingSeats = openSeatsLeft(state);
+  const alive = view.ranking.filter((row) => row.alive);
 
   return (
     <div className="grid-2">
       <div className="card">
-        <h2>Register Player</h2>
+        <h2>{t("registration.title")}</h2>
 
         {feedback && (
-          <div className="feedback-box">
-            <div className="feedback-title">✅ Registered</div>
-            <div className="feedback-player">{feedback.playerName}</div>
-            <div className="feedback-seat">Table {feedback.tableNo} — Seat {feedback.seatNo}</div>
-            <button className="btn small" onClick={() => setFeedback(null)}>Dismiss</button>
+          <div className="feedback-box" role="status">
+            <div className="feedback-title">{t("registration.registered")}</div>
+            <div className="feedback-player">{feedback.name}</div>
+            <div className="feedback-seat">{t("registration.seatFeedback", { table: feedback.seat.table, seat: feedback.seat.seat })}</div>
+            <button className="btn small" onClick={() => setFeedback(null)}>
+              {t("common.dismiss")}
+            </button>
           </div>
         )}
 
         <input
-          placeholder="Player name"
+          ref={inputRef}
+          placeholder={t("registration.placeholder")}
+          aria-label={t("registration.placeholder")}
           value={name}
           onChange={(event) => {
             setName(event.target.value);
@@ -75,42 +97,22 @@ export default function RegistrationScreen({ state }: { state: StateSnapshot }) 
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
-              handleAdd();
+              void handleAdd();
             }
           }}
           autoFocus
         />
-        <div className="radio-group">
-          <label>
-            <input
-              type="radio"
-              value="balanced"
-              checked={strategy === "balanced"}
-              onChange={() => setStrategy("balanced")}
-            />
-            Random (Balanced)
-          </label>
-          <label>
-            <input
-              type="radio"
-              value="random"
-              checked={strategy === "random"}
-              onChange={() => setStrategy("random")}
-            />
-            Random
-          </label>
-        </div>
         <div className="card">
           <div className="card-header">
-            <h3>Force Seat (Override Late Reg)</h3>
+            <h3>{t("registration.forceSeat")}</h3>
             <label className="toggle">
               <input type="checkbox" checked={forceSeat} onChange={(event) => setForceSeat(event.target.checked)} />
-              Enabled
+              {t("registration.enabled")}
             </label>
           </div>
           <div className="grid-2">
             <label>
-              Table
+              {t("common.table")}
               <input
                 type="number"
                 min={1}
@@ -120,43 +122,64 @@ export default function RegistrationScreen({ state }: { state: StateSnapshot }) 
               />
             </label>
             <label>
-              Seat
-              <input
-                type="number"
-                min={1}
-                value={seatNo}
-                onChange={(event) => setSeatNo(Number(event.target.value))}
-                disabled={!forceSeat}
-              />
+              {t("common.seat")}
+              <input type="number" min={1} value={seatNo} onChange={(event) => setSeatNo(Number(event.target.value))} disabled={!forceSeat} />
             </label>
           </div>
-          <div className="muted">Bypasses late registration and assigns directly if the seat is free.</div>
+          <div className="muted">{t("registration.forceSeatHint")}</div>
         </div>
-        <button className="btn primary" onClick={handleAdd}>Register</button>
+        <button className="btn primary" onClick={() => void handleAdd()}>
+          {t("registration.register")}
+        </button>
       </div>
 
       <div className="card">
-        <h3>Capacity</h3>
+        <h3>{t("registration.capacity")}</h3>
         <div className="stats-grid">
           <div>
-            <div className="stat-value">{state.players.length}</div>
-            <div className="stat-label">Registered</div>
+            <div className="stat-value">{view.counts.unique}</div>
+            <div className="stat-label">{t("registration.registeredCount")}</div>
           </div>
           <div>
-            <div className="stat-value">{remainingSeats}</div>
-            <div className="stat-label">Seats left</div>
+            <div className="stat-value">{seatsLeft(view)}</div>
+            <div className="stat-label">{t("registration.seatsLeft")}</div>
           </div>
           <div>
-            <div className={`pill ${lateRegStatus ? "" : "muted"}`}>
-              Late reg {lateRegStatus ? "OPEN" : "CLOSED"}
+            <div className={`pill ${registration.open ? "" : "muted"}`}>
+              {registration.open ? t("registration.open") : t("registration.closed")}
             </div>
           </div>
         </div>
-        <h4>Active Players</h4>
+        <div className="muted">
+          <RegistrationDeadline view={view} offsetMs={offsetMs} />
+          {registration.overrideOpen !== null && ` · ${t("registration.overridden")}`}
+        </div>
+        {phase === "running" && (
+          <div className="button-row">
+            {registration.open ? (
+              <button className="btn" onClick={() => void run({ type: "close_registration" })}>
+                {t("registration.close")}
+              </button>
+            ) : (
+              <button className="btn" onClick={() => void run({ type: "reopen_registration" })}>
+                {t("registration.reopen")}
+              </button>
+            )}
+          </div>
+        )}
+        <h4>{t("registration.players")}</h4>
         <div className="list">
-          {state.players.filter((p) => p.status === "active").map((player) => (
-            <div key={player.id} className="list-row">
-              <span>{player.name}</span>
+          {alive.map((row) => (
+            <div key={row.player} className="list-row">
+              <span>{row.name}</span>
+              <span className="button-row">
+                {row.seat && <span className="muted">{t("common.tableSeatShort", { table: row.seat.table, seat: row.seat.seat })}</span>}
+                {phase === "setup" && (
+                  <button className="btn small" onClick={() => void run({ type: "unregister", player: row.player })}>
+                    {t("registration.remove")}
+                  </button>
+                )}
+              </span>
             </div>
           ))}
         </div>

@@ -1,69 +1,50 @@
-import type { RankingEntry } from "../types";
-import { emitAppError, isTauriAvailable, saveExport } from "../api";
+import { isEngineError, type Engine, type RankingRow } from "../../engine/types";
+import { i18n as english, type I18n } from "../../i18n";
 import { buildRankingCsv } from "./csv";
 import { rankingFileName } from "./fileName";
 
-export interface PdfExportMeta {
+export interface RankingExport {
   tournamentName: string;
   /** Whether the tournament is finished, i.e. whether the ranking is final. */
   finished: boolean;
+  winner: number | null;
+  rows: readonly RankingRow[];
 }
 
-/** Delay before releasing a download's object URL (the value FileSaver.js uses). */
-export const OBJECT_URL_REVOKE_DELAY_MS = 40_000;
+/** An export failure, with a message ready for the user. */
+export class ExportError extends Error {}
 
-function downloadBrowser(filename: string, content: BlobPart, mimeType: string) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.style.display = "none";
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  // Revoking synchronously after click() can cancel the download before the browser has read the blob.
-  setTimeout(() => URL.revokeObjectURL(url), OBJECT_URL_REVOKE_DELAY_MS);
-}
-
-function reportExportError(format: "CSV" | "PDF", error: unknown) {
+function failure(i18n: I18n, format: "CSV" | "PDF", error: unknown): ExportError {
   console.error(`${format} export failed`, error);
-  const reason = error instanceof Error ? error.message : String(error);
-  emitAppError(`${format} export failed: ${reason}`);
+  const reason = isEngineError(error) ? i18n.error(error) : error instanceof Error ? error.message : String(error);
+  return new ExportError(i18n.t("exports.failed", { format, reason }));
 }
 
-/** Never rejects: failures are reported through the app error banner. */
-export async function exportCSV(entries: RankingEntry[], tournamentName: string): Promise<void> {
+/**
+ * Saves the ranking as CSV: a download in the browser, the save dialog on the desktop.
+ * Resolves to false when the user cancels; rejects with an `ExportError`.
+ */
+export async function exportCSV(engine: Engine, data: RankingExport, i18n: I18n = english): Promise<boolean> {
   try {
-    const content = buildRankingCsv(entries);
-    const fileName = rankingFileName(tournamentName, "csv");
-
-    if (!isTauriAvailable()) {
-      downloadBrowser(fileName, content, "text/csv;charset=utf-8");
-      return;
-    }
-
-    await saveExport(fileName, new TextEncoder().encode(content));
+    const content = buildRankingCsv(data.rows, data.winner, i18n);
+    return await engine.saveExport({
+      fileName: rankingFileName(data.tournamentName, "csv"),
+      bytes: new TextEncoder().encode(content),
+      mimeType: "text/csv;charset=utf-8"
+    });
   } catch (error) {
-    reportExportError("CSV", error);
+    throw failure(i18n, "CSV", error);
   }
 }
 
-/** Never rejects: failures are reported through the app error banner. */
-export async function exportPDF(entries: RankingEntry[], { tournamentName, finished }: PdfExportMeta): Promise<void> {
+/** Same as `exportCSV`, as a PDF. */
+export async function exportPDF(engine: Engine, data: RankingExport, i18n: I18n = english): Promise<boolean> {
   try {
     // pdf-lib, fontkit and the fonts are only downloaded when a PDF is actually exported.
     const { buildRankingPdf } = await import("./rankingPdf");
-    const bytes = await buildRankingPdf(entries, { tournamentName, finished });
-    const fileName = rankingFileName(tournamentName, "pdf");
-
-    if (!isTauriAvailable()) {
-      downloadBrowser(fileName, bytes.slice().buffer, "application/pdf");
-      return;
-    }
-
-    await saveExport(fileName, bytes);
+    const bytes = await buildRankingPdf(data.rows, { ...data, i18n });
+    return await engine.saveExport({ fileName: rankingFileName(data.tournamentName, "pdf"), bytes, mimeType: "application/pdf" });
   } catch (error) {
-    reportExportError("PDF", error);
+    throw failure(i18n, "PDF", error);
   }
 }

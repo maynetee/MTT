@@ -1,5 +1,6 @@
-import type { RankingEntry } from "../types";
-import { rankingStatusLabel } from "./ranking";
+import type { RankingRow } from "../../engine/types";
+import { i18n as english, type I18n } from "../../i18n";
+import { rankingStatus } from "./labels";
 
 /** Characters that make spreadsheet applications evaluate a cell as a formula. */
 const FORMULA_PREFIX = /^[=+\-@\t\r]/;
@@ -23,11 +24,13 @@ export function toCsvRow(fields: ReadonlyArray<string | number | null | undefine
 /**
  * Ranking as CSV: CRLF line endings, and a UTF-8 byte order mark so that
  * spreadsheet applications such as Excel decode non-ASCII names correctly.
+ * Tied players share their best place; the status column says the tie.
  */
-export function buildRankingCsv(entries: readonly RankingEntry[]): string {
-  const rows = [
-    toCsvRow(["Place", "Player", "Status"]),
-    ...entries.map((entry) => toCsvRow([entry.place, entry.playerName, rankingStatusLabel(entry)]))
+export function buildRankingCsv(rows: readonly RankingRow[], winner: number | null, i18n: I18n = english): string {
+  const { t } = i18n;
+  const lines = [
+    toCsvRow([t("exports.place"), t("exports.player"), t("exports.status")]),
+    ...rows.map((row) => toCsvRow([row.place, row.name, rankingStatus(i18n, row, winner)]))
   ];
-  return `﻿${rows.join("\r\n")}\r\n`;
+  return `﻿${lines.join("\r\n")}\r\n`;
 }
