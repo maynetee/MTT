@@ -394,8 +394,9 @@ pub(crate) fn decide_break(
     Ok(Event::TableBroken { table, moves })
 }
 
-/// `FormFinalTable`: every remaining player is redrawn to a random seat at `table`; the
-/// other tables close and the button is left for the director to set.
+/// `FormFinalTable`: every remaining player is redrawn to a random seat among the first
+/// `final_table_size` seats of `table`; the other tables close and the button is left for
+/// the director to set.
 pub(crate) fn decide_final_table(
     state: &State,
     table: TableNo,
@@ -419,7 +420,12 @@ pub(crate) fn decide_final_table(
             seats: target.seats,
         });
     }
-    let mut seats: Vec<SeatNo> = (1..=target.seats).map(SeatNo).collect();
+    // The draw uses the final table's seats (every player gets one if more are left): on
+    // larger tables the extra seats stay empty rather than leaving gaps among the players.
+    let used = usize::from(state.config.final_table_size())
+        .max(alive.len())
+        .min(usize::from(target.seats));
+    let mut seats: Vec<SeatNo> = (1..=used as u8).map(SeatNo).collect();
     rng.shuffle(&mut seats);
     let moves = alive
         .into_iter()
@@ -663,6 +669,44 @@ mod tests {
             break_sequence(kit.agg.state()),
             vec![TableNo(2), TableNo(4), TableNo(3), TableNo(1)]
         );
+    }
+
+    #[test]
+    fn final_table_draw_uses_the_final_table_seats() {
+        // Nine-seat tables, an eight-handed final table.
+        let mut config = crate::config::Config::new("Unit", 9, 2, 1000);
+        config.final_table_size = Some(8);
+        let mut kit = Kit::with_config(config);
+        let players: Vec<PlayerId> = (0..12)
+            .map(|i| kit.register_at(&format!("P{i}"), 1 + (i % 2) as u16, 1 + (i / 2) as u8))
+            .collect();
+        kit.ok(Command::StartClock {});
+        for &player in &players[..4] {
+            kit.ok(crate::testkit::bust(&[player]));
+        }
+        assert_eq!(suggestions(kit.agg.state()).final_table, Some(TableNo(1)));
+        // Whatever the draw, the eight players take seats 1 to 8: no gap at the table.
+        for seed in 0..64 {
+            let Event::FinalTableFormed { moves, .. } =
+                decide_final_table(kit.agg.state(), TableNo(1), &mut Rng::from_seed(seed)).unwrap()
+            else {
+                panic!("not a final table draw");
+            };
+            let mut seats: Vec<u8> = moves.iter().map(|m| m.to.seat.0).collect();
+            seats.sort_unstable();
+            assert_eq!(seats, (1..=8).collect::<Vec<u8>>(), "seed {seed}");
+        }
+        // Fewer players than the final table seats: they are drawn among its seats only.
+        kit.ok(crate::testkit::bust(&[players[4]]));
+        for seed in 0..64 {
+            let Event::FinalTableFormed { moves, .. } =
+                decide_final_table(kit.agg.state(), TableNo(1), &mut Rng::from_seed(seed)).unwrap()
+            else {
+                panic!("not a final table draw");
+            };
+            assert_eq!(moves.len(), 7);
+            assert!(moves.iter().all(|m| m.to.seat.0 <= 8), "seed {seed}");
+        }
     }
 
     #[test]

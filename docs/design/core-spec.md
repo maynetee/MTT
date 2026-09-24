@@ -156,8 +156,10 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
   button included (TDA). The table closes and its button is cleared (`TABLE_NOT_OPEN`,
   `LAST_TABLE`, `NOT_ENOUGH_SEATS`).
 - `FormFinalTable { table }`: every remaining player is redrawn to a random seat at
-  `table` (not closed; an idle table opens), every other open table closes, the button is
-  cleared for the director to set after the draw (`TOO_MANY_FOR_FINAL_TABLE`).
+  `table` (not closed; an idle table opens) among its first `max(final_table_size, alive)`
+  seats, so a final table smaller than the tables has no gap; every other open table
+  closes, the button is cleared for the director to set after the draw
+  (`TOO_MANY_FOR_FINAL_TABLE`).
 
 ## Re-entries, rebuys, add-ons
 
