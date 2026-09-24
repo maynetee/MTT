@@ -6,6 +6,8 @@ import type { BustInput } from "../bindings/BustInput";
 import type { ClockView } from "../bindings/ClockView";
 import type { Command } from "../bindings/Command";
 import type { Config } from "../bindings/Config";
+import type { DealQuote } from "../bindings/DealQuote";
+import type { DealRequest } from "../bindings/DealRequest";
 import type { Deadline } from "../bindings/Deadline";
 import type { DomainError } from "../bindings/DomainError";
 import type { History } from "../bindings/History";
@@ -29,6 +31,8 @@ export type {
   ClockView,
   Command,
   Config,
+  DealQuote,
+  DealRequest,
   Deadline,
   DomainError,
   History,
@@ -125,6 +129,8 @@ export interface Engine {
   getView(id: string): Promise<View>;
   /** Runs a command (undo/redo included) and returns the view after it. */
   dispatch(id: string, command: Command): Promise<View>;
+  /** ICM and chip chop proposals for a deal. A pure query: nothing is stored or announced. */
+  quoteDeal(request: DealRequest): Promise<DealQuote>;
   /** Called with the tournament id after every change, from any window or tab. */
   subscribe(listener: (id: string) => void): () => void;
   openDisplayWindow(id: string): Promise<void>;

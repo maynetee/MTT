@@ -1,10 +1,12 @@
-import init, { WasmTournament } from "../wasm/pkg/mtt_wasm.js";
+import init, { WasmTournament, quoteDeal as wasmQuoteDeal } from "../wasm/pkg/mtt_wasm.js";
 import wasmUrl from "../wasm/pkg/mtt_wasm_bg.wasm?url";
 import {
   hostError,
   notFound,
   toEngineError,
   type Command,
+  type DealQuote,
+  type DealRequest,
   type Engine,
   type ExportFile,
   type NewTournamentInput,
@@ -213,6 +215,10 @@ export class WasmEngine implements Engine {
     this.cache.set(id, { tournament, rev: next.rev });
     this.changed(id);
     return view;
+  }
+
+  async quoteDeal(request: DealRequest): Promise<DealQuote> {
+    return JSON.parse(wasmCall(() => wasmQuoteDeal(JSON.stringify(request)))) as DealQuote;
   }
 
   subscribe(listener: (id: string) => void): () => void {

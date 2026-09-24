@@ -7,6 +7,7 @@ const COMMANDS: &[&str] = &[
     "delete_tournament",
     "get_view",
     "dispatch",
+    "quote_deal",
     "open_display_window",
     "save_export",
     "legacy_import_status",

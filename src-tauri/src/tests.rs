@@ -104,6 +104,19 @@ fn get_view(window: &WebviewWindow<MockRuntime>, id: &str) -> Result<Value, Valu
     invoke(window, "get_view", json!({ "id": id }))
 }
 
+fn quote_deal(window: &WebviewWindow<MockRuntime>, request: Value) -> Result<Value, Value> {
+    invoke(window, "quote_deal", json!({ "request": request }))
+}
+
+fn sum(amounts: &Value) -> i64 {
+    amounts
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|amount| amount.as_i64().unwrap())
+        .sum()
+}
+
 /// A view without the fields that depend on when it was computed.
 fn timeless(mut view: Value) -> Value {
     view.as_object_mut().unwrap().remove("generatedAtMs");
@@ -343,6 +356,10 @@ fn the_display_window_can_read_tournaments_but_not_change_them() {
             "dispatch",
             json!({"id": id, "command": {"type": "start_clock"}}),
         ),
+        (
+            "quote_deal",
+            json!({"request": {"stacks": [2, 1], "prizes": [60, 40]}}),
+        ),
         ("create_tournament", json!({"input": input("Nope")})),
         ("delete_tournament", json!({"id": id})),
         ("open_display_window", json!({"id": id})),
@@ -359,6 +376,72 @@ fn the_display_window_can_read_tournaments_but_not_change_them() {
         );
     }
     assert_eq!(stored_events(data_dir.path(), &id), 1);
+}
+
+#[test]
+fn a_deal_quote_adds_up_exactly_to_the_prizes() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let app = mock_app(data_dir.path());
+    let main = main_window(&app);
+
+    // Malmuth-Harville by hand, 5000/3000/2000 chips for 500/300/200.00: A finishes first
+    // 1/2, second 3/10 * 5/7 + 1/5 * 5/8 = 19/56, third 9/56, so 250 + 300 * 19/56 +
+    // 200 * 9/56 = 383.93; B 150 + 300 * 3/8 + 200 * 13/40 = 327.50; C 288.57. Chip chop:
+    // 200.00 each, the other 400.00 by chips.
+    let quote = quote_deal(
+        &main,
+        json!({"stacks": [5000, 3000, 2000], "prizes": [50000, 30000, 20000]}),
+    );
+    assert_eq!(
+        quote,
+        Ok(json!({
+            "icm": [38393, 32750, 28857],
+            "chipChop": [40000, 32000, 28000],
+            "playFor": 0
+        }))
+    );
+
+    // Uneven amounts and money kept to play for: every minor unit is still handed out.
+    let quote = quote_deal(
+        &main,
+        json!({"stacks": [7001, 5003, 2999, 0], "prizes": [100_003, 60_001, 39_997], "playFor": 1_001}),
+    )
+    .unwrap();
+    assert_eq!(quote["playFor"], 1_001);
+    assert_eq!(sum(&quote["icm"]) + 1_001, 200_001);
+    assert_eq!(sum(&quote["chipChop"]) + 1_001, 200_001);
+    assert_eq!(quote["icm"][3], 0, "no chips, fourth place pays nothing");
+    assert_eq!(invoke(&main, "list_tournaments", json!({})), Ok(json!([])));
+}
+
+#[test]
+fn an_invalid_deal_returns_the_domain_error() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let app = mock_app(data_dir.path());
+    let main = main_window(&app);
+    let invalid = Err(json!({"code": "INVALID_ICM_INPUT"}));
+
+    assert_eq!(
+        quote_deal(&main, json!({"stacks": [100], "prizes": [60, 40]})),
+        invalid
+    );
+    assert_eq!(
+        quote_deal(&main, json!({"stacks": [100, -1], "prizes": [60, 40]})),
+        invalid
+    );
+    assert_eq!(
+        quote_deal(
+            &main,
+            json!({"stacks": [100, 50], "prizes": [60, 40], "playFor": 61})
+        ),
+        invalid
+    );
+    assert_eq!(
+        quote_deal(&main, json!({"stacks": vec![1; 21], "prizes": [100]})),
+        Err(json!({"code": "ICM_TOO_MANY_PLAYERS", "params": {"max": 20}}))
+    );
+    let malformed = quote_deal(&main, json!({"stacks": "lots"})).unwrap_err();
+    assert_eq!(malformed["code"], "HOST_ERROR");
 }
 
 #[test]

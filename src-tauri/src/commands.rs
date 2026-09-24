@@ -3,6 +3,7 @@
 
 use std::path::Path;
 
+use mtt_core::icm::{self, DealQuote, DealRequest};
 use mtt_core::{Command, TournamentId, View};
 use percent_encoding::percent_decode_str;
 use serde::Serialize;
@@ -87,6 +88,15 @@ pub fn dispatch<R: Runtime>(
     let view = host.dispatch(&id, command, &host::fresh_ctx()?)?;
     notify_changed(&app, &view.id);
     Ok(view)
+}
+
+/// ICM and chip chop proposals for a deal (a pure query: nothing is stored or emitted).
+///
+/// Async so that the ICM computation, exponential in the players, stays off the main thread.
+#[tauri::command]
+pub async fn quote_deal(request: serde_json::Value) -> CmdResult<DealQuote> {
+    let request: DealRequest = parse("deal request", request)?;
+    Ok(icm::quote(&request)?)
 }
 
 /// Whether the previous version left a tournament to import.

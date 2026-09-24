@@ -2,7 +2,7 @@ import { emit } from "@tauri-apps/api/event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TauriEngine } from "./tauriEngine";
-import type { EngineError } from "./types";
+import type { DealRequest, EngineError } from "./types";
 
 type Internals = { invoke: (cmd: string, args: unknown, options?: unknown) => Promise<unknown> };
 const internals = () => (window as unknown as { __TAURI_INTERNALS__: Internals }).__TAURI_INTERNALS__;
@@ -83,6 +83,27 @@ describe("TauriEngine", () => {
       code: "HOST_ERROR",
       params: { message: "Command list_tournaments not allowed by ACL" }
     });
+  });
+
+  it("asks quote_deal for a deal quote and passes its domain errors through", async () => {
+    const calls: Array<[string, unknown]> = [];
+    const quote = { icm: [38393, 32750, 28857], chipChop: [40000, 32000, 28000], playFor: 0 };
+    mockIPC((cmd, args) => {
+      calls.push([cmd, args]);
+      const { request } = args as { request: DealRequest };
+      if (request.prizes.length > request.stacks.length) throw { code: "INVALID_ICM_INPUT" };
+      return quote;
+    });
+    const engine = new TauriEngine();
+    const valid: DealRequest = { stacks: [5000, 3000, 2000], prizes: [50000, 30000, 20000] };
+    const invalid: DealRequest = { stacks: [100], prizes: [60, 40], playFor: 10 };
+
+    expect(await engine.quoteDeal(valid)).toEqual(quote);
+    expect(await rejection(engine.quoteDeal(invalid))).toEqual({ code: "INVALID_ICM_INPUT" });
+    expect(calls).toEqual([
+      ["quote_deal", { request: valid }],
+      ["quote_deal", { request: invalid }]
+    ]);
   });
 
   it("forwards tournament_changed events until unsubscribed", async () => {

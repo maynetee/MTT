@@ -3,6 +3,8 @@ import { listen } from "@tauri-apps/api/event";
 import {
   toEngineError,
   type Command,
+  type DealQuote,
+  type DealRequest,
   type Engine,
   type ExportFile,
   type NewTournamentInput,
@@ -46,6 +48,10 @@ export class TauriEngine implements Engine {
 
   dispatch(id: string, command: Command): Promise<View> {
     return call("dispatch", { id, command });
+  }
+
+  quoteDeal(request: DealRequest): Promise<DealQuote> {
+    return call("quote_deal", { request });
   }
 
   subscribe(listener: (id: string) => void): () => void {

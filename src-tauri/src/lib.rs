@@ -27,6 +27,7 @@ fn with_handlers<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
             commands::delete_tournament,
             commands::get_view,
             commands::dispatch,
+            commands::quote_deal,
             commands::open_display_window,
             commands::save_export,
             commands::legacy_import_status,

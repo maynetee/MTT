@@ -164,6 +164,7 @@ Registered in `src-tauri/src/lib.rs`, implemented in `src-tauri/src/commands.rs`
 | `delete_tournament` | `id` | nothing | Deletes the tournament and its log. |
 | `get_view` | `id` | `View` | At the host's current time. |
 | `dispatch` | `id`, `command` | `View` | Any `Command`, undo and redo included. |
+| `quote_deal` | `request` (`DealRequest`) | `DealQuote` | ICM and chip chop for a deal. A pure query: nothing stored or emitted. |
 | `open_display_window` | `id` | nothing | Opens or refocuses the `display` window, fullscreen on a secondary monitor when there is one. |
 | `save_export` | raw bytes, `x-file-name` header | `boolean` | Native save dialog; `false` when cancelled. CSV and PDF only. |
 | `legacy_import_status` | none | `{ available }` | Whether the previous version left a tournament on this computer. |
@@ -174,8 +175,10 @@ After every create, delete, dispatch and import, the host emits the Tauri event
 
 ### Browser: `WasmTournament`
 
-`crates/mtt-wasm/src/lib.rs` exports one class. Every value crosses the boundary as a JSON
-string; errors are thrown as JSON strings of the same `{"code", "params"}` shape.
+`crates/mtt-wasm/src/lib.rs` exports one class, plus the free function
+`quoteDeal(requestJson)`, which returns a `DealQuote` JSON for a `DealRequest` JSON. Every
+value crosses the boundary as a JSON string; errors are thrown as JSON strings of the same
+`{"code", "params"}` shape.
 
 | Method | Returns |
 | --- | --- |
@@ -202,6 +205,7 @@ interface Engine {
   deleteTournament(id: string): Promise<void>;
   getView(id: string): Promise<View>;
   dispatch(id: string, command: Command): Promise<View>;
+  quoteDeal(request: DealRequest): Promise<DealQuote>;
   subscribe(listener: (id: string) => void): () => void;
   openDisplayWindow(id: string): Promise<void>;
   closeCurrentWindow(): Promise<void>;

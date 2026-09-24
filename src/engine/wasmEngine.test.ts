@@ -330,3 +330,56 @@ describe("WasmEngine", () => {
     expect(storage.getItem(`mtt:v2:t:${id}`)).toContain('"tournament_created"');
   });
 });
+
+describe("WasmEngine.quoteDeal", () => {
+  it("matches Malmuth-Harville computed by hand for three players", async () => {
+    const engine = createTestEngine();
+
+    // 5000/3000/2000 chips for 500/300/200.00, in cents. Each place goes to a remaining
+    // player in proportion to the chips among the remaining ones:
+    //   A: 1st 1/2, 2nd 3/10 * 5/7 + 1/5 * 5/8 = 19/56, 3rd 9/56
+    //      50000/2 + 30000 * 19/56 + 20000 * 9/56 = 38392.86
+    //   B: 1st 3/10, 2nd 1/2 * 3/5 + 1/5 * 3/8 = 3/8, 3rd 13/40  -> 32750.00
+    //   C: 1st 1/5, 2nd 1/2 * 2/5 + 3/10 * 2/7 = 2/7, 3rd 18/35  -> 28857.14
+    // The cent left after flooring goes to the largest fraction (A). Chip chop: 200.00
+    // each (the lowest prize), then the other 400.00 by chips.
+    const quote = await engine.quoteDeal({ stacks: [5000, 3000, 2000], prizes: [50000, 30000, 20000] });
+
+    expect(quote).toEqual({ icm: [38393, 32750, 28857], chipChop: [40000, 32000, 28000], playFor: 0 });
+  });
+
+  it("keeps money to play for and hands out every other minor unit", async () => {
+    const storage = new MemoryStorage();
+    const engine = createTestEngine({ storage });
+    const listener = vi.fn();
+    engine.subscribe(listener);
+    const prizes = [100_003, 60_001, 39_997];
+
+    const quote = await engine.quoteDeal({ stacks: [7001, 5003, 2999, 0], prizes, playFor: 1001 });
+
+    const sum = (amounts: number[]) => amounts.reduce((total, amount) => total + amount, 0);
+    expect(quote.playFor).toBe(1001);
+    expect(sum(quote.icm) + quote.playFor).toBe(sum(prizes));
+    expect(sum(quote.chipChop) + quote.playFor).toBe(sum(prizes));
+    expect(quote.icm[3]).toBe(0);
+    // A query: nothing stored, nobody notified.
+    await Promise.resolve();
+    expect(storage.length).toBe(0);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid deal with the core's error", async () => {
+    const engine = createTestEngine();
+
+    expect(await rejection(engine.quoteDeal({ stacks: [100], prizes: [60, 40] }))).toEqual({ code: "INVALID_ICM_INPUT" });
+    expect(await rejection(engine.quoteDeal({ stacks: [100, 50], prizes: [60, 40], playFor: 61 }))).toEqual({
+      code: "INVALID_ICM_INPUT"
+    });
+    expect(await rejection(engine.quoteDeal({ stacks: Array(21).fill(1), prizes: [100] }))).toEqual({
+      code: "ICM_TOO_MANY_PLAYERS",
+      params: { max: 20 }
+    });
+    const malformed = await rejection(engine.quoteDeal({ stacks: "lots" } as never));
+    expect(malformed.code).toBe("HOST_ERROR");
+  });
+});

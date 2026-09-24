@@ -5,10 +5,14 @@
 //! strings: the core's `DomainError`, or `HOST_ERROR` when the host cannot read its input
 //! (malformed JSON, invalid seed or time, unreadable saved log).
 //!
+//! Besides [`WasmTournament`], `quoteDeal` evaluates a deal (ICM and chip chop) without a
+//! tournament.
+//!
 //! The host supplies time and randomness: `now_ms` is the browser's wall clock and `seed` a
 //! fresh random `u64` per command, passed as a decimal string because a JS number cannot
 //! hold 64 bits. Nothing here reads a clock or an entropy source.
 
+use mtt_core::icm::{self, DealRequest};
 use mtt_core::{Aggregate, Command, Config, Ctx, Level, NewTournament, TournamentId};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
@@ -84,6 +88,20 @@ fn view(agg: &Aggregate, now_ms: f64) -> String {
 
 fn saved(agg: &Aggregate) -> String {
     agg.to_json().unwrap_or_else(|e| host_error(e.to_string()))
+}
+
+fn quote(request_json: &str) -> Result<String, String> {
+    let request: DealRequest =
+        serde_json::from_str(request_json).map_err(|e| host_error(e.to_string()))?;
+    let quote = icm::quote(&request).map_err(|e| domain_error(&e))?;
+    serde_json::to_string(&quote).map_err(|e| host_error(e.to_string()))
+}
+
+/// ICM and chip chop proposals for a `DealRequest` JSON, as a `DealQuote` JSON. A pure
+/// query: it needs no tournament, time or seed.
+#[wasm_bindgen(js_name = quoteDeal)]
+pub fn quote_deal(request_json: &str) -> Result<String, JsValue> {
+    quote(request_json).map_err(|e| JsValue::from_str(&e))
 }
 
 /// One tournament: the core aggregate with its event log and undo cursor.
@@ -254,6 +272,30 @@ mod tests {
         let reloaded = load(&json).expect("reloaded");
         assert_eq!(reloaded, agg);
         assert_eq!(view(&reloaded, T0), view(&agg, T0));
+    }
+
+    #[test]
+    fn quotes_a_deal_in_camel_case() {
+        let request = json!({ "stacks": [3000, 1000], "prizes": [700, 300], "playFor": 100 });
+        let quote = parse(&quote(&request.to_string()).expect("quoted"));
+        assert_eq!(
+            quote,
+            json!({ "icm": [525, 375], "chipChop": [525, 375], "playFor": 100 })
+        );
+    }
+
+    #[test]
+    fn an_invalid_deal_is_a_domain_error() {
+        let err = |request: Value| parse(&quote(&request.to_string()).unwrap_err());
+        assert_eq!(
+            err(json!({ "stacks": [100], "prizes": [60, 40] })),
+            json!({ "code": "INVALID_ICM_INPUT" })
+        );
+        assert_eq!(
+            err(json!({ "stacks": vec![1; 21], "prizes": [100] })),
+            json!({ "code": "ICM_TOO_MANY_PLAYERS", "params": { "max": 20 } })
+        );
+        assert_eq!(parse(&quote("{").unwrap_err())["code"], "HOST_ERROR");
     }
 
     /// The same draws are asserted by src/engine/wasmEngine.test.ts through the wasm build.

@@ -11,6 +11,7 @@
     "allow-delete-tournament",
     "allow-get-view",
     "allow-dispatch",
+    "allow-quote-deal",
     "allow-open-display-window",
     "allow-save-export",
     "allow-legacy-import-status",
