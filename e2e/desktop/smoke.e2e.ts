@@ -17,8 +17,6 @@ function seconds(text: string): number {
   return match[0].split(":").reduce((total, part) => total * 60 + Number(part), 0);
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 const clockPod = () => $('[role="group"][aria-label="Tournament clock"]');
 const stat = (label: string) => $(`//dt[normalize-space()="${label}"]/following-sibling::dd[1]`);
 const button = (name: string) => $(`//button[normalize-space()="${name}" or @aria-label="${name}"]`);
@@ -62,11 +60,18 @@ describe("MTT Tournament Director (desktop)", () => {
   it("runs the clock in real time", async () => {
     await clockPod().$("button=Start").click();
     await expect(clockPod()).toHaveText(expect.stringContaining("Running"));
+    // Three seconds off the clock take about three seconds. A window that is not in front
+    // repaints late (WebKit slows its timers), hence the slack either way.
     const before = seconds(await clockPod().getText());
-    await sleep(3_000);
-    const elapsed = before - seconds(await clockPod().getText());
-    expect(elapsed).toBeGreaterThanOrEqual(2);
-    expect(elapsed).toBeLessThanOrEqual(4);
+    const startedAt = Date.now();
+    await browser.waitUntil(async () => seconds(await clockPod().getText()) <= before - 3, {
+      timeout: 10_000,
+      interval: 100,
+      timeoutMsg: "the clock did not count down"
+    });
+    const took = (Date.now() - startedAt) / 1000;
+    expect(took).toBeGreaterThan(1.9);
+    expect(took).toBeLessThan(5.5);
   });
 
   it("eliminates a player, then undoes it", async () => {
