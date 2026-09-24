@@ -91,11 +91,11 @@ describe("MTT Tournament Director (desktop)", () => {
     await browser.switchToWindow("display");
     try {
       await expect(browser).toHaveUrl(expect.stringMatching(/#\/display\/[^/]+$/));
-      // Whatever its layout, the display shows the time left and the level.
-      const time = $(`//body//*[not(*)][string-length(normalize-space()) > 3][translate(normalize-space(), "0123456789", "") = ":"]`);
+      // The time left in the level, as a timer, under the level's heading.
+      const time = $('[role="timer"]');
       await expect(time).toBeDisplayed();
       expect(seconds(await time.getText())).toBeGreaterThan(0);
-      await expect($("body")).toHaveText(expect.stringMatching(/Level 1(?!\d)/i));
+      await expect($("h2=Level 1")).toBeDisplayed();
 
       // The exit control shows when the mouse moves.
       await browser.action("pointer").move({ x: 200, y: 200 }).move({ x: 400, y: 300 }).perform();
