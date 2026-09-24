@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "../../i18n";
 import { useEngine } from "../EngineContext";
+import { DemoBanner } from "./DemoBanner";
 
 /** Page frame: brand, optional header content and actions, then the page. */
 export function AppShell({
@@ -43,6 +44,7 @@ export function AppShell({
           {status}
         </div>
       </header>
+      <DemoBanner />
       {children}
     </div>
   );

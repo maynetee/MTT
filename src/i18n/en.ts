@@ -139,6 +139,11 @@ export const en = {
     engineFailed: "The tournament engine could not start: {message}",
     allTournaments: "← Tournaments"
   },
+  demo: {
+    notice: "Browser demo — tournaments are saved in this browser only.",
+    download: "Download the desktop app",
+    dismiss: "Dismiss the demo notice"
+  },
   phase: {
     setup: "Setup",
     running: "Running",
