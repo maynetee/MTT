@@ -100,7 +100,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const show = ({ message, tone = "info", action, duration }: ToastOptions) => {
       const id = nextId.current++;
       const fallback = tone === "error" || action ? TOAST_LONG_DURATION_MS : TOAST_DURATION_MS;
-      setToasts((current) => [...current, { id, message, tone, action, duration: duration === undefined ? fallback : duration }]);
+      // The same message again (an error repeated by a double click) replaces the first one.
+      const repeats = (toast: ToastEntry) => typeof message === "string" && !action && !toast.action && toast.tone === tone && toast.message === message;
+      setToasts((current) => [
+        ...current.filter((toast) => !repeats(toast)),
+        { id, message, tone, action, duration: duration === undefined ? fallback : duration }
+      ]);
       return id;
     };
     return {

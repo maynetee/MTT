@@ -69,10 +69,26 @@ describe("RegistrationScreen", () => {
     await user.click(screen.getByRole("button", { name: "Start" }));
     expect(await screen.findByText(/^Closes at .+ \(in 20:00\)$/)).toBeInTheDocument();
 
+    // It would close on its own at the end of level 1: closing now is confirmed first.
     await user.click(screen.getByRole("button", { name: "Close registration" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Close registration now?" });
+    await user.click(within(dialog).getByRole("button", { name: "Close registration" }));
     expect(await screen.findByText("Registration closed")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Reopen registration" }));
     expect(await screen.findByText("Registration open")).toBeInTheDocument();
+  });
+
+  it("closes a registration left open until closed by hand without asking", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await withTournament();
+    await register(engine, id, ["Ann", "Ben"]);
+    await engine.dispatch(id, { type: "start_clock" });
+    renderApp(engine, `/t/${id}/registration`);
+
+    await user.click(await screen.findByRole("button", { name: "Close registration" }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(await screen.findByText("Registration closed")).toBeInTheDocument();
   });
 
   it("removes a registration before the start", async () => {

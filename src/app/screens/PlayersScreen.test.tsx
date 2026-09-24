@@ -28,6 +28,8 @@ function row(name: string) {
   return screen.getByRole("rowheader", { name }).closest("tr") as HTMLElement;
 }
 
+const notifications = () => screen.getByRole("region", { name: "Notifications" });
+
 describe("PlayersScreen revive", () => {
   it("revives an eliminated player at the first free seat by default", async () => {
     const { engine, id } = await seatPlayers();
@@ -106,6 +108,43 @@ describe("PlayersScreen eliminations", () => {
     expect(within(row("Ben")).getByText("Eliminated")).toBeInTheDocument();
     expect(within(row("Ann")).getByText("#4")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Undo eliminate Ann and Ben" })).toBeInTheDocument();
+    expect(within(notifications()).getByText("Ann and Ben eliminated")).toBeInTheDocument();
+  });
+
+  it("offers to undo an elimination from its toast", async () => {
+    const { engine, id } = await fourPlayers();
+    const user = userEvent.setup();
+    renderApp(engine, `/t/${id}/players`);
+
+    await user.click(await screen.findByRole("button", { name: "Eliminate Cat" }));
+    const toast = (await within(notifications()).findByText("Cat eliminated")).closest("li") as HTMLElement;
+    await waitFor(async () => expect((await engine.getView(id)).counts.alive).toBe(3));
+
+    await user.click(within(toast).getByRole("button", { name: "Undo" }));
+
+    await waitFor(async () => expect((await engine.getView(id)).counts.alive).toBe(4));
+    expect(within(notifications()).queryByText("Cat eliminated")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Eliminate Cat" })).toBeInTheDocument();
+  });
+
+  it("does not undo another action from an elimination's toast", async () => {
+    const { engine, id } = await fourPlayers();
+    const user = userEvent.setup();
+    renderApp(engine, `/t/${id}/players`);
+
+    await user.click(await screen.findByRole("button", { name: "Eliminate Cat" }));
+    const toast = (await within(notifications()).findByText("Cat eliminated")).closest("li") as HTMLElement;
+    // Another action comes after the elimination (here from another window).
+    await act(async () => {
+      await engine.dispatch(id, { type: "pause_clock" });
+    });
+
+    await user.click(within(toast).getByRole("button", { name: "Undo" }));
+
+    expect(await within(notifications()).findByText(/^Other changes came after this elimination/)).toBeInTheDocument();
+    const view = await engine.getView(id);
+    expect(view.counts.alive).toBe(3);
+    expect(view.clock.running).toBe(false);
   });
 
   it("ties players eliminated in the same hand without stacks", async () => {

@@ -4,6 +4,7 @@ import { useI18n } from "../../i18n";
 import { Button } from "../components/Button";
 import { Section } from "../components/Card";
 import { ConfigFields, LateRegFields, sanitizeConfig } from "../components/ConfigForm";
+import { useToast } from "../components/Toast";
 import { useTournament } from "../TournamentContext";
 
 /** Tournament settings (UpdateConfig): places paid, tables, late registration... */
@@ -12,6 +13,7 @@ export default function SettingsScreen() {
   const { view, run } = useTournament();
   const [config, setConfig] = useState<Config>(view.config);
   const [dirty, setDirty] = useState(false);
+  const toast = useToast();
   const started = view.phase !== "setup";
   const finished = view.phase === "finished";
 
@@ -26,7 +28,10 @@ export default function SettingsScreen() {
   };
 
   const save = async () => {
-    if (await run({ type: "update_config", config: sanitizeConfig(config) })) setDirty(false);
+    if (await run({ type: "update_config", config: sanitizeConfig(config) })) {
+      setDirty(false);
+      toast.success(t("toast.settingsSaved"));
+    }
   };
 
   return (

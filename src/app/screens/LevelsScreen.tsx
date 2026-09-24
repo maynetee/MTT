@@ -4,7 +4,9 @@ import { useI18n } from "../../i18n";
 import { Button } from "../components/Button";
 import { Section } from "../components/Card";
 import { Callout } from "../components/Callout";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { StructureEditor } from "../components/StructureEditor";
+import { useToast } from "../components/Toast";
 import { useTournament } from "../TournamentContext";
 import { fromDraft, toDraft, type LevelDraft } from "../utils/structure";
 import { errorRow, StructureActions } from "./SetupScreen";
@@ -16,6 +18,8 @@ export default function LevelsScreen() {
   const [rows, setRows] = useState<LevelDraft[]>(() => view.levels.map((row) => toDraft(row.level, row.index)));
   const [dirty, setDirty] = useState(false);
   const [rejectedRow, setRejectedRow] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const toast = useToast();
 
   // Follow the tournament's structure until the director starts editing.
   useEffect(() => {
@@ -35,12 +39,16 @@ export default function LevelsScreen() {
   };
 
   const save = async () => {
+    setConfirming(false);
     const saved = await run({ type: "update_structure", levels: rows.map(fromDraft) }, (error: EngineError) => setRejectedRow(errorRow(error)));
     if (saved) {
       setDirty(false);
       setRejectedRow(null);
+      toast.success(t("toast.structureSaved"));
     }
   };
+  // During play the clock keeps running on the new structure: ask first.
+  const requestSave = () => (view.phase === "running" ? setConfirming(true) : void save());
 
   const discard = () => {
     setDirty(false);
@@ -81,11 +89,19 @@ export default function LevelsScreen() {
           <Button variant="ghost" onClick={discard}>
             {t("levels.discard")}
           </Button>
-          <Button variant="primary" icon="check" onClick={() => void save()}>
+          <Button variant="primary" icon="check" onClick={requestSave}>
             {t("levels.save")}
           </Button>
         </div>
       )}
+      <ConfirmDialog
+        open={confirming}
+        title={t("levels.confirmTitle")}
+        message={t("levels.confirmMessage")}
+        confirmLabel={t("levels.save")}
+        onCancel={() => setConfirming(false)}
+        onConfirm={save}
+      />
     </>
   );
 }

@@ -4,6 +4,7 @@ import { useI18n } from "../../i18n";
 import { Button, ButtonLink } from "../components/Button";
 import { Section } from "../components/Card";
 import { Callout } from "../components/Callout";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Field, Select } from "../components/Field";
 import { SeatChanges } from "../components/SeatChanges";
 import { BreakTableDialog } from "../components/TableDialogs";
@@ -65,6 +66,7 @@ export default function MovesScreen() {
   const [selectedSeat, setSelectedSeat] = useState("");
   const [moves, setMoves] = useState<SeatChange[]>([]);
   const [breaking, setBreaking] = useState<number | null>(null);
+  const [drawing, setDrawing] = useState<number | null>(null);
   const { suggestions } = view;
   const seats = freeSeats(view);
   const target = seats.find((seat) => seatKey(seat) === selectedSeat) ?? null;
@@ -95,7 +97,7 @@ export default function MovesScreen() {
           {suggestions.finalTable !== null && (
             <div className="suggestion">
               <p>{t("moves.finalTable", { count: view.counts.alive, table: suggestions.finalTable })}</p>
-              <Button variant="primary" icon="shuffle" onClick={() => void runAndReport({ type: "form_final_table", table: suggestions.finalTable! })}>
+              <Button variant="primary" icon="shuffle" onClick={() => setDrawing(suggestions.finalTable)}>
                 {t("moves.drawFinalTable")}
               </Button>
             </div>
@@ -159,6 +161,18 @@ export default function MovesScreen() {
         onConfirm={(table) => {
           setBreaking(null);
           return runAndReport({ type: "break_table", table });
+        }}
+      />
+      <ConfirmDialog
+        open={drawing !== null}
+        title={t("moves.finalTitle")}
+        message={t("moves.finalMessage", { count: view.counts.alive, table: drawing ?? "" })}
+        confirmLabel={t("moves.drawFinalTable")}
+        onCancel={() => setDrawing(null)}
+        onConfirm={() => {
+          const table = drawing!;
+          setDrawing(null);
+          return runAndReport({ type: "form_final_table", table });
         }}
       />
     </div>

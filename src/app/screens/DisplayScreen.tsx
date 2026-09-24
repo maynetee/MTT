@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { Ante, LevelRow, View } from "../../engine/types";
+import { toEngineError, type Ante, type LevelRow, type View } from "../../engine/types";
 import { useI18n, type I18n } from "../../i18n";
 import { Button } from "../components/Button";
 import { Section } from "../components/Card";
@@ -192,29 +192,29 @@ export default function DisplayScreen({ view, offsetMs, preview = false }: Displ
     </div>
   );
 
-  if (preview) {
-    return (
-      <Section
-        title={t("display.preview")}
-        description={t("display.previewHint")}
-        actions={
-          <Button icon="external" onClick={() => void engine.openDisplayWindow(view.id).catch(() => undefined)}>
-            {t("display.openWindow")}
-          </Button>
-        }
-      >
-        <div className="display-wrapper">{content}</div>
-      </Section>
-    );
-  }
-
   return content;
 }
 
 /** The Display tab of the director window. */
 export function DisplayPreview() {
-  const { view, offsetMs } = useTournament();
-  return <DisplayScreen view={view} offsetMs={offsetMs} preview />;
+  const { t } = useI18n();
+  const engine = useEngine();
+  const { view, offsetMs, report } = useTournament();
+  return (
+    <Section
+      title={t("display.preview")}
+      description={t("display.previewHint")}
+      actions={
+        <Button icon="external" onClick={() => void engine.openDisplayWindow(view.id).catch((error: unknown) => report(toEngineError(error)))}>
+          {t("display.openWindow")}
+        </Button>
+      }
+    >
+      <div className="display-wrapper">
+        <DisplayScreen view={view} offsetMs={offsetMs} preview />
+      </div>
+    </Section>
+  );
 }
 
 function DisplayWindow({ id }: { id: string }) {

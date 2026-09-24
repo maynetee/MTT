@@ -8,9 +8,9 @@ import { Button, ButtonLink, IconButton } from "../components/Button";
 import { Section } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
-import { ErrorBanner } from "../components/ErrorBanner";
 import { Pill, type PillTone } from "../components/Pill";
 import { Table } from "../components/Table";
+import { useToast } from "../components/Toast";
 import { useEngine } from "../EngineContext";
 import { useTournamentList } from "../hooks/useTournamentList";
 
@@ -32,9 +32,17 @@ export default function TournamentListScreen() {
   const { t } = i18n;
   const engine = useEngine();
   const navigate = useNavigate();
+  const toast = useToast();
   const { summaries, error, setError } = useTournamentList();
   const [confirming, setConfirming] = useState<TournamentSummary | null>(null);
   const [legacyAvailable, setLegacyAvailable] = useState(false);
+
+  // Engine errors are shown as toasts, translated.
+  useEffect(() => {
+    if (!error) return;
+    toast.error(i18n.error(error));
+    setError(null);
+  }, [error, setError, toast, i18n]);
 
   useEffect(() => {
     let active = true;
@@ -51,6 +59,7 @@ export default function TournamentListScreen() {
     setConfirming(null);
     try {
       await engine.deleteTournament(summary.id);
+      toast.success(t("toast.deleted", { name: summary.name }));
     } catch (thrown) {
       setError(toEngineError(thrown));
     }
@@ -80,7 +89,6 @@ export default function TournamentListScreen() {
 
   return (
     <AppShell>
-      {error && <ErrorBanner message={i18n.error(error)} onDismiss={() => setError(null)} />}
       <Section
         level={1}
         title={t("list.title")}
@@ -157,6 +165,8 @@ export default function TournamentListScreen() {
         title={t("list.deleteTitle", { name: confirming?.name ?? "" })}
         message={t("list.deleteMessage")}
         confirmLabel={t("list.deleteConfirm")}
+        // A tournament that has started has results worth a second look: type its name.
+        confirmText={confirming && confirming.phase !== "setup" ? confirming.name : undefined}
         onCancel={() => setConfirming(null)}
         onConfirm={() => (confirming ? handleDelete(confirming) : undefined)}
       />

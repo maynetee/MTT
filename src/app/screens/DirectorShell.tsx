@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Outlet, useParams } from "react-router-dom";
 import { toEngineError, type Command, type EngineError, type View } from "../../engine/types";
 import { useI18n } from "../../i18n";
@@ -7,9 +7,9 @@ import { ButtonLink, Button, IconButton } from "../components/Button";
 import { Callout } from "../components/Callout";
 import { ClockPod } from "../components/ClockPod";
 import { EmptyState } from "../components/EmptyState";
-import { ErrorBanner } from "../components/ErrorBanner";
 import { Pill } from "../components/Pill";
 import { Tabs } from "../components/Tabs";
+import { useToast } from "../components/Toast";
 import { useTournamentView } from "../hooks/useTournamentView";
 import { TournamentContext, type TournamentContextValue } from "../TournamentContext";
 import { isEditableTarget, isMac } from "../utils/keyboard";
@@ -45,23 +45,45 @@ export default function DirectorShell({ id }: { id: string }) {
   const i18n = useI18n();
   const { t } = i18n;
   const { view, offsetMs, loadError, dispatch } = useTournamentView(id);
-  const [error, setError] = useState<EngineError | null>(null);
+  const toast = useToast();
   const names = useMemo(() => (view ? playerNames(view) : () => undefined), [view]);
+  // The latest view, for actions that outlive the render that created them (a toast's Undo).
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  // Every rejected command is shown, translated, with player names.
+  const report = useCallback((error: EngineError) => toast.error(i18n.error(error, names)), [toast, i18n, names]);
 
   const run = useCallback<TournamentContextValue["run"]>(
     async (command, onError) => {
       try {
-        const next = await dispatch(command);
-        setError(null);
-        return next;
+        return await dispatch(command);
       } catch (thrown) {
         const engineError = toEngineError(thrown);
-        setError(engineError);
+        report(engineError);
         onError?.(engineError);
         return null;
       }
     },
-    [dispatch]
+    [dispatch, report]
+  );
+
+  const undoIfLast = useCallback<TournamentContextValue["undoIfLast"]>(
+    async (seq) => {
+      if (!mounted.current || viewRef.current?.history.undo?.seq !== seq) {
+        toast.show({ message: t("toast.undoStale") });
+        return null;
+      }
+      return run({ type: "undo" });
+    },
+    [run, toast, t]
   );
 
   // Undo/redo shortcuts, except while typing in a field (native text undo wins there) or
@@ -85,8 +107,8 @@ export default function DirectorShell({ id }: { id: string }) {
   }, []);
 
   const context = useMemo<TournamentContextValue | null>(
-    () => (view ? { id, view, offsetMs, run, report: setError, playerName: names } : null),
-    [id, view, offsetMs, run, names]
+    () => (view ? { id, view, offsetMs, run, undoIfLast, report, playerName: names } : null),
+    [id, view, offsetMs, run, undoIfLast, report, names]
   );
 
   if (!view || !context) {
@@ -140,7 +162,6 @@ export default function DirectorShell({ id }: { id: string }) {
       }
       nav={<Tabs label={t("app.sections")} groups={TAB_GROUPS.map((group) => group.map((tab) => ({ to: `${base}/${tab}`, label: t(`tabs.${tab}`) })))} />}
     >
-      {error && <ErrorBanner message={i18n.error(error, names)} onDismiss={() => setError(null)} />}
       {finishPending && (
         <Callout
           tone="warning"

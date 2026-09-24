@@ -3,26 +3,37 @@ import { useI18n } from "../../i18n";
 import { Button } from "../components/Button";
 import { Section } from "../components/Card";
 import { Callout } from "../components/Callout";
-import { ErrorBanner } from "../components/ErrorBanner";
 import { Table } from "../components/Table";
+import { useToast } from "../components/Toast";
 import { useEngine } from "../EngineContext";
 import { useTournament } from "../TournamentContext";
 import { exportCSV, exportPDF, type RankingExport } from "../utils/exports";
 import { formatPlace, rankingStatus } from "../utils/labels";
 
+type Format = "CSV" | "PDF";
+
 export default function ExportsScreen() {
   const i18n = useI18n();
   const { t } = i18n;
   const engine = useEngine();
+  const toast = useToast();
   const { view } = useTournament();
-  const [failure, setFailure] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Format | null>(null);
   const finished = view.phase === "finished";
   const data: RankingExport = { tournamentName: view.config.name, finished, winner: view.winner, rows: view.ranking };
   const provisional = view.ranking.some((row) => row.provisional);
 
-  const run = (exporter: typeof exportCSV) => {
-    setFailure(null);
-    exporter(engine, data, i18n).catch((error: unknown) => setFailure(error instanceof Error ? error.message : String(error)));
+  const run = async (format: Format) => {
+    setBusy(format);
+    try {
+      // Resolves to false when the director cancels the save dialog: nothing to say then.
+      if (await (format === "CSV" ? exportCSV : exportPDF)(engine, data, i18n)) toast.success(t("toast.exported", { format }));
+    } catch (error) {
+      // An ExportError, whose message is already translated.
+      toast.error(error instanceof Error ? error.message : t("exports.failed", { format, reason: String(error) }));
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
@@ -32,16 +43,15 @@ export default function ExportsScreen() {
       flush
       actions={
         <>
-          <Button icon="download" onClick={() => run(exportPDF)}>
+          <Button icon="download" onClick={() => void run("PDF")} loading={busy === "PDF"}>
             {t("exports.pdf")}
           </Button>
-          <Button variant="primary" icon="download" onClick={() => run(exportCSV)}>
+          <Button variant="primary" icon="download" onClick={() => void run("CSV")} loading={busy === "CSV"}>
             {t("exports.csv")}
           </Button>
         </>
       }
     >
-      {failure && <ErrorBanner message={failure} onDismiss={() => setFailure(null)} />}
       {finished ? <Callout tone="success">{t("exports.finalRanking")}</Callout> : provisional && <Callout>{t("exports.provisionalHint")}</Callout>}
       <Table caption={t("exports.title")} density="compact">
         <thead>

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { ToastProvider } from "./components/Toast";
 import ClockScreen from "./screens/ClockScreen";
 import { DirectorRoute } from "./screens/DirectorShell";
 import { DisplayPreview, DisplayRoute } from "./screens/DisplayScreen";
@@ -24,11 +25,12 @@ function ScrollToTop() {
 
 /**
  * Routes (hash based): `/` the tournament list, `/new` a new tournament, `/t/:id/<tab>` the
- * director's tabs, `/display/:id` the public display window.
+ * director's tabs, `/display/:id` the public display window. Toasts outlive the screen that
+ * raised them (an elimination's Undo stays offered after switching tabs).
  */
 export default function App() {
   return (
-    <>
+    <ToastProvider>
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<TournamentListScreen />} />
@@ -49,6 +51,6 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
+    </ToastProvider>
   );
 }

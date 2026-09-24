@@ -3,6 +3,7 @@ import type { SeatRef, View } from "../../engine/types";
 import { useI18n } from "../../i18n";
 import { Button, IconButton } from "../components/Button";
 import { Section, Stat, StatGroup } from "../components/Card";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Checkbox, Field, TextInput } from "../components/Field";
 import { Icon } from "../components/Icon";
 import { NumberInput } from "../components/NumberInput";
@@ -82,8 +83,16 @@ export default function RegistrationScreen() {
   const [forceSeat, setForceSeat] = useState(false);
   const [tableNo, setTableNo] = useState<number | null>(1);
   const [seatNo, setSeatNo] = useState<number | null>(1);
+  const [confirmingClose, setConfirmingClose] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const { registration, phase } = view;
+
+  const closeRegistration = () => {
+    setConfirmingClose(false);
+    return run({ type: "close_registration" });
+  };
+  // Closing by hand is the plan with a manual deadline; otherwise it closes before its time.
+  const requestClose = () => (registration.deadline.type === "manual" ? void closeRegistration() : setConfirmingClose(true));
 
   const handleAdd = async () => {
     const trimmed = name.trim();
@@ -155,7 +164,7 @@ export default function RegistrationScreen() {
           actions={
             phase === "running" &&
             (registration.open ? (
-              <Button onClick={() => void run({ type: "close_registration" })}>{t("registration.close")}</Button>
+              <Button onClick={requestClose}>{t("registration.close")}</Button>
             ) : (
               <Button onClick={() => void run({ type: "reopen_registration" })}>{t("registration.reopen")}</Button>
             ))
@@ -218,6 +227,14 @@ export default function RegistrationScreen() {
           )}
         </Section>
       </div>
+      <ConfirmDialog
+        open={confirmingClose}
+        title={t("registration.closeTitle")}
+        message={t("registration.closeMessage")}
+        confirmLabel={t("registration.close")}
+        onCancel={() => setConfirmingClose(false)}
+        onConfirm={closeRegistration}
+      />
     </div>
   );
 }

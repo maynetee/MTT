@@ -10,6 +10,7 @@ import { NumberInput } from "../components/NumberInput";
 import { Pill } from "../components/Pill";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { Table } from "../components/Table";
+import { useToast } from "../components/Toast";
 import { useTournament } from "../TournamentContext";
 import { isMac } from "../utils/keyboard";
 import { formatPlace } from "../utils/labels";
@@ -21,8 +22,9 @@ type Filter = "all" | "alive" | "out";
 
 export default function PlayersScreen() {
   const i18n = useI18n();
-  const { t } = i18n;
-  const { view, run } = useTournament();
+  const { t, list } = i18n;
+  const { view, run, undoIfLast } = useTournament();
+  const toast = useToast();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -59,7 +61,20 @@ export default function PlayersScreen() {
   const reviveSeat = availableSeats.find((seat) => seatKey(seat) === reviveSeatKey) ?? null;
   const winner = view.winner === null ? null : view.ranking.find((row) => row.player === view.winner);
 
-  const eliminate = (player: number) => void run({ type: "bust_players", busts: [{ player }] });
+  /** Eliminates, then offers to take it back: a wrong row clicked in a hurry is one click away. */
+  const bust = async (busts: BustInput[]) => {
+    const next = await run({ type: "bust_players", busts });
+    if (!next) return null;
+    const seq = next.history.undo?.seq;
+    const names = busts.map(({ player }) => next.ranking.find((row) => row.player === player)?.name ?? `#${player}`);
+    toast.show({
+      message: t("toast.eliminated", { names: list(names) }),
+      action: seq === undefined ? undefined : { label: t("toast.undo"), onAction: () => void undoIfLast(seq) }
+    });
+    return next;
+  };
+
+  const eliminate = (player: number) => void bust([{ player }]);
 
   const toggle = (player: number, selected: boolean) => {
     const next = new Map(selection ?? []);
@@ -71,7 +86,7 @@ export default function PlayersScreen() {
   const eliminateSelected = async () => {
     if (!selection || selection.size === 0) return;
     const busts: BustInput[] = [...selection].map(([player, stack]) => (stack === null ? { player } : { player, startStack: Math.trunc(stack) }));
-    if (await run({ type: "bust_players", busts })) setSelection(null);
+    if (await bust(busts)) setSelection(null);
   };
 
   const handleRevive = async () => {
@@ -194,7 +209,7 @@ export default function PlayersScreen() {
                     <td className="actions">
                       {selection && selected && (
                         <NumberInput
-                          digits={8}
+                          digits={10}
                           min={1}
                           className="stack-input"
                           placeholder={t("players.startStackOptional")}

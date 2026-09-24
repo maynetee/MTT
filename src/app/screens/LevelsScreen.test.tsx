@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { register, renderApp, withTournament } from "../../test/app";
@@ -26,7 +26,7 @@ describe("LevelsScreen", () => {
     expect(screen.getByLabelText("Level 3 BB").closest(".level-row")).toHaveAttribute("aria-current", "step");
   });
 
-  it("saves structure changes with UpdateStructure", async () => {
+  it("saves structure changes with UpdateStructure, after confirmation during play", async () => {
     const user = userEvent.setup();
     const { engine, id } = await runningAtLevel(3);
     renderApp(engine, `/t/${id}/levels`);
@@ -37,6 +37,13 @@ describe("LevelsScreen", () => {
     await user.click(screen.getByRole("button", { name: "Add level" }));
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
+    // The clock is running: the change is confirmed first, and Cancel keeps the draft.
+    const dialog = screen.getByRole("alertdialog", { name: "Change the structure during play?" });
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect((await engine.getView(id)).levels).toHaveLength(5);
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Save changes" }));
+
     await waitFor(async () => {
       const view = await engine.getView(id);
       expect(view.levels).toHaveLength(6);
@@ -44,6 +51,19 @@ describe("LevelsScreen", () => {
       expect(view.history.undo?.kind).toBe("structure_updated");
     });
     expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    expect(screen.getByText("Structure saved")).toBeInTheDocument();
+  });
+
+  it("saves without confirmation before the start", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await withTournament();
+    renderApp(engine, `/t/${id}/levels`);
+
+    await user.click(await screen.findByRole("button", { name: "Add break" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await waitFor(async () => expect((await engine.getView(id)).levels).toHaveLength(6));
   });
 
   it("highlights the row the core rejects and keeps the draft", async () => {

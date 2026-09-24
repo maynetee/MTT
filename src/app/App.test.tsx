@@ -98,7 +98,25 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: "Redo" })).toBeDisabled();
   });
 
-  it("shows a rejected command's translated error in the banner", async () => {
+  it("asks for the name before deleting a tournament that has started", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await withTournament();
+    await register(engine, id, ["Ann", "Ben"]);
+    await engine.dispatch(id, { type: "start_clock" });
+    renderApp(engine, "/");
+
+    await user.click(await screen.findByRole("button", { name: "Delete Test event" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Delete “Test event”?" });
+    const confirm = within(dialog).getByRole("button", { name: "Delete tournament" });
+    expect(confirm).toBeDisabled();
+    await user.type(within(dialog).getByLabelText("Type “Test event” to confirm"), "Test event");
+    await user.click(confirm);
+
+    expect(await screen.findByText("“Test event” deleted")).toBeInTheDocument();
+    expect(await engine.listTournaments()).toEqual([]);
+  });
+
+  it("shows a rejected command's translated error as a toast", async () => {
     const user = userEvent.setup();
     const { engine, id } = await withTournament();
     await register(engine, id, ["Alice"]);
@@ -106,7 +124,8 @@ describe("App", () => {
 
     await user.type(await screen.findByPlaceholderText("Player name"), "alice{Enter}");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Alice is already registered.");
+    const notifications = screen.getByRole("region", { name: "Notifications" });
+    expect(await within(notifications).findByRole("alert")).toHaveTextContent("Alice is already registered.");
     expect(screen.getByPlaceholderText("Player name")).toHaveValue("alice");
   });
 

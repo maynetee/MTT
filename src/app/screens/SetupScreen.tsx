@@ -6,8 +6,8 @@ import { AppShell, PageTitle } from "../components/AppShell";
 import { Button } from "../components/Button";
 import { Section } from "../components/Card";
 import { ConfigFields, LateRegFields, sanitizeConfig } from "../components/ConfigForm";
-import { ErrorBanner } from "../components/ErrorBanner";
 import { StructureEditor } from "../components/StructureEditor";
+import { useToast } from "../components/Toast";
 import { useEngine } from "../EngineContext";
 import { defaultStructure, fromDraft, newBreakDraft, newPlayDraft, toDraft, type LevelDraft } from "../utils/structure";
 
@@ -51,6 +51,7 @@ export function StructureActions({ rows, onChange }: { rows: LevelDraft[]; onCha
 export default function SetupScreen() {
   const { t, error: describe } = useI18n();
   const engine = useEngine();
+  const toast = useToast();
   const navigate = useNavigate();
   const [config, setConfig] = useState<Config>(defaultConfig);
   const [rows, setRows] = useState<LevelDraft[]>(() => defaultStructure().map((level) => toDraft(level)));
@@ -64,14 +65,16 @@ export default function SetupScreen() {
       const id = await engine.createTournament({ config: sanitizeConfig(config), structure: rows.map(fromDraft) });
       navigate(`/t/${encodeURIComponent(id)}/registration`);
     } catch (thrown) {
-      setError(toEngineError(thrown));
+      const engineError = toEngineError(thrown);
+      // The message as a toast; the structure row it points at stays highlighted.
+      toast.error(describe(engineError));
+      setError(engineError);
       setCreating(false);
     }
   };
 
   return (
     <AppShell title={<PageTitle name={t("setup.title")} />}>
-      {error && <ErrorBanner message={describe(error)} onDismiss={() => setError(null)} />}
       <div className="setup-grid">
         <Section title={t("config.section")} description={t("config.sectionHint")}>
           <ConfigFields config={config} onChange={setConfig} />

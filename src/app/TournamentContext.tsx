@@ -7,11 +7,16 @@ export interface TournamentContextValue {
   /** Host clock minus local clock (see useTournamentView). */
   offsetMs: number;
   /**
-   * Runs a command. Resolves to the new view, or to null after showing the error in the
-   * banner; `onError` lets a screen also react to it (e.g. highlight a structure row).
+   * Runs a command. Resolves to the new view, or to null after showing the translated error
+   * as a toast; `onError` lets a screen also react to it (e.g. highlight a structure row).
    */
   run(command: Command, onError?: (error: EngineError) => void): Promise<View | null>;
-  /** Shows an error in the banner. */
+  /**
+   * Undoes the action that `seq` identifies, if it is still the last one. Otherwise nothing
+   * is undone and a toast explains why (other changes came after it).
+   */
+  undoIfLast(seq: number): Promise<View | null>;
+  /** Shows an error as a toast. */
   report(error: EngineError): void;
   /** The name of a player of this tournament, for messages. */
   playerName(player: number): string | undefined;

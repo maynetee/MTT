@@ -90,7 +90,7 @@ describe("MovesScreen suggestions", () => {
     expect(view.tables.map((table) => table.status)).toEqual(["open", "open", "closed"]);
   });
 
-  it("draws the final table", async () => {
+  it("draws the final table after confirmation", async () => {
     const { engine, id } = await withTournament({ tables: 2, seats: 4 });
     await register(engine, id, [
       ["Ann", 1, 1],
@@ -103,6 +103,9 @@ describe("MovesScreen suggestions", () => {
 
     expect(await screen.findByText("Final table: redraw the 3 remaining players at table 1.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Draw the final table" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Draw the final table?" });
+    expect(dialog).toHaveAccessibleDescription("The 3 remaining players are redrawn to new seats at table 1, and the other tables close.");
+    await user.click(within(dialog).getByRole("button", { name: "Draw the final table" }));
 
     const moved = await screen.findByRole("status", { name: "Players moved" });
     expect(within(moved).getByRole("row", { name: /^Cat Table 2 Seat 1 Table 1 Seat \d$/ })).toBeInTheDocument();

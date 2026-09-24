@@ -218,7 +218,14 @@ export const en = {
   },
   toast: {
     region: "Notifications",
-    dismiss: "Dismiss notification"
+    dismiss: "Dismiss notification",
+    undo: "Undo",
+    eliminated: "{names} eliminated",
+    undoStale: "Other changes came after this elimination: use Undo in the header to go back one step at a time.",
+    settingsSaved: "Settings saved",
+    structureSaved: "Structure saved",
+    deleted: "“{name}” deleted",
+    exported: "Ranking exported as {format}"
   },
   list: {
     title: "Tournaments",
@@ -302,7 +309,9 @@ export const en = {
     save: "Save changes",
     discard: "Discard changes",
     unsaved: "Unsaved changes",
-    pastLocked: "Levels already played are locked."
+    pastLocked: "Levels already played are locked.",
+    confirmTitle: "Change the structure during play?",
+    confirmMessage: "The clock keeps running. Changes to the level in progress apply at once; levels already played stay as they were."
   },
   registration: {
     title: "Register player",
@@ -325,6 +334,8 @@ export const en = {
     deadlineManual: "Open until you close it",
     overridden: "Set by hand",
     close: "Close registration",
+    closeTitle: "Close registration now?",
+    closeMessage: "It would close on its own later. Late players cannot register until you reopen it.",
     reopen: "Reopen registration",
     players: "Players in play",
     remove: "Remove",
@@ -380,7 +391,7 @@ export const en = {
     sameHand: "Eliminated in the same hand…",
     sameHandHint: "Tick every player eliminated in this hand. Enter each starting stack to rank them (the bigger stack finishes higher), or none for a tie.",
     startStack: "Starting stack",
-    startStackOptional: "Starting stack (optional)",
+    startStackOptional: "Stack (optional)",
     eliminateSelected: { one: "Eliminate {count} player", other: "Eliminate {count} players" },
     select: "Select {name}",
     summary: "Field",
@@ -396,6 +407,8 @@ export const en = {
     suggestions: "Suggestions",
     finalTable: "Final table: redraw the {count} remaining players at table {table}.",
     drawFinalTable: "Draw the final table",
+    finalTitle: "Draw the final table?",
+    finalMessage: "The {count} remaining players are redrawn to new seats at table {table}, and the other tables close.",
     breakTable: "Break table {table}: the other tables can seat everyone.",
     breakTableAction: "Break table {table}",
     balance: "Balance the tables",
