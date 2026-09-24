@@ -205,6 +205,19 @@ describe("PayoutsScreen", { timeout: 20_000 }, () => {
     ]);
   });
 
+  it("points to Settings when the tournament pays no prizes", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await tenPlayers({ payouts: false });
+    renderApp(engine, `/t/${id}/payouts`);
+
+    expect(await screen.findByText("This tournament pays no prizes")).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Payouts" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Lock payouts" })).not.toBeInTheDocument();
+    const [, settings] = screen.getAllByRole("link", { name: "Settings" });
+    await user.click(settings);
+    expect(await screen.findByRole("checkbox", { name: /This tournament pays prizes/ })).not.toBeChecked();
+  });
+
   it("explains that amounts need money tracking", async () => {
     const { engine, id } = await withTournament({ placesPaid: 4 });
     renderApp(engine, `/t/${id}/payouts`);

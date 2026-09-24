@@ -14,7 +14,11 @@ placeTo: number | null,
 /**
  * The place may still change (late registration open, or the player may re-enter).
  */
-provisional: boolean, inMoney: boolean, entries: number, 
+provisional: boolean, 
+/**
+ * Paid (or still in once everyone left is paid); never without payouts.
+ */
+inMoney: boolean, entries: number, 
 /**
  * Rebuys bought; present when any.
  */
@@ -25,6 +29,6 @@ rebuys?: number,
 addons?: number, 
 /**
  * Prize won (provisional like the place); present for placed players when money is
- * tracked and the prize is not zero.
+ * tracked, the tournament pays prizes and the prize is not zero.
  */
 prize?: Money, };

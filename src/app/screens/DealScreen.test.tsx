@@ -55,6 +55,20 @@ describe("DealScreen", { timeout: 20_000 }, () => {
     expect(await within(tabs()).findByRole("link", { name: "Deal" })).toBeInTheDocument();
   });
 
+  it("has no deal tab when the tournament pays no prizes, and says why at its address", async () => {
+    const { engine, id } = await withTournament({ tables: 1, config: { money, payouts: false } });
+    const view = await register(engine, id, NAMES);
+    await engine.dispatch(id, { type: "start_clock" });
+    await engine.dispatch(id, { type: "bust_players", busts: [{ player: playerId(view, "Eve") }] });
+    renderApp(engine, `/t/${id}/deal`);
+
+    expect(await screen.findByText("This tournament pays no prizes")).toBeInTheDocument();
+    expect(within(tabs()).queryByRole("link", { name: "Deal" })).not.toBeInTheDocument();
+    expect(within(tabs()).queryByRole("link", { name: "Payouts" })).not.toBeInTheDocument();
+    // The tab, and the way to turn the prizes on.
+    expect(screen.getAllByRole("link", { name: "Settings" })).toHaveLength(2);
+  });
+
   it("quotes ICM and chip chop for the chip counts entered", async () => {
     const { engine, id } = await threeLeft();
     const user = userEvent.setup();

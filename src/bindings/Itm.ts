@@ -8,4 +8,4 @@ export type Itm = { "status": "not_yet", toMoney: number, } | { "status": "bubbl
 /**
  * Prize of the next player out, when money is tracked.
  */
-nextPayout?: Money, };
+nextPayout?: Money, } | { "status": "none" };

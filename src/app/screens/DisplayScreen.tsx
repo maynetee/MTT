@@ -12,6 +12,7 @@ import { useTournamentView } from "../hooks/useTournamentView";
 import { useLevelSounds } from "../sound/useLevelSounds";
 import { useTournament } from "../TournamentContext";
 import { anteLabel, blindsLabel } from "../utils/labels";
+import { paysPrizes } from "../utils/payouts";
 import { displayState, finalPlaces, formatMoney, payoutLadder, type DisplayState } from "./DisplayModel";
 
 /** How long the exit control stays visible after the mouse stops moving. */
@@ -199,11 +200,12 @@ function Registration({ view, local }: { view: View; local: LocalClock }) {
   );
 }
 
-/** Where the field stands against the places paid. */
+/** Where the field stands against the places paid; nothing when the tournament pays no prizes. */
 function MoneyBand({ view }: { view: View }) {
   const i18n = useI18n();
   const { t } = i18n;
   const { itm, money } = view;
+  if (itm.status === "none") return null;
   const [text, hint] =
     itm.status === "in_money"
       ? [t("display.inMoney"), money && itm.nextPayout !== undefined ? t("display.nextPayout", { amount: formatMoney(i18n.locale, itm.nextPayout, money.currency) }) : null]
@@ -265,7 +267,10 @@ function ComingUp({ view }: { view: View }) {
 const Rail = memo(function Rail({ view }: { view: View }) {
   const i18n = useI18n();
   const { t } = i18n;
-  const { counts, chips, money } = view;
+  const { counts, chips } = view;
+  // Without prizes a tracked pool means nothing to the room: the layout without money.
+  const prizes = paysPrizes(view.config);
+  const money = prizes ? view.money : undefined;
   const reentries = counts.reentries ?? 0;
   return (
     <aside className="tv-rail">
@@ -293,7 +298,7 @@ const Rail = memo(function Rail({ view }: { view: View }) {
             <span className="tv-stat-value">{i18n.number(chips.inPlay)}</span>
           </dd>
         </div>
-        {!money && (
+        {!money && prizes && (
           <div className="tv-stat">
             <dt>{t("display.placesPaidLabel")}</dt>
             <dd>

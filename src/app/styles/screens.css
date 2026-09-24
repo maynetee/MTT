@@ -80,6 +80,10 @@
   grid-column: span 2;
 }
 
+.span-all {
+  grid-column: 1 / -1;
+}
+
 .readout {
   display: grid;
   gap: 6px;

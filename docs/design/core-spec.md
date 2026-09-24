@@ -73,8 +73,12 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
 
 - `Config { name, seats_per_table (2..=12), max_tables (1..=1000), final_table_size
   (default seats_per_table), balance_trigger (default 2), break_order, starting_stack,
-  places_paid (>= 1), late_reg: Deadline, payout: PayoutConfig, money?: MoneyConfig,
-  reentry?, rebuy?, addon?: Purchase }`.
+  places_paid (>= 1), late_reg: Deadline, payouts?: bool, payout: PayoutConfig,
+  money?: MoneyConfig, reentry?, rebuy?, addon?: Purchase }`.
+- `payouts` says whether the tournament pays prizes: `true` by default and absent from the
+  JSON (only `false` is written, so older logs read and write unchanged). `false` is a
+  tournament without payouts (a freeroll for points, a league night): see Payouts.
+  `places_paid` and `payout` stay valid and are kept for when it is turned back on.
 - `PayoutConfig { placesPaid?: Percent { bps } | Fixed { n }, amounts?: Curve {
   firstShareBps? } | CustomBps { bps } | CustomAmounts { amounts } }`; `{}` (the old
   format) means `places_paid` places on the default curve. Errors: `INVALID_PLACES_PAID`,
@@ -100,8 +104,9 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
   `sb <= 0`, `bb < sb`, negative ante, duration outside `(0, 24h]`. Warnings: ante above big
   blind, big blind lower than the previous play level.
 - Play-level numbers skip breaks (`[P, P, B, P]` is 1, 2, -, 3).
-- `UpdateConfig`: while payouts are locked, changing `placesPaid`, `payout`,
-  `money.roundingUnit` or `money.minCash` is `PAYOUTS_LOCKED`. Seats per table, starting
+- `UpdateConfig`: while payouts are locked (so also while a deal stands), changing
+  `payouts`, `placesPaid`, `payout`, `money.roundingUnit` or `money.minCash` is
+  `PAYOUTS_LOCKED`; otherwise payouts can be turned off or on at any time. Seats per table, starting
   stack and `money.buyIn` are locked once started;
   enabling/disabling money tracking and the currency are locked as soon as a player is
   registered (`CONFIG_LOCKED { field }`, e.g. `money.currency`); `max_tables` cannot drop
@@ -214,6 +219,11 @@ distribute; `overlay = effective - pool` is paid by the house.
   -> `PayoutsUnlocked {}` (`PAYOUTS_NOT_LOCKED`). While locked the view uses the stored
   amounts (places paid = their count, capped by N) and warns
   `PAYOUTS_STALE { lockedPool, pool }` when the pool would now give other amounts.
+- Without payouts (`Config.payouts` false) no place is paid, whatever the pool: places
+  paid 0, no payout table and no payout warning, ITM `none`, no ranking row in the money
+  or with a prize. The pool, fees, guarantee and overlay are still tracked when money is.
+  `LockPayouts`, `UnlockPayouts` and `RecordDeal` are `PAYOUTS_DISABLED` (checked first);
+  payouts cannot be locked, hence no deal recorded, without payouts.
 
 ## Deals and ICM
 
@@ -233,7 +243,7 @@ distribute; `overlay = effective - pool` is paid by the house.
 - Floats: the ICM probabilities and the payout curve weights are the only float
   computations; nothing float is stored, logged or shown.
 - `RecordDeal { amounts: [{ player, amount }], playFor? }` -> `DealRecorded { amounts,
-  playFor }`. Needs money (`MONEY_NOT_CONFIGURED`), running (`NOT_STARTED`), entries closed
+  playFor }`. Needs payouts (`PAYOUTS_DISABLED`), money (`MONEY_NOT_CONFIGURED`), running (`NOT_STARTED`), entries closed
   (`LATE_REG_OPEN`), locked payouts (`PAYOUTS_NOT_LOCKED`), one deal only
   (`DEAL_ALREADY_RECORDED`), every player still in exactly once (`DUPLICATE_PLAYER`,
   `PLAYER_NOT_FOUND`, `PLAYER_NOT_ACTIVE`, `DEAL_PLAYER_MISSING { player }`), valid amounts
@@ -320,15 +330,17 @@ then), registration (open, override, deadline, `closes_in_ms`, `closes_at_ms`,
 busted, `reentries?` / `rebuys?` / `addons?` when offered or bought), chips
 (starting stack, in play = sum of stacks bought, average, average in big blinds x100 using
 the next play level during a break), places paid (see Payouts), ITM status
-(`not_yet { to_money }` / `bubble` when alive == paid + 1 / `in_money`), ranking rows (alive
+(`not_yet { to_money }` / `bubble` when alive == paid + 1 / `in_money`, or `none` without
+payouts), ranking rows (alive
 first, then by place, with ties, provisional and in-money flags, entries, `rebuys?` /
 `addons?`), tables with seats,
 names, button and next blinds, suggestions (final table, table break, balance plan),
 warnings, and `money?` when money is tracked (currency, pool, fees, guarantee, overlay,
-effective pool, `payouts` per place, `locked`, `deal`). With money, ranking rows carry
-`prize?` (ties split, provisional like the place, deal amounts for deal players) and
-`itm` `in_money` carries `nextPayout?`, the prize of the next player out (none after a
-deal). `placesPaid` is the count in force (reduced or locked).
+effective pool, `payouts` per place (empty without payouts), `locked`, `deal`). With money
+and payouts, ranking rows carry `prize?` (ties split, provisional like the place, deal
+amounts for deal players) and `itm` `in_money` carries `nextPayout?`, the prize of the next
+player out (none after a deal). `placesPaid` is the count in force (reduced or locked; 0
+without payouts).
 
 Compatibility: every field added to an existing wire type (config, events, view) is
 optional (`#[serde(default, skip_serializing_if = "Option::is_none")]`, `#[ts(optional)]`)
@@ -354,14 +366,16 @@ no `getrandom`. The host passes a fresh seed per command; outcomes are stored in
   re-entries, rebuys, add-ons, refunds), `effective = max(pool, guarantee)`, entries are
   never fewer than unique players, payouts are non-increasing and (unlocked, not custom
   amounts, with players) sum exactly to the effective pool, and once finished the prizes
-  add up to the payouts. A pure property checks `payouts::compute` for any pool, places,
+  add up to the payouts; without payouts (off at creation or after a random `UpdateConfig`)
+  nothing is paid, locked or dealt and ITM is `none`. A pure property checks `payouts::compute` for any pool, places,
   curve or custom shares, unit and minimum cash; another checks that ICM and chip chop add
   up exactly for any stacks and prizes; a third records an ICM deal (random play-for) and
   plays to the end: prizes add up to the locked payouts and the log replays.
 - ICM regressions: the two-player closed form `E1 = p2 + (p1 - p2) * s1 / S`, a brute force
   over every finishing order for up to 6 players (within one minor unit), exact sums.
 - JSON scenarios (`tests/scenarios/*.json`, among them 100 entries with re-entries, a
-  guarantee, curve payouts, rounding and a bubble tie) with partial view matching:
+  guarantee, curve payouts, rounding and a bubble tie, and a freezeout without payouts)
+  with partial view matching:
   `{ name, seed, tournament, steps: [{ atMs, cmd, expect?, view? }], checks: [{ nowMs, view }] }`.
 
 ## Hosts

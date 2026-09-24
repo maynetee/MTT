@@ -102,6 +102,20 @@ describe("director shortcuts", () => {
     await waitFor(() => expect(screen.getByRole("link", { name: "Registration" })).toHaveAttribute("aria-current", "page"));
   });
 
+  it("numbers the tabs without Payouts when the tournament pays no prizes", async () => {
+    const { engine, id } = await withTournament({ config: { payouts: false } });
+    renderApp(engine, `/t/${id}/clock`);
+    const nav = await screen.findByRole("navigation", { name: "Tournament sections" });
+    const user = userEvent.setup();
+
+    expect(within(nav).queryByRole("link", { name: "Payouts" })).not.toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Levels" })).toHaveAttribute("aria-keyshortcuts", "6");
+    await user.keyboard("6");
+    await waitFor(() => expect(screen.getByRole("link", { name: "Levels" })).toHaveAttribute("aria-current", "page"));
+    await user.keyboard("9");
+    await waitFor(() => expect(screen.getByRole("link", { name: "Exports" })).toHaveAttribute("aria-current", "page"));
+  });
+
   it("opens the display window of this tournament with D", async () => {
     const { engine, id } = await withTournament();
     const openDisplay = vi.spyOn(engine, "openDisplayWindow").mockResolvedValue();

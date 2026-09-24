@@ -10,6 +10,7 @@ import { useTournament } from "../TournamentContext";
 import { exportCSV, exportPDF, type RankingExport } from "../utils/exports";
 import { formatPlace, rankingStatus } from "../utils/labels";
 import { moneyFormatter } from "../utils/money";
+import { paysPrizes } from "../utils/payouts";
 
 type Format = "CSV" | "PDF";
 
@@ -21,7 +22,8 @@ export default function ExportsScreen() {
   const { view } = useTournament();
   const [busy, setBusy] = useState<Format | null>(null);
   const finished = view.phase === "finished";
-  const currency = view.money?.currency;
+  // A prize column only when there are prizes to show.
+  const currency = paysPrizes(view.config) ? view.money?.currency : undefined;
   const data: RankingExport = { tournamentName: view.config.name, finished, winner: view.winner, rows: view.ranking, currency };
   const format = currency ? moneyFormatter(i18n.locale, currency) : null;
   const provisional = view.ranking.some((row) => row.provisional);

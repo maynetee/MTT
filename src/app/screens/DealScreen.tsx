@@ -15,7 +15,8 @@ import { Table } from "../components/Table";
 import { useEngine } from "../EngineContext";
 import { useTournament } from "../TournamentContext";
 import { moneyFormatter, type MoneyFormatter } from "../utils/money";
-import { MAX_DEAL_PLAYERS, dealAvailable } from "../utils/payouts";
+import { MAX_DEAL_PLAYERS, dealAvailable, paysPrizes } from "../utils/payouts";
+import { NoPrizes } from "./NoPrizes";
 
 /** The quote follows the chip counts once the director pauses typing. */
 const QUOTE_DELAY_MS = 200;
@@ -155,6 +156,9 @@ export default function DealScreen() {
     };
   }, [engine, request]);
 
+  if (!paysPrizes(view.config)) {
+    return <NoPrizes />;
+  }
   if (!money || !format) {
     return <EmptyState icon="info" title={t("deal.noMoney")} />;
   }

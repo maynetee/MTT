@@ -6,7 +6,8 @@
 //! Payouts: the places paid come from the rule (`PlacesPaid`, or `Config.places_paid`),
 //! capped by the number of players; the effective pool is split by a curve or a custom
 //! table, floored to the rounding unit, the remainder going to first place. When the last
-//! payout falls below the minimum cash (or to zero), fewer places are paid.
+//! payout falls below the minimum cash (or to zero), fewer places are paid. A tournament
+//! without payouts (`Config.payouts` off) pays no place at all, whatever the pool.
 //!
 //! Floats: the curve weights are the only float computation here (`libm`, so native and
 //! WASM give the same bits); they become integer weights at once and never reach the
@@ -65,8 +66,11 @@ pub fn entries(state: &State) -> u32 {
 }
 
 /// Places the configuration pays for `entries` entries and `players` unique players,
-/// before any minimum-cash reduction: at least 1, at most `players`.
+/// before any minimum-cash reduction: at least 1, at most `players`; none without payouts.
 pub fn rule_places(config: &Config, entries: u32, players: u32) -> u32 {
+    if !config.payouts {
+        return 0;
+    }
     let wanted = match &config.payout.amounts {
         Some(PayoutAmounts::CustomBps { bps }) => bps.len() as u32,
         Some(PayoutAmounts::CustomAmounts { amounts }) => amounts.len() as u32,
@@ -259,9 +263,13 @@ pub fn compute(
 }
 
 /// Payouts derived from the current pool and configuration (ignoring any lock), when
-/// money is tracked.
+/// money is tracked and the tournament pays prizes.
 pub fn derived(state: &State) -> Option<PayoutTable> {
-    let money = state.config.money.as_ref()?;
+    let money = state
+        .config
+        .money
+        .as_ref()
+        .filter(|_| state.config.payouts)?;
     let places = rule_places(&state.config, entries(state), state.players.len() as u32);
     Some(compute(
         pool(state).effective,
@@ -275,9 +283,10 @@ pub fn derived(state: &State) -> Option<PayoutTable> {
 /// Payouts in force: the locked table, else the derived one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InForce {
-    /// Amount per place (empty without money tracking).
+    /// Amount per place (empty without money tracking or without payouts).
     pub amounts: Vec<Money>,
-    /// Places paid (also without money tracking), capped by the number of players.
+    /// Places paid (also without money tracking), capped by the number of players; 0
+    /// without payouts.
     pub places_paid: u32,
     pub locked: bool,
     /// Table derived from the current pool, when money is tracked.
@@ -288,7 +297,12 @@ pub struct InForce {
 pub fn in_force(state: &State) -> InForce {
     let players = state.players.len() as u32;
     let derived = derived(state);
-    match (&state.payouts_locked, &derived) {
+    // Payouts cannot be locked without payouts (`PAYOUTS_DISABLED`, `PAYOUTS_LOCKED`).
+    let locked = state
+        .payouts_locked
+        .as_ref()
+        .filter(|_| state.config.payouts);
+    match (locked, &derived) {
         (Some(locked), _) => InForce {
             amounts: locked.amounts.clone(),
             places_paid: (locked.amounts.len() as u32).min(players),
@@ -361,6 +375,9 @@ pub fn prizes(state: &State, amounts: &[Money]) -> BTreeMap<PlayerId, Money> {
 /// `LockPayouts`: freezes the payouts derived now; later entries leave them unchanged
 /// (the view warns `PAYOUTS_STALE`).
 pub(crate) fn decide_lock(state: &State) -> Result<Event, DomainError> {
+    if !state.config.payouts {
+        return Err(DomainError::PayoutsDisabled);
+    }
     let Some(table) = derived(state) else {
         return Err(DomainError::MoneyNotConfigured);
     };
@@ -382,6 +399,9 @@ pub(crate) fn decide_lock(state: &State) -> Result<Event, DomainError> {
 
 /// `UnlockPayouts`: payouts follow the pool again.
 pub(crate) fn decide_unlock(state: &State) -> Result<Event, DomainError> {
+    if !state.config.payouts {
+        return Err(DomainError::PayoutsDisabled);
+    }
     if state.payouts_locked.is_none() {
         return Err(DomainError::PayoutsNotLocked);
     }
@@ -669,5 +689,44 @@ mod tests {
         kit.ok(Command::UnlockPayouts {});
         kit.ok(Command::UpdateConfig { config });
         assert_eq!(kit.agg.view(kit.now).places_paid, 2);
+    }
+
+    #[test]
+    fn no_payouts_pay_no_place() {
+        let config = Config {
+            payouts: false,
+            places_paid: 3,
+            ..Config::new("Unit", 9, 2, 10_000)
+        };
+        assert_eq!(rule_places(&config, 10, 10), 0);
+        let mut kit = money_kit(None);
+        let mut config = kit.agg.state().config.clone();
+        config.payouts = false;
+        kit.ok(Command::UpdateConfig { config });
+        kit.register("A");
+        kit.register("B");
+        // The pool is still tracked, but nothing is paid out of it.
+        let p = pool(kit.agg.state());
+        assert_eq!((p.prize, p.fees), (Money(20_000), Money(2_000)));
+        assert_eq!(derived(kit.agg.state()), None);
+        let paid = in_force(kit.agg.state());
+        assert_eq!((paid.amounts.len(), paid.places_paid), (0, 0));
+        let view = kit.agg.view(kit.now);
+        assert_eq!(view.places_paid, 0);
+        assert_eq!(view.money.as_ref().unwrap().payouts, Vec::<Money>::new());
+        assert!(view.warnings.is_empty(), "{:?}", view.warnings);
+        for cmd in [Command::LockPayouts {}, Command::UnlockPayouts {}] {
+            assert_eq!(kit.err(cmd), DomainError::PayoutsDisabled);
+        }
+        // Without money tracking either.
+        let mut kit = Kit::with_config(Config {
+            payouts: false,
+            ..Config::new("Unit", 9, 2, 10_000)
+        });
+        kit.register("A");
+        assert_eq!(
+            kit.err(Command::LockPayouts {}),
+            DomainError::PayoutsDisabled
+        );
     }
 }

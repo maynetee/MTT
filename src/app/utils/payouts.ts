@@ -7,9 +7,14 @@ export const BPS = 10_000;
 /** Most players the core's ICM calculation takes (`ICM_TOO_MANY_PLAYERS` beyond). */
 export const MAX_DEAL_PLAYERS = 20;
 
-/** Whether the Deal tab is offered: money tracked, and a deal recorded or 2 to 20 players left in play. */
+/** Whether the tournament pays prizes: on unless turned off (`payouts` is only written when false). */
+export function paysPrizes(config: Config): boolean {
+  return config.payouts !== false;
+}
+
+/** Whether the Deal tab is offered: prizes paid, money tracked, and a deal recorded or 2 to 20 players left in play. */
 export function dealAvailable(view: View): boolean {
-  if (!view.money) return false;
+  if (!view.money || !paysPrizes(view.config)) return false;
   if (view.money.deal) return true;
   return view.phase === "running" && view.counts.alive >= 2 && view.counts.alive <= MAX_DEAL_PLAYERS;
 }

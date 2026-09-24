@@ -22,7 +22,7 @@ import type { Warning } from "./Warning";
 export type View = { generatedAtMs: number, id: TournamentId, phase: PhaseName, winner: PlayerId | null, history: History, config: Config, levels: Array<LevelRow>, clock: ClockView, registration: RegistrationView, counts: Counts, chips: ChipsView, 
 /**
  * Places paid, capped by the number of players (after the minimum-cash reduction, or
- * as locked).
+ * as locked); 0 without payouts.
  */
 placesPaid: number, itm: Itm, ranking: Array<RankingRow>, tables: Array<TableView>, suggestions: Suggestions, warnings: Array<Warning>, 
 /**

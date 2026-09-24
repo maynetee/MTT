@@ -1,0 +1,90 @@
+{
+  "name": "freezeout without payouts to a winner",
+  "seed": 86,
+  "tournament": {
+    "id": "league-night",
+    "config": {
+      "name": "League night",
+      "seatsPerTable": 6,
+      "maxTables": 1,
+      "startingStack": 10000,
+      "placesPaid": 2,
+      "payouts": false,
+      "money": {
+        "currency": { "code": "EUR", "exponent": 2 },
+        "buyIn": { "prize": 2000, "fee": 500 },
+        "roundingUnit": 100
+      }
+    },
+    "structure": [
+      { "type": "play", "sb": 25, "bb": 50, "durationMs": 1200000 },
+      { "type": "play", "sb": 50, "bb": 100, "durationMs": 1200000 },
+      { "type": "break", "durationMs": 600000 },
+      { "type": "play", "sb": 100, "bb": 200, "durationMs": 1200000 }
+    ]
+  },
+  "steps": [
+    { "atMs": 1000, "cmd": { "type": "register", "name": "Alice" } },
+    { "atMs": 2000, "cmd": { "type": "register", "name": "Bob" } },
+    { "atMs": 3000, "cmd": { "type": "register", "name": "Carol" } },
+    { "atMs": 4000, "cmd": { "type": "register", "name": "Dave" } },
+    {
+      "atMs": 5000,
+      "cmd": { "type": "lock_payouts" },
+      "expect": { "error": "PAYOUTS_DISABLED" },
+      "view": {
+        "config": { "payouts": false },
+        "placesPaid": 0,
+        "itm": { "status": "none" },
+        "money": { "pool": 8000, "fees": 2000, "effectivePool": 8000, "payouts": [], "locked": false },
+        "warnings": []
+      }
+    },
+    {
+      "atMs": 10000,
+      "cmd": { "type": "start_clock" },
+      "view": { "phase": "running", "placesPaid": 0, "itm": { "status": "none" } }
+    },
+    {
+      "atMs": 60000,
+      "cmd": { "type": "bust_players", "busts": [{ "player": 1 }] },
+      "view": { "itm": { "status": "none" }, "counts": { "alive": 3, "busted": 1 } }
+    },
+    {
+      "atMs": 120000,
+      "cmd": { "type": "bust_players", "busts": [{ "player": 2 }] },
+      "view": { "itm": { "status": "none" }, "placesPaid": 0 }
+    },
+    { "atMs": 130000, "cmd": { "type": "close_registration" } },
+    {
+      "atMs": 140000,
+      "cmd": { "type": "record_deal", "amounts": [{ "player": 3, "amount": 4000 }, { "player": 4, "amount": 4000 }] },
+      "expect": { "error": "PAYOUTS_DISABLED" }
+    },
+    {
+      "atMs": 180000,
+      "cmd": { "type": "bust_players", "busts": [{ "player": 3 }] },
+      "view": {
+        "phase": "finished",
+        "winner": 4,
+        "placesPaid": 0,
+        "itm": { "status": "none" },
+        "money": { "pool": 8000, "payouts": [], "deal": null }
+      }
+    }
+  ],
+  "checks": [
+    {
+      "nowMs": 3600000,
+      "view": {
+        "phase": "finished",
+        "ranking": [
+          { "name": "Dave", "place": 1, "inMoney": false },
+          { "name": "Carol", "place": 2, "inMoney": false },
+          { "name": "Bob", "place": 3, "inMoney": false },
+          { "name": "Alice", "place": 4, "inMoney": false }
+        ]
+      }
+    }
+  ]
+}

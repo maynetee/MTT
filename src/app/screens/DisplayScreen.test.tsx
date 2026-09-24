@@ -291,6 +291,36 @@ describe("DisplayScreen", () => {
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   });
 
+  it("without prizes: no money line, no payouts, the levels coming up, even with the buy-ins tracked", async () => {
+    const t = await running(5, { money, placesPaid: 3, payouts: false });
+    // Four left: the bubble, had the tournament paid three places.
+    await t.bust(1);
+    const view = await t.view();
+    expect(view.itm).toEqual({ status: "none" });
+    show(t.engine, view);
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(document.querySelector(".tv-band")).toBeNull();
+    expect(screen.queryByText("Prize pool")).not.toBeInTheDocument();
+    expect(screen.queryByText("Places paid")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Payouts" })).not.toBeInTheDocument();
+    const schedule = within(screen.getByRole("region", { name: "Coming up" }));
+    expect(schedule.getAllByRole("listitem")[0]).toHaveTextContent("Level 2");
+    expect(within(screen.getByText("Players").nextElementSibling as HTMLElement).getByText("4")).toBeInTheDocument();
+  });
+
+  it("without prizes: the winner and the final places, no amounts", async () => {
+    const t = await running(3, { money, payouts: false });
+    await t.run({ type: "close_registration" });
+    await t.bust(2);
+    const view = await t.view();
+    show(t.engine, view);
+
+    expect(document.querySelector(".tv-winner-prize")).toBeNull();
+    const results = within(screen.getByRole("list")).getAllByRole("listitem");
+    expect(results.map((row) => row.children.length)).toEqual([2, 2, 2]);
+  });
+
   it("invites a click when the browser keeps the sound off", async () => {
     const t = await running();
     show(t.engine, await t.view(), { soundLocked: true });

@@ -64,7 +64,39 @@ describe("SettingsScreen money", () => {
     expect(await screen.findByLabelText("Round payouts to")).toBeDisabled();
     expect(screen.getByLabelText("Minimum cash")).toBeDisabled();
     expect(screen.getByLabelText("Places paid")).toBeDisabled();
-    expect(screen.getAllByText("Payouts are locked: unlock them to change this.")).toHaveLength(3);
+    expect(screen.getByRole("checkbox", { name: /This tournament pays prizes/ })).toBeDisabled();
+    expect(screen.getAllByText("Payouts are locked: unlock them to change this.")).toHaveLength(4);
+  });
+});
+
+describe("SettingsScreen prizes", () => {
+  it("turns the prizes off during a tournament, and back on with undo", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await withTournament({ config: { money } });
+    await register(engine, id, ["Ann", "Ben", "Cat", "Dan"]);
+    await engine.dispatch(id, { type: "start_clock" });
+    renderApp(engine, `/t/${id}/settings`);
+    const nav = await screen.findByRole("navigation", { name: "Tournament sections" });
+    expect(within(nav).getByRole("link", { name: "Payouts" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: /This tournament pays prizes/ }));
+    expect(screen.queryByRole("spinbutton", { name: "Places paid" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Round payouts to")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    await waitFor(() => expect(within(nav).queryByRole("link", { name: "Payouts" })).not.toBeInTheDocument());
+    const view = await engine.getView(id);
+    expect(view.config.payouts).toBe(false);
+    expect(view.placesPaid).toBe(0);
+    expect(view.itm).toEqual({ status: "none" });
+    // Buy-ins stay tracked: the pool is still there, but paid to nobody.
+    expect(view.money).toMatchObject({ pool: 40_000, payouts: [] });
+    expect(screen.getByRole("checkbox", { name: /This tournament pays prizes/ })).not.toBeChecked();
+
+    await user.click(screen.getByRole("button", { name: /^Undo/ }));
+    await waitFor(() => expect(within(nav).getByRole("link", { name: "Payouts" })).toBeInTheDocument());
+    expect(screen.getByRole("checkbox", { name: /This tournament pays prizes/ })).toBeChecked();
+    expect((await engine.getView(id)).placesPaid).toBe(3);
   });
 });
 

@@ -21,7 +21,18 @@ balanceTrigger: number,
 /**
  * Tables to break first, in order; other tables follow from the highest number down.
  */
-breakOrder: Array<TableNo>, startingStack: Chips, placesPaid: number, lateReg: Deadline, payout: PayoutConfig, 
+breakOrder: Array<TableNo>, startingStack: Chips, 
+/**
+ * Places paid by default (see `PayoutConfig`); ignored without payouts.
+ */
+placesPaid: number, lateReg: Deadline, 
+/**
+ * Whether the tournament pays prizes (the default). Without payouts nobody is in the
+ * money: no places paid, no bubble, no payouts, no deal. `places_paid` and `payout`
+ * are kept for when it is turned back on. Only `false` is written, so logs from
+ * before this field serialize unchanged.
+ */
+payouts?: boolean, payout: PayoutConfig, 
 /**
  * Buy-ins and prize pool; absent for a tournament without money tracking.
  */

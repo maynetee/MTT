@@ -31,6 +31,10 @@ export interface TournamentSpec {
   tables?: number;
   seats?: number;
   placesPaid?: number;
+  /** False: the tournament pays no prizes. */
+  prizes?: boolean;
+  /** Tracks buy-ins with the default buy-in (EUR 100). */
+  money?: boolean;
   /** Minutes of the first rows of the default structure (4 play levels, then a break). */
   minutes?: number[];
 }
@@ -51,6 +55,8 @@ export async function createTournament(page: Page, spec: TournamentSpec): Promis
   if (spec.tables !== undefined) await page.getByRole("spinbutton", { name: "Tables", exact: true }).fill(String(spec.tables));
   if (spec.seats !== undefined) await page.getByRole("spinbutton", { name: "Seats per table", exact: true }).fill(String(spec.seats));
   if (spec.placesPaid !== undefined) await page.getByRole("spinbutton", { name: "Places paid", exact: true }).fill(String(spec.placesPaid));
+  if (spec.prizes !== undefined) await page.getByRole("checkbox", { name: /This tournament pays prizes/ }).setChecked(spec.prizes);
+  if (spec.money !== undefined) await page.getByRole("checkbox", { name: /Track buy-ins and the prize pool/ }).setChecked(spec.money);
   for (const [index, minutes] of (spec.minutes ?? []).entries()) {
     await page.getByRole("spinbutton", { name: `Level ${index + 1} Minutes`, exact: true }).fill(String(minutes));
   }

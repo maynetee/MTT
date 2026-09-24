@@ -174,7 +174,8 @@ pub struct MoneyView {
     pub overlay: Money,
     /// Distributed to the players: the larger of `pool` and `guarantee`.
     pub effective_pool: Money,
-    /// Payouts in force, first place first (`payouts[0]` is 1st place).
+    /// Payouts in force, first place first (`payouts[0]` is 1st place); empty without
+    /// payouts.
     pub payouts: Vec<Money>,
     /// The payouts are frozen by `LockPayouts`.
     pub locked: bool,
@@ -200,6 +201,9 @@ pub enum Itm {
         #[cfg_attr(any(test, feature = "ts"), ts(optional))]
         next_payout: Option<Money>,
     },
+    /// The tournament pays no prizes: there is no money to reach.
+    #[serde(rename = "none")]
+    NoPayouts,
 }
 
 /// One line of the ranking. Alive players come first, without a place.
@@ -216,6 +220,7 @@ pub struct RankingRow {
     pub place_to: Option<u32>,
     /// The place may still change (late registration open, or the player may re-enter).
     pub provisional: bool,
+    /// Paid (or still in once everyone left is paid); never without payouts.
     pub in_money: bool,
     pub entries: u8,
     /// Rebuys bought; present when any.
@@ -227,7 +232,7 @@ pub struct RankingRow {
     #[cfg_attr(any(test, feature = "ts"), ts(optional))]
     pub addons: Option<u8>,
     /// Prize won (provisional like the place); present for placed players when money is
-    /// tracked and the prize is not zero.
+    /// tracked, the tournament pays prizes and the prize is not zero.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(any(test, feature = "ts"), ts(optional))]
     pub prize: Option<Money>,
@@ -275,7 +280,7 @@ pub struct View {
     pub counts: Counts,
     pub chips: ChipsView,
     /// Places paid, capped by the number of players (after the minimum-cash reduction, or
-    /// as locked).
+    /// as locked); 0 without payouts.
     pub places_paid: u32,
     pub itm: Itm,
     pub ranking: Vec<RankingRow>,
@@ -352,8 +357,12 @@ fn money_view(state: &State, payouts: payouts::InForce) -> Option<MoneyView> {
     })
 }
 
-/// [`itm`] with the prize of the next player out while running.
+/// [`itm`] with the prize of the next player out while running; `NoPayouts` without
+/// payouts.
 fn itm_with_payout(state: &State, alive: u32, payouts: &payouts::InForce) -> Itm {
+    if !state.config.payouts {
+        return Itm::NoPayouts;
+    }
     match itm(state.phase, alive, payouts.places_paid) {
         Itm::InMoney { .. } => Itm::InMoney {
             next_payout: Some(payouts::amount_at(&payouts.amounts, alive)).filter(|amount| {
@@ -493,13 +502,15 @@ fn ranking_rows(
     payouts: &payouts::InForce,
 ) -> Vec<RankingRow> {
     let places_paid = payouts.places_paid;
-    let alive_in_money = matches!(
-        itm(state.phase, state.alive_count() as u32, places_paid),
-        Itm::InMoney { .. }
-    );
+    let paying = state.config.payouts;
+    let alive_in_money = paying
+        && matches!(
+            itm(state.phase, state.alive_count() as u32, places_paid),
+            Itm::InMoney { .. }
+        );
     let prizes = match state.config.money {
-        Some(_) => payouts::prizes(state, &payouts.amounts),
-        None => Default::default(),
+        Some(_) if paying => payouts::prizes(state, &payouts.amounts),
+        _ => Default::default(),
     };
     let places = ranking::placements(state);
     let running = state.phase == Phase::Running;
@@ -521,7 +532,7 @@ fn ranking_rows(
                     && placement.is_some()
                     && (registration_open || purchase::can_reenter(state, p, now_ms)),
                 in_money: match placement {
-                    Some(pl) => pl.place <= places_paid,
+                    Some(pl) => paying && pl.place <= places_paid,
                     None => alive_in_money,
                 },
                 entries: p.entries,
@@ -639,5 +650,40 @@ mod tests {
         assert_eq!(itm(running, 3, 3), in_money);
         assert_eq!(itm(running, 1, 3), in_money);
         assert_eq!(itm(Phase::Setup, 3, 3), Itm::NotYet { to_money: 0 });
+    }
+
+    #[test]
+    fn no_payouts_means_nobody_in_the_money() {
+        use crate::command::Command;
+        use crate::config::{Config, MoneyConfig};
+        use crate::testkit::{Kit, bust};
+
+        let mut kit = Kit::with_config(Config {
+            payouts: false,
+            places_paid: 2,
+            money: Some(MoneyConfig::new("EUR", 2, 10_000, 1_000)),
+            ..Config::new("Unit", 9, 1, 10_000)
+        });
+        let ids: Vec<PlayerId> = (0..4).map(|i| kit.register(&format!("P{i}"))).collect();
+        assert_eq!(kit.agg.view(kit.now).itm, Itm::NoPayouts);
+        kit.ok(Command::StartClock {});
+        kit.ok(Command::CloseRegistration {});
+        // Where the bubble would be, and in what would be the money.
+        for &id in &ids[..3] {
+            kit.ok(bust(&[id]));
+            let view = kit.agg.view(kit.now);
+            assert_eq!(view.itm, Itm::NoPayouts);
+            assert_eq!(view.places_paid, 0);
+            assert!(
+                view.ranking
+                    .iter()
+                    .all(|r| !r.in_money && r.prize.is_none())
+            );
+        }
+        let view = kit.agg.view(kit.now);
+        assert_eq!(view.winner, Some(ids[3]));
+        assert_eq!(view.money.map(|m| m.pool), Some(Money(40_000)));
+        let json = serde_json::to_value(&view.itm).unwrap();
+        assert_eq!(json, serde_json::json!({"status": "none"}));
     }
 }

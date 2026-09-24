@@ -146,6 +146,33 @@ describe("ExportsScreen", () => {
     );
   });
 
+  it("has no prize column when the tournament pays no prizes, buy-ins tracked or not", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await withTournament({
+      tables: 1,
+      config: { payouts: false, money: { currency: { code: "EUR", exponent: 2 }, buyIn: { prize: 5_000, fee: 500 }, roundingUnit: 100 } }
+    });
+    const view = await register(engine, id, ["Anna", "Bob", "Chloé"]);
+    await engine.dispatch(id, { type: "start_clock" });
+    await engine.dispatch(id, { type: "close_registration" });
+    await engine.dispatch(id, { type: "bust_players", busts: [{ player: playerId(view, "Chloé") }] });
+    await engine.dispatch(id, { type: "bust_players", busts: [{ player: playerId(view, "Bob") }] });
+    const save = vi.spyOn(engine, "saveExport").mockResolvedValue(true);
+    renderApp(engine, `/t/${id}/exports`);
+
+    const table = await screen.findByRole("table", { name: "Exports" });
+    expect(within(table).queryByRole("columnheader", { name: "Prize" })).not.toBeInTheDocument();
+    expect(rows()).toEqual([
+      ["#1", "Anna", "Winner"],
+      ["#2", "Bob", "Eliminated"],
+      ["#3", "Chloé", "Eliminated"]
+    ]);
+    await user.click(screen.getByRole("button", { name: "Export CSV" }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(new TextDecoder().decode(save.mock.calls[0][0].bytes)).toBe("Place,Player,Status\r\n1,Anna,Winner\r\n2,Bob,Eliminated\r\n3,Chloé,Eliminated\r\n");
+  });
+
   it("shows an export failure", async () => {
     const user = userEvent.setup();
     const { engine, id } = await fourPlayers();

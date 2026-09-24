@@ -240,9 +240,16 @@ pub struct Config {
     #[serde(default)]
     pub break_order: Vec<TableNo>,
     pub starting_stack: Chips,
+    /// Places paid by default (see `PayoutConfig`); ignored without payouts.
     pub places_paid: u16,
     #[serde(default)]
     pub late_reg: Deadline,
+    /// Whether the tournament pays prizes (the default). Without payouts nobody is in the
+    /// money: no places paid, no bubble, no payouts, no deal. `places_paid` and `payout`
+    /// are kept for when it is turned back on. Only `false` is written, so logs from
+    /// before this field serialize unchanged.
+    #[serde(default = "default_payouts", skip_serializing_if = "is_true")]
+    pub payouts: bool,
     #[serde(default)]
     pub payout: PayoutConfig,
     /// Buy-ins and prize pool; absent for a tournament without money tracking.
@@ -265,6 +272,14 @@ fn default_balance_trigger() -> u8 {
     2
 }
 
+fn default_payouts() -> bool {
+    true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
+}
+
 impl Config {
     /// A configuration with defaults for everything but the essentials.
     pub fn new(name: &str, seats_per_table: u8, max_tables: u16, starting_stack: i64) -> Self {
@@ -278,6 +293,7 @@ impl Config {
             starting_stack: Chips(starting_stack),
             places_paid: 1,
             late_reg: Deadline::Manual,
+            payouts: true,
             payout: PayoutConfig::default(),
             money: None,
             reentry: None,
@@ -529,9 +545,10 @@ fn payout_rules(config: &Config) -> (u16, &PayoutConfig, Option<(Money, Option<M
     (config.places_paid, &config.payout, money)
 }
 
-/// `UpdateConfig`: see [`locked_field`]; payout settings are frozen while payouts are
-/// locked; tables in use cannot be removed. Amounts already paid are recorded in their
-/// events, so a new buy-in only applies to later entries.
+/// `UpdateConfig`: see [`locked_field`]; payout settings (turning payouts off included)
+/// are frozen while payouts are locked, hence while a deal stands; tables in use cannot
+/// be removed. Amounts already paid are recorded in their events, so a new buy-in only
+/// applies to later entries.
 pub(crate) fn decide_update(state: &State, config: &Config) -> Result<Event, DomainError> {
     validate(config, &state.structure)?;
     if *config == state.config {
@@ -542,7 +559,9 @@ pub(crate) fn decide_update(state: &State, config: &Config) -> Result<Event, Dom
             field: field.to_owned(),
         });
     }
-    if state.payouts_locked.is_some() && payout_rules(config) != payout_rules(&state.config) {
+    let payouts_changed = config.payouts != state.config.payouts
+        || payout_rules(config) != payout_rules(&state.config);
+    if state.payouts_locked.is_some() && payouts_changed {
         return Err(DomainError::PayoutsLocked);
     }
     for table in state.tables.values() {
@@ -689,9 +708,25 @@ mod tests {
         assert_eq!(config.late_reg, Deadline::Manual);
         assert_eq!(config.payout, PayoutConfig::default());
         assert_eq!(config.money, None);
+        assert!(config.payouts);
         // Absent optional sections stay absent, so old logs serialize unchanged.
         let back = serde_json::to_value(&config).unwrap();
         assert!(back.get("money").is_none());
+        assert!(back.get("payouts").is_none());
+    }
+
+    #[test]
+    fn only_a_tournament_without_payouts_writes_the_flag() {
+        let json = serde_json::json!({
+            "name": "League night", "seatsPerTable": 9, "maxTables": 4,
+            "startingStack": 20000, "placesPaid": 3, "payouts": false
+        });
+        let config: Config = serde_json::from_value(json).unwrap();
+        assert!(!config.payouts);
+        // Places paid keep their valid value for when payouts are turned back on.
+        assert_eq!(validate(&config, &levels()), Ok(()));
+        let back = serde_json::to_value(&config).unwrap();
+        assert_eq!(back.get("payouts"), Some(&serde_json::json!(false)));
     }
 
     #[test]
@@ -873,6 +908,32 @@ mod tests {
             kit.ok(Command::Unregister { player: a });
             let cmd = update(&kit, |c| c.money = None);
             kit.ok(cmd);
+        }
+
+        #[test]
+        fn payouts_turn_off_and_on_unless_locked() {
+            let mut kit = Kit::with_config(Config {
+                money: Some(money()),
+                ..Config::new("Unit", 9, 2, 10_000)
+            });
+            kit.register("A");
+            kit.register("B");
+            kit.ok(Command::StartClock {});
+            kit.ok(update(&kit, |c| c.payouts = false));
+            assert!(!kit.agg.state().config.payouts);
+            kit.ok(update(&kit, |c| c.payouts = true));
+            kit.ok(Command::LockPayouts {});
+            assert_eq!(
+                kit.err(update(&kit, |c| c.payouts = false)),
+                DomainError::PayoutsLocked
+            );
+            kit.ok(Command::UnlockPayouts {});
+            kit.ok(update(&kit, |c| c.payouts = false));
+            // Undo brings the payouts back, redo removes them again.
+            kit.ok(Command::Undo {});
+            assert!(kit.agg.state().config.payouts);
+            kit.ok(Command::Redo {});
+            assert!(!kit.agg.state().config.payouts);
         }
 
         #[test]

@@ -100,9 +100,9 @@ fn command() -> impl Strategy<Value = Command> {
         1 => table().prop_map(|table| Command::FormFinalTable { table }),
         3 => Just(Command::Undo {}),
         1 => Just(Command::Redo {}),
-        1 => (1u16..=5, 2u16..=TABLES + 1, 3u8..=SEATS + 1).prop_map(|(paid, tables, seats)| {
+        1 => (1u16..=5, 2u16..=TABLES + 1, 3u8..=SEATS + 1, prop::bool::weighted(0.75)).prop_map(|(paid, tables, seats, payouts)| {
             Command::UpdateConfig {
-                config: Config { places_paid: paid, ..Config::new("Prop", seats, tables, 10_000) },
+                config: Config { places_paid: paid, payouts, ..Config::new("Prop", seats, tables, 10_000) },
             }
         }),
         1 => structure().prop_map(|levels| Command::UpdateStructure { levels }),
@@ -243,9 +243,26 @@ fn payout() -> impl Strategy<Value = PayoutConfig> {
 }
 
 /// Payouts in force are non-increasing and, unless locked or custom amounts, add up to
-/// the effective pool; once finished, the prizes add up to the payouts.
+/// the effective pool; once finished, the prizes add up to the payouts. Without payouts
+/// nothing is paid, locked or dealt, and nobody is in the money.
 fn check_payouts(agg: &Aggregate, now: i64) {
     let view = agg.view(now);
+    let state = agg.state();
+    if !state.config.payouts {
+        assert!(state.payouts_locked.is_none() && state.deal.is_none());
+        assert_eq!(view.places_paid, 0);
+        assert_eq!(view.itm, mtt_core::view::Itm::NoPayouts);
+        assert!(
+            view.ranking
+                .iter()
+                .all(|r| !r.in_money && r.prize.is_none())
+        );
+        if let Some(money) = &view.money {
+            assert!(money.payouts.is_empty() && !money.locked && money.deal.is_none());
+        }
+        return;
+    }
+    assert_ne!(view.itm, mtt_core::view::Itm::NoPayouts);
     let Some(money) = &view.money else {
         return;
     };
@@ -374,10 +391,12 @@ fn icm_deal(state: &State, play_for: Option<Money>) -> Command {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_ops(
     late_reg: Deadline,
     trigger: u8,
     money: Option<MoneyConfig>,
+    payouts: bool,
     payout: PayoutConfig,
     players: u32,
     start: bool,
@@ -397,6 +416,7 @@ fn run_ops(
         late_reg,
         balance_trigger: trigger,
         money,
+        payouts,
         payout,
         reentry: Some(Purchase {
             max: Some(2),
@@ -508,12 +528,13 @@ proptest! {
         late_reg in deadline(),
         trigger in 2u8..=SEATS,
         money in money(),
+        payouts in prop::bool::weighted(0.8),
         payout in payout(),
         players in 2u32..=12,
         start in any::<bool>(),
         ops in prop::collection::vec(op(), 1..80),
     ) {
-        run_ops(late_reg, trigger, money, payout, players, start, ops);
+        run_ops(late_reg, trigger, money, payouts, payout, players, start, ops);
     }
 
     #[test]

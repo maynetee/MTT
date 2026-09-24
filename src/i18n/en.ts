@@ -91,6 +91,7 @@ const errors = {
   NO_ENTRIES: "There are no entries yet.",
   PAYOUTS_LOCKED: "Payouts are locked: unlock them first.",
   PAYOUTS_NOT_LOCKED: "Lock the payouts first.",
+  PAYOUTS_DISABLED: "This tournament pays no prizes: turn payouts on in Settings first.",
   ICM_TOO_MANY_PLAYERS: "ICM works with at most {max} players.",
   INVALID_ICM_INPUT: "Check the chip counts: none can be negative. The amount left to play for cannot be more than the first prize.",
   DEAL_ALREADY_RECORDED: "A deal is already recorded.",
@@ -289,6 +290,9 @@ export const en = {
     capacitySeats: { one: "{count} seat", other: "{count} seats" },
     lockedHint: "Seats per table and the starting stack are locked once the tournament has started.",
     placesPaidElsewhere: "Set on the Payouts tab.",
+    payouts: "This tournament pays prizes",
+    payoutsHint: "Off for a freeroll for points, a league night or a practice event: no places paid, no bubble, no payouts.",
+    noPlacesPaid: "None",
     /** Field names in CONFIG_LOCKED errors (`money`, `money.currency`, `money.buyIn`). */
     money: {
       label: "Money tracking",
@@ -438,7 +442,9 @@ export const en = {
     removePlace: "Remove the last place",
     total: "Total {total}",
     totalOf: "Total {total} of {pool}",
-    roundingTitle: "Rounding"
+    roundingTitle: "Rounding",
+    noPrizes: "This tournament pays no prizes",
+    noPrizesHint: "Tick “This tournament pays prizes” in Settings to set the places paid and the payouts."
   },
   deal: {
     calculator: "Deal calculator",

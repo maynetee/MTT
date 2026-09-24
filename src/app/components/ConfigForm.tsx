@@ -4,6 +4,7 @@ import type { MoneyConfig } from "../../bindings/MoneyConfig";
 import type { Purchase } from "../../bindings/Purchase";
 import type { PurchaseWindow } from "../../bindings/PurchaseWindow";
 import { useI18n } from "../../i18n";
+import { paysPrizes } from "../utils/payouts";
 import { Checkbox, Field, RadioGroup, TextInput, type RadioOption } from "./Field";
 import { NO_LOCKS, type ConfigLocks } from "./MoneyFields";
 import { NumberInput } from "./NumberInput";
@@ -79,6 +80,12 @@ export function sanitizeConfig(config: Config): Config {
   };
 }
 
+/** Turns prizes on or off. Only `false` is stored: paying prizes is the default, absent from the config. */
+export function withPayouts(config: Config, payouts: boolean): Config {
+  const { payouts: _payouts, ...rest } = config;
+  return payouts ? rest : { ...rest, payouts: false };
+}
+
 interface Props {
   config: Config;
   onChange(config: Config): void;
@@ -86,7 +93,7 @@ interface Props {
   locks?: ConfigLocks;
 }
 
-/** Name, tables and seats, places paid, starting stack and balancing settings. */
+/** Name, tables and seats, places paid (or no prizes at all), starting stack and balancing settings. */
 export function ConfigFields({ config, onChange, locks = NO_LOCKS }: Props) {
   const { t } = useI18n();
   const set = (changes: Partial<Config>) => onChange({ ...config, ...changes });
@@ -96,6 +103,7 @@ export function ConfigFields({ config, onChange, locks = NO_LOCKS }: Props) {
   // A share of the entries or a custom payout table decides the places paid instead.
   const placesRule = config.payout.placesPaid !== undefined || (config.payout.amounts !== undefined && config.payout.amounts.type !== "curve");
   const placesHint = locks.payoutsLocked ? t("money.payoutsLockedHint") : placesRule ? t("config.placesPaidElsewhere") : undefined;
+  const payouts = paysPrizes(config);
 
   return (
     <div className="form-grid">
@@ -112,9 +120,17 @@ export function ConfigFields({ config, onChange, locks = NO_LOCKS }: Props) {
           title={locked}
         />
       </Field>
-      <Field label={t("config.placesPaid")} hint={placesHint}>
-        <NumberInput min={1} value={config.placesPaid} onChange={(value) => set({ placesPaid: integer(value) })} disabled={locks.payoutsLocked || placesRule} />
-      </Field>
+      {payouts ? (
+        <Field label={t("config.placesPaid")} hint={placesHint}>
+          <NumberInput min={1} value={config.placesPaid} onChange={(value) => set({ placesPaid: integer(value) })} disabled={locks.payoutsLocked || placesRule} />
+        </Field>
+      ) : (
+        // Nobody is paid: a readout keeps the grid in place.
+        <div className="readout">
+          <span className="readout-label">{t("config.placesPaid")}</span>
+          <span className="readout-value">{t("config.noPlacesPaid")}</span>
+        </div>
+      )}
       <Field label={t("config.maxTables")}>
         <NumberInput min={1} value={config.maxTables} onChange={(value) => set({ maxTables: integer(value) })} />
       </Field>
@@ -144,6 +160,14 @@ export function ConfigFields({ config, onChange, locks = NO_LOCKS }: Props) {
       <Field label={t("config.balanceTrigger")} hint={t("config.balanceTriggerHint")} className="span-2">
         <NumberInput digits={3} min={2} value={config.balanceTrigger} onChange={(value) => set({ balanceTrigger: integer(value) })} />
       </Field>
+      <Checkbox
+        className="span-all"
+        label={t("config.payouts")}
+        description={locks.payoutsLocked ? t("money.payoutsLockedHint") : t("config.payoutsHint")}
+        checked={payouts}
+        disabled={locks.payoutsLocked}
+        onChange={(event) => onChange(withPayouts(config, event.target.checked))}
+      />
     </div>
   );
 }

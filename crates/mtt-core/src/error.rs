@@ -240,6 +240,8 @@ pub enum DomainError {
     /// Unlock the payouts before changing how they are computed.
     PayoutsLocked,
     PayoutsNotLocked,
+    /// The tournament pays no prizes (`Config.payouts` is off).
+    PayoutsDisabled,
 
     // Deals.
     IcmTooManyPlayers {

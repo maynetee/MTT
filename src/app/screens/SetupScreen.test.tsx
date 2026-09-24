@@ -79,6 +79,36 @@ describe("SetupScreen", () => {
     expect(view.money).toBeUndefined();
   });
 
+  it("pays prizes by default, or creates a tournament without payouts", async () => {
+    const user = userEvent.setup();
+    const engine = createTestEngine();
+    renderApp(engine, "/new");
+
+    const prizes = await screen.findByRole("checkbox", { name: /This tournament pays prizes/ });
+    expect(prizes).toBeChecked();
+    await user.click(screen.getByRole("checkbox", { name: /Track buy-ins and the prize pool/ }));
+    expect(screen.getByLabelText("Round payouts to")).toBeInTheDocument();
+
+    await user.click(prizes);
+    // No places paid, no payout rounding: nothing is paid out.
+    expect(screen.queryByRole("spinbutton", { name: "Places paid" })).not.toBeInTheDocument();
+    expect(screen.getByText("Places paid").nextSibling).toHaveTextContent("None");
+    expect(screen.queryByLabelText("Round payouts to")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Minimum cash")).not.toBeInTheDocument();
+    // The buy-ins are still tracked.
+    expect(screen.getByLabelText("Buy-in")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Create tournament" }));
+
+    await screen.findByRole("heading", { name: "Register player" });
+    const [summary] = await engine.listTournaments();
+    const view = await engine.getView(summary.id);
+    expect(view.config.payouts).toBe(false);
+    expect(view.placesPaid).toBe(0);
+    expect(view.itm).toEqual({ status: "none" });
+    expect(view.money).toMatchObject({ payouts: [] });
+    expect(screen.queryByRole("link", { name: "Payouts" })).not.toBeInTheDocument();
+  });
+
   it("creates a tournament with a buy-in typed in major units, converted exactly", async () => {
     const user = userEvent.setup();
     const engine = createTestEngine();

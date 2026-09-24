@@ -2,6 +2,7 @@ import type { Config } from "../../engine/types";
 import type { MoneyConfig } from "../../bindings/MoneyConfig";
 import { useI18n } from "../../i18n";
 import { CURRENCY_CODES, DEFAULT_CURRENCY, currencyName, currencyOf, majorUnit, moneyFormatter, rescale } from "../utils/money";
+import { paysPrizes } from "../utils/payouts";
 import { Checkbox, Field, Select } from "./Field";
 import { MoneyInput } from "./MoneyInput";
 
@@ -71,7 +72,8 @@ interface Props {
 
 /**
  * Money tracking, off by default (a free or home game needs none): currency, buy-in split
- * between the prize pool and the house fee, guarantee, payout rounding and minimum cash.
+ * between the prize pool and the house fee, guarantee, and, when the tournament pays prizes,
+ * payout rounding and minimum cash.
  */
 export function MoneyFields({ config, onChange, locks = NO_LOCKS }: Props) {
   const { t, locale } = useI18n();
@@ -131,23 +133,27 @@ export function MoneyFields({ config, onChange, locks = NO_LOCKS }: Props) {
               onChange={(value) => setMoney({ guarantee: optionalAmount(value) })}
             />
           </Field>
-          <Field label={t("money.roundingUnit")} hint={payoutHint ?? t("money.roundingUnitHint")}>
-            <MoneyInput
-              currency={money.currency}
-              value={money.roundingUnit}
-              disabled={locks.payoutsLocked}
-              onChange={(value) => setMoney({ roundingUnit: amount(value) })}
-            />
-          </Field>
-          <Field label={t("money.minCash")} hint={payoutHint ?? t("money.minCashHint")}>
-            <MoneyInput
-              currency={money.currency}
-              value={money.minCash ?? null}
-              placeholder={t("money.none")}
-              disabled={locks.payoutsLocked}
-              onChange={(value) => setMoney({ minCash: optionalAmount(value) })}
-            />
-          </Field>
+          {paysPrizes(config) && (
+            <>
+              <Field label={t("money.roundingUnit")} hint={payoutHint ?? t("money.roundingUnitHint")}>
+                <MoneyInput
+                  currency={money.currency}
+                  value={money.roundingUnit}
+                  disabled={locks.payoutsLocked}
+                  onChange={(value) => setMoney({ roundingUnit: amount(value) })}
+                />
+              </Field>
+              <Field label={t("money.minCash")} hint={payoutHint ?? t("money.minCashHint")}>
+                <MoneyInput
+                  currency={money.currency}
+                  value={money.minCash ?? null}
+                  placeholder={t("money.none")}
+                  disabled={locks.payoutsLocked}
+                  onChange={(value) => setMoney({ minCash: optionalAmount(value) })}
+                />
+              </Field>
+            </>
+          )}
         </div>
       )}
     </div>

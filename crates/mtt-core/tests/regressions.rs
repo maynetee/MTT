@@ -869,6 +869,86 @@ fn tie_split_across_paid_boundary() {
     );
 }
 
+// Tournaments without payouts (#86).
+
+/// A freeroll for points pays nobody: no bubble, no money line, no prize, even with the
+/// buy-ins tracked, and turning payouts back on restores the places paid.
+#[test]
+fn no_payouts_has_no_bubble() {
+    let config = Config {
+        payouts: false,
+        ..money_config(9, 1)
+    };
+    let mut h = Harness::new(config, levels());
+    let ids = h.register_many(6);
+    h.start();
+    for (i, &id) in ids[..5].iter().enumerate() {
+        let view = h.view();
+        assert_eq!(view.itm, Itm::NoPayouts, "after {i} busts");
+        assert_eq!(view.places_paid, 0);
+        if i == 2 {
+            // Four left: the bubble with 3 places paid.
+            let mut config = h.agg.state().config.clone();
+            config.payouts = true;
+            h.ok(Command::UpdateConfig { config });
+            assert_eq!(h.view().itm, Itm::Bubble);
+            assert_eq!(h.view().places_paid, 3);
+            h.ok(Command::Undo {});
+            assert_eq!(h.view().itm, Itm::NoPayouts);
+        }
+        if i == 4 {
+            h.ok(Command::CloseRegistration {});
+        }
+        h.bust(&[id]);
+    }
+    let view = h.view();
+    assert_eq!(view.winner, Some(ids[5]));
+    assert!(
+        view.ranking
+            .iter()
+            .all(|r| !r.in_money && r.prize.is_none())
+    );
+    let money = view.money.expect("the pool is still tracked");
+    assert_eq!((money.pool, money.payouts.len()), (Money(60_000), 0));
+    assert!(!money.locked && money.deal.is_none());
+}
+
+/// Locking payouts or recording a deal makes no sense without payouts; turning payouts
+/// off is refused while they are locked, hence while a deal stands.
+#[test]
+fn no_payouts_rejects_lock_and_deal() {
+    let mut h = Harness::new(money_config(9, 1), levels());
+    let ids = h.register_many(4);
+    h.start();
+    h.bust(&[ids[0]]);
+    h.ok(Command::CloseRegistration {});
+    h.ok(Command::LockPayouts {});
+    let mut off = h.agg.state().config.clone();
+    off.payouts = false;
+    assert_eq!(
+        h.err(Command::UpdateConfig {
+            config: off.clone()
+        }),
+        DomainError::PayoutsLocked
+    );
+    h.ok(Command::UnlockPayouts {});
+    h.ok(Command::UpdateConfig { config: off });
+    for cmd in [
+        Command::LockPayouts {},
+        Command::UnlockPayouts {},
+        Command::RecordDeal {
+            amounts: Vec::new(),
+            play_for: None,
+        },
+    ] {
+        assert_eq!(h.err(cmd), DomainError::PayoutsDisabled);
+    }
+    assert_eq!(
+        serde_json::to_value(DomainError::PayoutsDisabled).unwrap(),
+        serde_json::json!({"code": "PAYOUTS_DISABLED"})
+    );
+}
+
 // ICM.
 
 /// Brute force Malmuth-Harville: every finishing order, each with its probability.

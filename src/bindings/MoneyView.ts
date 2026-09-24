@@ -24,7 +24,8 @@ overlay: Money,
  */
 effectivePool: Money, 
 /**
- * Payouts in force, first place first (`payouts[0]` is 1st place).
+ * Payouts in force, first place first (`payouts[0]` is 1st place); empty without
+ * payouts.
  */
 payouts: Array<Money>, 
 /**

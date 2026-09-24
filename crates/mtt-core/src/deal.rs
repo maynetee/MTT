@@ -45,6 +45,9 @@ pub(crate) fn decide_deal(
     play_for: Option<Money>,
     now_ms: i64,
 ) -> Result<Event, DomainError> {
+    if !state.config.payouts {
+        return Err(DomainError::PayoutsDisabled);
+    }
     match state.phase {
         Phase::Setup => return Err(DomainError::NotStarted),
         Phase::Finished { .. } => return Err(DomainError::TournamentFinished),
@@ -234,5 +237,44 @@ mod tests {
         }
         kit.ok(Command::Undo {});
         kit.ok(Command::UnlockPayouts {});
+    }
+
+    #[test]
+    fn no_deal_without_payouts() {
+        let (mut kit, ids) = kit();
+        kit.ok(Command::StartClock {});
+        kit.ok(bust(&[ids[4]]));
+        kit.ok(bust(&[ids[3]]));
+        kit.ok(Command::CloseRegistration {});
+        let mut config = kit.agg.state().config.clone();
+        config.payouts = false;
+        kit.ok(Command::UpdateConfig { config });
+        assert_eq!(
+            kit.err(deal(
+                &[(ids[0], 25_000), (ids[1], 15_000), (ids[2], 10_000)],
+                None
+            )),
+            DomainError::PayoutsDisabled
+        );
+    }
+
+    #[test]
+    fn a_deal_keeps_the_payouts_on() {
+        let (mut kit, ids) = kit();
+        kit.ok(Command::StartClock {});
+        kit.ok(bust(&[ids[4]]));
+        kit.ok(bust(&[ids[3]]));
+        kit.ok(Command::CloseRegistration {});
+        kit.ok(Command::LockPayouts {});
+        kit.ok(deal(
+            &[(ids[0], 25_000), (ids[1], 15_000), (ids[2], 10_000)],
+            None,
+        ));
+        let mut config = kit.agg.state().config.clone();
+        config.payouts = false;
+        assert_eq!(
+            kit.err(Command::UpdateConfig { config }),
+            DomainError::PayoutsLocked
+        );
     }
 }

@@ -15,7 +15,8 @@ import { useEngine } from "../EngineContext";
 import { useTournament } from "../TournamentContext";
 import { formatPlace } from "../utils/labels";
 import { formatBps, moneyFormatter, type MoneyFormatter } from "../utils/money";
-import { BPS, applyDraft, draftOf, firstShareOf, ladder, sharesOf, type PayoutDraft, type PlacesMode, type SplitMode } from "../utils/payouts";
+import { BPS, applyDraft, draftOf, firstShareOf, ladder, paysPrizes, sharesOf, type PayoutDraft, type PlacesMode, type SplitMode } from "../utils/payouts";
+import { NoPrizes } from "./NoPrizes";
 
 /** Changes apply once the director pauses, so the ladder follows the controls. */
 export const APPLY_DELAY_MS = 300;
@@ -90,12 +91,18 @@ function PoolSummary({ format }: { format: MoneyFormatter }) {
   );
 }
 
+/** The Payouts tab; a tournament without prizes has none (the tab is hidden then). */
+export default function PayoutsScreen() {
+  const { view } = useTournament();
+  return paysPrizes(view.config) ? <PayoutsEditor /> : <NoPrizes />;
+}
+
 /**
  * Places paid and how the prize pool is split, with the resulting ladder from the view.
  * Changes apply as the director makes them (each one can be undone from the header); the
  * payouts can be locked once the field is known.
  */
-export default function PayoutsScreen() {
+function PayoutsEditor() {
   const i18n = useI18n();
   const { t } = i18n;
   const engine = useEngine();

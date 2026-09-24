@@ -95,6 +95,7 @@ const errors = {
   NO_ENTRIES: "Il n’y a encore aucune entrée.",
   PAYOUTS_LOCKED: "Les gains sont verrouillés : déverrouillez-les d’abord.",
   PAYOUTS_NOT_LOCKED: "Verrouillez d’abord les gains.",
+  PAYOUTS_DISABLED: "Ce tournoi ne distribue pas de gains : activez-les d’abord dans les Réglages.",
   ICM_TOO_MANY_PLAYERS: "L’ICM fonctionne avec {max} joueurs au plus.",
   INVALID_ICM_INPUT: "Vérifiez les tapis : aucun ne peut être négatif. Le montant restant à jouer ne peut pas dépasser le premier prix.",
   DEAL_ALREADY_RECORDED: "Un deal est déjà enregistré.",
@@ -292,6 +293,9 @@ export const fr = {
     capacitySeats: { one: "{count} siège", other: "{count} sièges" },
     lockedHint: "Les sièges par table et le tapis de départ sont verrouillés une fois le tournoi commencé.",
     placesPaidElsewhere: "Se règle dans l’onglet Gains.",
+    payouts: "Ce tournoi distribue des gains",
+    payoutsHint: "Décoché pour un freeroll à points, une soirée de ligue ou un tournoi d’entraînement : aucune place payée, ni bulle ni gains.",
+    noPlacesPaid: "Aucune",
     money: {
       label: "Suivi de l’argent",
       currency: "Devise",
@@ -440,7 +444,9 @@ export const fr = {
     removePlace: "Retirer la dernière place",
     total: "Total {total}",
     totalOf: "Total {total} sur {pool}",
-    roundingTitle: "Arrondi"
+    roundingTitle: "Arrondi",
+    noPrizes: "Ce tournoi ne distribue pas de gains",
+    noPrizesHint: "Cochez « Ce tournoi distribue des gains » dans les Réglages pour définir les places payées et les gains."
   },
   deal: {
     calculator: "Calculateur de deal",
