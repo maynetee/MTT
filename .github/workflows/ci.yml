@@ -55,3 +55,40 @@ jobs:
       - name: Tests
         run: cargo test --locked
 
+  core:
+    name: Core crate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests (regenerate src/bindings)
+        run: |
+          rm -rf src/bindings
+          cargo test --workspace --locked
+      - name: WASM build
+        run: cargo build -p mtt-core --target wasm32-unknown-unknown --locked
+      - name: No getrandom in the core
+        run: |
+          tree="$(cargo tree -p mtt-core -e normal --target wasm32-unknown-unknown)"
+          if grep -q getrandom <<<"$tree"; then
+            echo "::error::mtt-core must not depend on getrandom"
+            exit 1
+          fi
+      - name: TypeScript bindings are up to date
+        run: |
+          git diff --exit-code -- src/bindings
+          untracked="$(git ls-files --others --exclude-standard -- src/bindings)"
+          if [ -n "$untracked" ]; then
+            echo "::error::Untracked generated bindings, run cargo test and commit them:"
+            echo "$untracked"
+            exit 1
+          fi
+
