@@ -217,8 +217,9 @@ interface Engine {
 
 Every method rejects with an `EngineError`. `subscribe` is backed by `tournament_changed` on the
 desktop and by the broadcast channel and storage events in the browser. In the browser,
-`openDisplayWindow` opens a new tab, `saveExport` downloads the file and the legacy import is
-unavailable.
+`openDisplayWindow` opens one display tab (and points it at the other tournament when called
+again, like the desktop's display window), `saveExport` downloads the file and the legacy
+import is unavailable.
 
 ## Persistence
 

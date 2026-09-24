@@ -1,0 +1,12 @@
+/* The tournament list: search and phase filter above the table. */
+
+.list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.list-empty {
+  padding: var(--space-2) 0 var(--space-5);
+}

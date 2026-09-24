@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toEngineError, type PhaseName, type TournamentSummary } from "../../engine/types";
 import { useI18n } from "../../i18n";
@@ -8,16 +8,37 @@ import { Button, ButtonLink, IconButton } from "../components/Button";
 import { Section } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
+import { TextInput } from "../components/Field";
+import { Icon } from "../components/Icon";
 import { Pill, type PillTone } from "../components/Pill";
+import { SegmentedControl } from "../components/SegmentedControl";
 import { Table } from "../components/Table";
 import { useToast } from "../components/Toast";
 import { useEngine } from "../EngineContext";
 import { useTournamentList } from "../hooks/useTournamentList";
+import { relativeTime } from "../utils/relativeTime";
+import { byLastChange, copyName, duplicateTournament, filterTournaments, type PhaseFilter } from "../utils/tournamentList";
 
 /** Set once the previous version's tournament was imported, so the import is not offered again. */
 const LEGACY_IMPORTED_KEY = "mtt:legacy-imported";
 
 const PHASE_TONES: Record<PhaseName, PillTone> = { setup: "neutral", running: "success", finished: "muted" };
+const PHASES: readonly PhaseName[] = ["setup", "running", "finished"];
+
+/** Above this many tournaments, the list gets a search field and a phase filter. */
+export const FILTER_THRESHOLD = 8;
+/** How often "5 minutes ago" is brought up to date. */
+const RELATIVE_TIME_REFRESH_MS = 30_000;
+
+/** The current time, updated every `intervalMs`. */
+function useNow(intervalMs: number): number {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(timer);
+  }, [intervalMs]);
+  return now;
+}
 
 function legacyImported(): boolean {
   try {
@@ -36,6 +57,14 @@ export default function TournamentListScreen() {
   const { summaries, error, setError } = useTournamentList();
   const [confirming, setConfirming] = useState<TournamentSummary | null>(null);
   const [legacyAvailable, setLegacyAvailable] = useState(false);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [phase, setPhase] = useState<PhaseFilter>("all");
+  const now = useNow(RELATIVE_TIME_REFRESH_MS);
+  const sorted = useMemo(() => (summaries ? byLastChange(summaries) : null), [summaries]);
+  // Filters only apply while they are shown.
+  const filtering = (sorted?.length ?? 0) > FILTER_THRESHOLD;
+  const visible = sorted && filtering ? filterTournaments(sorted, search, phase) : sorted;
 
   // Engine errors are shown as toasts, translated.
   useEffect(() => {
@@ -65,6 +94,22 @@ export default function TournamentListScreen() {
     }
   };
 
+  const handleDuplicate = async (summary: TournamentSummary) => {
+    setDuplicating(summary.id);
+    try {
+      const templates = { first: t("list.copyName", { name: "{name}" }), nth: t("list.copyNameN", { name: "{name}", n: "{n}" }) };
+      const name = copyName(summary.name, sorted?.map((entry) => entry.name) ?? [], templates);
+      const id = await duplicateTournament(engine, summary.id, name);
+      toast.success(t("list.duplicated", { name }), {
+        action: { label: t("list.open"), onAction: () => navigate(`/t/${encodeURIComponent(id)}`) }
+      });
+    } catch (thrown) {
+      setError(toEngineError(thrown));
+    } finally {
+      setDuplicating(null);
+    }
+  };
+
   const handleImport = async () => {
     try {
       const id = await engine.importLegacy();
@@ -80,7 +125,7 @@ export default function TournamentListScreen() {
   };
 
   // The host keeps reporting the old data after an import: offer it on a fresh install only.
-  const offerImport = legacyAvailable && summaries?.length === 0 && !legacyImported();
+  const offerImport = legacyAvailable && sorted?.length === 0 && !legacyImported();
   const create = (
     <ButtonLink variant="primary" icon="plus" to="/new">
       {t("list.create")}
@@ -92,9 +137,9 @@ export default function TournamentListScreen() {
       <Section
         level={1}
         title={t("list.title")}
-        flush={Boolean(summaries?.length)}
+        flush={Boolean(sorted?.length)}
         actions={
-          summaries?.length ? (
+          sorted?.length ? (
             create
           ) : offerImport ? (
             <Button onClick={() => void handleImport()} title={t("list.importLegacyHint")}>
@@ -103,60 +148,106 @@ export default function TournamentListScreen() {
           ) : undefined
         }
       >
-        {summaries === null ? (
+        {sorted === null || visible === null ? (
           <p className="page-loading">{t("common.loading")}</p>
-        ) : summaries.length === 0 ? (
+        ) : sorted.length === 0 ? (
           <EmptyState art={<BrandMark size={56} />} title={t("list.emptyTitle")} description={t("list.emptyDescription")} action={create} />
         ) : (
-          <Table caption={t("list.title")}>
-            <thead>
-              <tr>
-                <th scope="col">{t("list.name")}</th>
-                <th scope="col">{t("list.status")}</th>
-                <th scope="col" className="num">
-                  {t("list.playersColumn")}
-                </th>
-                <th scope="col" className="num">
-                  {t("list.aliveColumn")}
-                </th>
-                <th scope="col">{t("list.updatedColumn")}</th>
-                <th scope="col" className="actions">
-                  <span className="visually-hidden">{t("list.open")}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {summaries.map((summary) => (
-                <tr key={summary.id}>
-                  <th scope="row" className="strong tournament-name">
-                    {summary.name}
-                  </th>
-                  <td>
-                    <Pill tone={PHASE_TONES[summary.phase]} dot={summary.phase === "running"}>
-                      {t(`phase.${summary.phase}`)}
-                    </Pill>
-                  </td>
-                  <td className="num">{summary.players}</td>
-                  <td className="num">{summary.phase === "running" ? summary.alive : t("common.none")}</td>
-                  <td className="muted">{i18n.dateTime(summary.updatedAtMs)}</td>
-                  <td className="actions">
-                    <span className="row-actions">
-                      <ButtonLink size="sm" to={`/t/${encodeURIComponent(summary.id)}`} aria-label={`${t("list.open")} ${summary.name}`}>
-                        {t("list.open")}
-                      </ButtonLink>
-                      <IconButton
-                        icon="trash"
-                        size="sm"
-                        label={`${t("list.delete")} ${summary.name}`}
-                        tooltipAlign="end"
-                        onClick={() => setConfirming(summary)}
-                      />
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+          <>
+            {filtering && (
+              <div className="list-toolbar">
+                <span className="search-field">
+                  <Icon name="search" size={16} className="search-field-icon" />
+                  <TextInput
+                    type="search"
+                    placeholder={t("list.search")}
+                    aria-label={t("list.search")}
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                </span>
+                <SegmentedControl<PhaseFilter>
+                  label={t("list.filter")}
+                  value={phase}
+                  onChange={setPhase}
+                  segments={[
+                    { value: "all", label: t("list.filterAll"), count: sorted.length },
+                    ...PHASES.map((value) => ({
+                      value,
+                      label: t(`phase.${value}`),
+                      count: sorted.filter((summary) => summary.phase === value).length
+                    }))
+                  ]}
+                />
+              </div>
+            )}
+            {visible.length === 0 ? (
+              <p className="muted list-empty">{search.trim() ? t("list.noMatch", { search: search.trim() }) : t("list.noneInFilter")}</p>
+            ) : (
+              <Table caption={t("list.title")}>
+                <thead>
+                  <tr>
+                    <th scope="col">{t("list.name")}</th>
+                    <th scope="col">{t("list.status")}</th>
+                    <th scope="col" className="num">
+                      {t("list.playersColumn")}
+                    </th>
+                    <th scope="col" className="num">
+                      {t("list.aliveColumn")}
+                    </th>
+                    <th scope="col">{t("list.updatedColumn")}</th>
+                    <th scope="col" className="actions">
+                      <span className="visually-hidden">{t("list.open")}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((summary) => (
+                    <tr key={summary.id}>
+                      <th scope="row" className="strong tournament-name">
+                        {summary.name}
+                      </th>
+                      <td>
+                        <Pill tone={PHASE_TONES[summary.phase]} dot={summary.phase === "running"}>
+                          {t(`phase.${summary.phase}`)}
+                        </Pill>
+                      </td>
+                      <td className="num">{summary.players}</td>
+                      <td className="num">{summary.phase === "running" ? summary.alive : t("common.none")}</td>
+                      <td className="muted">
+                        <time dateTime={new Date(summary.updatedAtMs).toISOString()} title={i18n.dateTime(summary.updatedAtMs)}>
+                          {relativeTime(summary.updatedAtMs, now, i18n.locale)}
+                        </time>
+                      </td>
+                      <td className="actions">
+                        <span className="row-actions">
+                          <ButtonLink size="sm" to={`/t/${encodeURIComponent(summary.id)}`} aria-label={`${t("list.open")} ${summary.name}`}>
+                            {t("list.open")}
+                          </ButtonLink>
+                          <IconButton
+                            icon="copy"
+                            size="sm"
+                            label={`${t("list.duplicate")} ${summary.name}`}
+                            hint={t("list.duplicateHint")}
+                            tooltipAlign="end"
+                            disabled={duplicating !== null}
+                            onClick={() => void handleDuplicate(summary)}
+                          />
+                          <IconButton
+                            icon="trash"
+                            size="sm"
+                            label={`${t("list.delete")} ${summary.name}`}
+                            tooltipAlign="end"
+                            onClick={() => setConfirming(summary)}
+                          />
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+          </>
         )}
       </Section>
       <ConfirmDialog

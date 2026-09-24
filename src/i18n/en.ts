@@ -239,7 +239,17 @@ export const en = {
     deleteMessage: "Its players, results and history are removed for good. This cannot be undone.",
     deleteConfirm: "Delete tournament",
     importLegacy: "Import from the previous version",
-    importLegacyHint: "A tournament from the previous version of the app was found on this computer."
+    importLegacyHint: "A tournament from the previous version of the app was found on this computer.",
+    duplicate: "Duplicate",
+    duplicateHint: "A new tournament with the same settings and structure, without players.",
+    duplicated: "“{name}” created",
+    copyName: "{name} (copy)",
+    copyNameN: "{name} (copy {n})",
+    search: "Search tournaments",
+    filter: "Show",
+    filterAll: "All",
+    noMatch: "No tournament matches “{search}”.",
+    noneInFilter: "No tournament in this list."
   },
   config: {
     section: "Tournament",

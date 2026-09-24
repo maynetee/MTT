@@ -20,6 +20,8 @@ export const tournamentKey = (id: string) => `mtt:v2:t:${id}`;
 /** Tabs of the same origin tell each other about changes on this channel. */
 export const CHANNEL_NAME = "mtt";
 export const TOURNAMENT_CHANGED = "tournament_changed";
+/** The browsing context name of the display tab. */
+export const DISPLAY_WINDOW_NAME = "mtt-display";
 /** Delay before releasing a download's object URL (the value FileSaver.js uses). */
 export const OBJECT_URL_REVOKE_DELAY_MS = 40_000;
 
@@ -228,9 +230,13 @@ export class WasmEngine implements Engine {
     };
   }
 
-  /** Opens the display in a tab of its own, under the app's base path (`/MTT/` on GitHub Pages). */
+  /**
+   * Opens the display in a tab of its own, under the app's base path (`/MTT/` on GitHub Pages).
+   * Like the desktop's display window there is one display tab: opening the display of another
+   * tournament points that tab at it.
+   */
   async openDisplayWindow(id: string): Promise<void> {
-    window.open(`${import.meta.env.BASE_URL}#/display/${encodeURIComponent(id)}`, `mtt-display-${id}`);
+    window.open(`${import.meta.env.BASE_URL}#/display/${encodeURIComponent(id)}`, DISPLAY_WINDOW_NAME)?.focus();
   }
 
   async closeCurrentWindow(): Promise<void> {

@@ -144,6 +144,12 @@ const PATHS = {
       <rect x="2.75" y="5.75" width="18.5" height="12.5" rx="2.25" />
       <path d="M6.5 9.5h.01M10 9.5h.01M13.5 9.5h.01M17.5 9.5h.01M6.5 12.5h.01M17.5 12.5h.01M9 15h6" />
     </>
+  ),
+  copy: (
+    <>
+      <rect x="8.75" y="8.75" width="11.5" height="11.5" rx="2.25" />
+      <path d="M15.25 8.75V6a2.25 2.25 0 0 0-2.25-2.25H6A2.25 2.25 0 0 0 3.75 6v7A2.25 2.25 0 0 0 6 15.25h2.75" />
+    </>
   )
 } satisfies Record<string, ReactNode>;
 

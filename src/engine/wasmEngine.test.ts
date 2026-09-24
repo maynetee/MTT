@@ -307,18 +307,25 @@ describe("WasmEngine", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it("opens the display in a tab of its own under the app's base path", async () => {
+  it("opens the display in a tab of its own under the app's base path, and points it at another tournament", async () => {
     const engine = createTestEngine();
-    const open = vi.fn();
+    const focus = vi.fn();
+    const open = vi.fn(() => ({ focus }));
     vi.stubGlobal("window", { open });
     vi.stubEnv("BASE_URL", "/MTT/");
     try {
       await engine.openDisplayWindow("a b");
+      await engine.openDisplayWindow("c");
     } finally {
       vi.unstubAllEnvs();
       vi.unstubAllGlobals();
     }
-    expect(open).toHaveBeenCalledWith("/MTT/#/display/a%20b", "mtt-display-a b");
+    // The same target name: the browser navigates the display tab it opened first.
+    expect(open.mock.calls).toEqual([
+      ["/MTT/#/display/a%20b", "mtt-display"],
+      ["/MTT/#/display/c", "mtt-display"]
+    ]);
+    expect(focus).toHaveBeenCalledTimes(2);
   });
 
   it("stores the list and the logs under versioned keys", async () => {
