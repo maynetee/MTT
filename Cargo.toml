@@ -1,6 +1,5 @@
 [workspace]
-members = ["crates/mtt-core"]
-exclude = ["src-tauri"]
+members = ["crates/mtt-core", "src-tauri"]
 resolver = "3"
 
 [workspace.package]
