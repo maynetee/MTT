@@ -11,7 +11,8 @@ describe("App", () => {
   it("opens on the tournament list, in demo mode in a browser", async () => {
     renderApp(createTestEngine(), "/");
     expect(await screen.findByRole("heading", { name: "Tournaments" })).toBeInTheDocument();
-    expect(screen.getByText("No tournament yet")).toBeInTheDocument();
+    // The heading shows at once, the list once the engine has answered.
+    expect(await screen.findByText("No tournament yet")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "New tournament" })).toBeInTheDocument();
     expect(screen.getByText("DEMO")).toBeInTheDocument();
   });
