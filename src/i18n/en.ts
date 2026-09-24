@@ -468,6 +468,28 @@ export const en = {
     noMoney: "Deals share prize money: turn on money tracking in Settings first.",
     unavailable: "The deal calculator opens once the tournament runs with {max} players or fewer left."
   },
+  presets: {
+    title: "Preset",
+    turbo: "Turbo",
+    regular: "Regular",
+    deepstack: "Deepstack",
+    levelMinutes: "{minutes}-min levels",
+    needsStack: "Enter the starting stack first.",
+    total: "Duration",
+    duration: "{hours} h {minutes}",
+    levels: "Levels",
+    levelsCount: { one: "{count} play level", other: "{count} play levels" },
+    breaksCount: { zero: "no break", one: "{count} break", other: "{count} breaks" },
+    atStart: "Start",
+    after: "After {hours} h",
+    over: "Structure over",
+    stackInBb: "{bb} BB",
+    averageStack: "average stack {stack}",
+    startingStack: "starting stack {stack}",
+    replaceTitle: "Replace the structure?",
+    replaceMessage: "The levels you edited are replaced by the {preset} structure for a starting stack of {stack}.",
+    replace: "Replace"
+  },
   setup: {
     title: "New tournament",
     create: "Create tournament"

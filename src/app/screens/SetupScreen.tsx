@@ -8,9 +8,12 @@ import { Section } from "../components/Card";
 import { ConfigFields, LateRegFields, sanitizeConfig } from "../components/ConfigForm";
 import { MoneyFields } from "../components/MoneyFields";
 import { PurchaseFields } from "../components/PurchaseFields";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { StructureEditor } from "../components/StructureEditor";
+import { StructurePresets, StructurePreview } from "../components/StructurePresets";
 import { useToast } from "../components/Toast";
 import { useEngine } from "../EngineContext";
+import { presetStructure, type PresetSpeed } from "../utils/presets";
 import { defaultStructure, firstBreakAfter, fromDraft, newBreakDraft, newPlayDraft, toDraft, type LevelDraft } from "../utils/structure";
 
 export function defaultConfig(): Config {
@@ -51,12 +54,29 @@ export function StructureActions({ rows, onChange }: { rows: LevelDraft[]; onCha
 }
 
 export default function SetupScreen() {
-  const { t, error: describe } = useI18n();
+  const i18n = useI18n();
+  const { t, error: describe } = i18n;
   const engine = useEngine();
   const toast = useToast();
   const navigate = useNavigate();
   const [config, setConfig] = useState<Config>(defaultConfig);
   const [rows, setRows] = useState<LevelDraft[]>(() => defaultStructure().map((level) => toDraft(level)));
+  // Levels edited by hand since the last preset: replacing them asks first.
+  const [edited, setEdited] = useState(false);
+  const [replacing, setReplacing] = useState<PresetSpeed | null>(null);
+  const levels = rows.map(fromDraft);
+
+  const editRows = (next: LevelDraft[]) => {
+    setRows(next);
+    setEdited(true);
+  };
+  const applyPreset = (speed: PresetSpeed) => {
+    setRows(presetStructure(speed, config.startingStack).map((level) => toDraft(level)));
+    setEdited(false);
+    setReplacing(null);
+    setError(null);
+  };
+  const pickPreset = (speed: PresetSpeed) => (edited ? setReplacing(speed) : applyPreset(speed));
   const [error, setError] = useState<EngineError | null>(null);
   const [creating, setCreating] = useState(false);
   const invalidRow = errorRow(error);
@@ -64,7 +84,7 @@ export default function SetupScreen() {
   const handleCreate = async () => {
     setCreating(true);
     try {
-      const id = await engine.createTournament({ config: sanitizeConfig(config), structure: rows.map(fromDraft) });
+      const id = await engine.createTournament({ config: sanitizeConfig(config), structure: levels });
       navigate(`/t/${encodeURIComponent(id)}/registration`);
     } catch (thrown) {
       const engineError = toEngineError(thrown);
@@ -97,10 +117,21 @@ export default function SetupScreen() {
         <PurchaseFields config={config} onChange={setConfig} firstBreakAfter={firstBreakAfter(rows)} />
       </Section>
 
-      <Section title={t("structure.title")} flush>
-        <StructureEditor rows={rows} onChange={setRows} invalidRows={invalidRow === null ? undefined : new Set([invalidRow])} />
-        <StructureActions rows={rows} onChange={setRows} />
+      <Section title={t("structure.title")} flush actions={<StructurePresets startingStack={config.startingStack} onPick={pickPreset} />}>
+        <StructurePreview levels={levels} startingStack={config.startingStack} />
+        <StructureEditor rows={rows} onChange={editRows} invalidRows={invalidRow === null ? undefined : new Set([invalidRow])} />
+        <StructureActions rows={rows} onChange={editRows} />
       </Section>
+      <ConfirmDialog
+        open={replacing !== null}
+        title={t("presets.replaceTitle")}
+        message={replacing && t("presets.replaceMessage", { preset: t(`presets.${replacing}`), stack: i18n.number(config.startingStack) })}
+        confirmLabel={t("presets.replace")}
+        onCancel={() => setReplacing(null)}
+        onConfirm={() => {
+          if (replacing) applyPreset(replacing);
+        }}
+      />
 
       <div className="action-bar">
         <Button variant="primary" size="lg" icon="check" onClick={() => void handleCreate()} loading={creating}>

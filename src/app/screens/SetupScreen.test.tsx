@@ -173,6 +173,42 @@ describe("SetupScreen", () => {
     expect(config.rebuy).toBeUndefined();
   });
 
+  it("generates the structure from a preset and previews it", async () => {
+    const user = userEvent.setup();
+    const engine = createTestEngine();
+    renderApp(engine, "/new");
+
+    await user.click(await screen.findByRole("button", { name: /^Regular/ }));
+    expect(screen.getByLabelText("Level 1 SB")).toHaveValue("75");
+    expect(screen.getByLabelText("Level 1 BB")).toHaveValue("150");
+    expect(screen.getByLabelText("Level 2 Ante")).toHaveDisplayValue("BB ante");
+    const preview = (label: string) => screen.getByText(label, { selector: "dt" }).nextSibling;
+    expect(preview("Duration")).toHaveTextContent("10 h 00");
+    expect(preview("Start")).toHaveTextContent("Level 1 · 75/150average stack 133.3 BB");
+    expect(preview("After 2 h")).toHaveTextContent("Break · 15 minstarting stack 25 BB");
+    expect(preview("After 4 h")).toHaveTextContent("Level 12 · 1,200/2,400 · BBA 2,400");
+
+    // From another stack, once the levels were edited by hand: the director confirms.
+    const stack = screen.getByLabelText("Starting stack");
+    await user.clear(stack);
+    await user.type(stack, "25000");
+    await user.clear(screen.getByLabelText("Level 1 SB"));
+    await user.type(screen.getByLabelText("Level 1 SB"), "60");
+    await user.click(screen.getByRole("button", { name: /^Deepstack/ }));
+    const dialog = screen.getByRole("alertdialog", { name: "Replace the structure?" });
+    expect(dialog).toHaveTextContent("The levels you edited are replaced by the Deepstack structure for a starting stack of 25,000.");
+    await user.click(within(dialog).getByRole("button", { name: "Replace" }));
+    expect(screen.getByLabelText("Level 1 SB")).toHaveValue("75");
+    expect(preview("Start")).toHaveTextContent("average stack 166.7 BB");
+
+    await user.click(screen.getByRole("button", { name: "Create tournament" }));
+    await screen.findByRole("heading", { name: "Register player" });
+    const [summary] = await engine.listTournaments();
+    const view = await engine.getView(summary.id);
+    expect(view.levels[0].level).toEqual({ type: "play", sb: 75, bb: 150, ante: { type: "none" }, durationMs: 30 * 60_000 });
+    expect(view.warnings).toEqual([]);
+  });
+
   it("reports the core's configuration errors", async () => {
     const user = userEvent.setup();
     const engine = createTestEngine();
