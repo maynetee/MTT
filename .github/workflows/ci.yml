@@ -31,35 +31,14 @@ jobs:
         run: npx vite build
 
   rust:
-    name: Rust backend
+    name: Rust
     runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: src-tauri
     steps:
       - uses: actions/checkout@v7
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-      - name: Format
-        run: cargo fmt --all --check
-      - name: Lint
-        run: cargo clippy --all-targets --locked -- -D warnings
-      - name: Tests
-        run: cargo test --locked
-
-  core:
-    name: Core crate
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -73,15 +52,6 @@ jobs:
         run: |
           rm -rf src/bindings
           cargo test --workspace --locked
-      - name: WASM build
-        run: cargo build -p mtt-core --target wasm32-unknown-unknown --locked
-      - name: No getrandom in the core
-        run: |
-          tree="$(cargo tree -p mtt-core -e normal --target wasm32-unknown-unknown)"
-          if grep -q getrandom <<<"$tree"; then
-            echo "::error::mtt-core must not depend on getrandom"
-            exit 1
-          fi
       - name: TypeScript bindings are up to date
         run: |
           git diff --exit-code -- src/bindings
@@ -91,4 +61,12 @@ jobs:
             echo "$untracked"
             exit 1
           fi
-
+      - name: WASM build
+        run: cargo build -p mtt-core --target wasm32-unknown-unknown --locked
+      - name: No getrandom in the core
+        run: |
+          tree="$(cargo tree -p mtt-core -e normal --target wasm32-unknown-unknown)"
+          if grep -q getrandom <<<"$tree"; then
+            echo "::error::mtt-core must not depend on getrandom"
+            exit 1
+          fi

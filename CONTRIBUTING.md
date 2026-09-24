@@ -22,7 +22,7 @@ Set `MTT_DATA_DIR` to a throwaway directory (`MTT_DATA_DIR=/tmp/mtt-dev npm run 
 npm run typecheck
 npm test
 npm run build
-cd src-tauri && cargo fmt --all --check && cargo clippy --all-targets -- -D warnings && cargo test
+cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 ```
 
 CI runs the same checks on every pull request.
