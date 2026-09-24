@@ -64,6 +64,15 @@ jobs:
         run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Clippy (end-to-end build)
+        run: cargo clippy -p mtt --all-targets --locked --features e2e -- -D warnings
+      - name: No WebDriver server in the release app
+        run: |
+          tree="$(cargo tree -p mtt -e normal --locked)"
+          if grep -q tauri-plugin-wdio-webdriver <<<"$tree"; then
+            echo "::error::tauri-plugin-wdio-webdriver must stay behind the e2e feature"
+            exit 1
+          fi
       - name: Tests (regenerate src/bindings)
         run: |
           rm -rf src/bindings
