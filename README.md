@@ -200,7 +200,7 @@ npm run tauri build       # installers for your system, in target/release/bundle
 and `test` rebuild it first when it is missing or older than the Rust sources.
 
 During development, point the desktop app at a throwaway data folder so your real tournaments
-stay untouched:
+stay untouched (debug builds only: the released app ignores `MTT_DATA_DIR`):
 
 ```sh
 MTT_DATA_DIR=/tmp/mtt-dev npm run tauri dev

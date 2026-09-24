@@ -24,7 +24,7 @@ npm run dev         # browser demo only
 with a Content-Security-Policy `<meta>`. `npx vite preview --mode pages` serves it at
 http://localhost:4173/MTT/.
 
-Set `MTT_DATA_DIR` to a throwaway directory (`MTT_DATA_DIR=/tmp/mtt-dev npm run tauri dev`) to keep development data apart from your real tournaments.
+Set `MTT_DATA_DIR` to a throwaway directory (`MTT_DATA_DIR=/tmp/mtt-dev npm run tauri dev`) to keep development data apart from your real tournaments. Debug and end-to-end builds honour it and `MTT_LEGACY_DB` (the previous version's database); release builds ignore both.
 
 ## Before opening a pull request
 

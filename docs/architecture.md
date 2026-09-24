@@ -226,7 +226,8 @@ import is unavailable.
 ### Desktop: SQLite
 
 The database is `mtt.sqlite` in the app data directory (`com.maynetee.mtt`), or in
-`MTT_DATA_DIR` when that variable is set. `src-tauri/src/store.rs` keeps the schema small and
+`MTT_DATA_DIR` when that variable is set in a debug or end-to-end build (release builds ignore
+it). `src-tauri/src/store.rs` keeps the schema small and
 stores only what the core decided:
 
 ```sql
@@ -321,9 +322,12 @@ notified once per stored revision.
   chose. The suggested file name is reduced to a bare file name and only `.csv` and `.pdf` are
   accepted. CSV fields that would start a spreadsheet formula are neutralized.
 - **Read-only legacy import** (`src-tauri/src/legacy.rs`). The previous version's database
-  (`com.mtt.app/mtt.sqlite` next to ours, or `MTT_LEGACY_DB`) is opened with
-  `SQLITE_OPEN_READ_ONLY`, and its tournament is rebuilt through ordinary core commands, so the
-  result passed every rule of the core.
+  (`com.mtt.app/mtt.sqlite` next to ours, or `MTT_LEGACY_DB` in debug and end-to-end builds) is
+  opened with `SQLITE_OPEN_READ_ONLY`, and its tournament is rebuilt through ordinary core
+  commands, so the result passed every rule of the core.
+- **No data location from the environment in releases.** `MTT_DATA_DIR` and `MTT_LEGACY_DB`
+  exist for development and tests; release builds ignore them and always use the app data
+  directory.
 - **Everything is local.** No account, no telemetry, no network calls besides loading the app
   itself.
 

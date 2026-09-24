@@ -634,3 +634,35 @@ fn nothing_is_imported_without_a_previous_database() {
     }
     assert!(!missing.exists());
 }
+
+#[test]
+fn release_builds_ignore_the_development_overrides() {
+    let set = |_: &str| Some(OsString::from("/tmp/mtt-elsewhere"));
+    assert_eq!(override_path(DATA_DIR_ENV, false, set), None);
+    assert_eq!(override_path(LEGACY_DB_ENV, false, set), None);
+}
+
+#[test]
+fn development_and_test_builds_honour_the_overrides_when_set() {
+    let set = |_: &str| Some(OsString::from("/tmp/mtt-elsewhere"));
+    assert_eq!(
+        override_path(DATA_DIR_ENV, true, set),
+        Some(PathBuf::from("/tmp/mtt-elsewhere"))
+    );
+    assert_eq!(
+        override_path(DATA_DIR_ENV, true, |_| Some(OsString::new())),
+        None
+    );
+    assert_eq!(override_path(DATA_DIR_ENV, true, |_| None), None);
+    // The variable read is the one named.
+    let named = override_path(LEGACY_DB_ENV, true, |name| Some(OsString::from(name)));
+    assert_eq!(named, Some(PathBuf::from("MTT_LEGACY_DB")));
+}
+
+#[test]
+fn only_debug_and_end_to_end_builds_honour_the_overrides() {
+    assert_eq!(
+        DEV_OVERRIDES,
+        cfg!(debug_assertions) || cfg!(feature = "e2e")
+    );
+}

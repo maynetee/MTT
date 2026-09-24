@@ -7,6 +7,7 @@ mod host;
 mod legacy;
 mod store;
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use tauri::{AppHandle, Manager, Runtime};
@@ -37,19 +38,37 @@ fn with_handlers<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
 
 /// Environment variable that overrides the data directory, the one holding `mtt.sqlite`.
 ///
-/// Meant for development and tests, so that they run against a throwaway directory instead
+/// For development and tests only, so that they run against a throwaway directory instead
 /// of the real tournament data, e.g. `MTT_DATA_DIR=/tmp/mtt-dev npm run tauri dev`. When it
-/// is unset or empty, the platform's app data directory is used (on macOS,
-/// `~/Library/Application Support/com.maynetee.mtt`).
+/// is unset or empty, or in a release build, the platform's app data directory is used (on
+/// macOS, `~/Library/Application Support/com.maynetee.mtt`).
 const DATA_DIR_ENV: &str = "MTT_DATA_DIR";
 
 /// Name of the database file in the data directory (the previous version used the same).
 const DB_FILE: &str = "mtt.sqlite";
 
-fn env_path(name: &str) -> Option<PathBuf> {
-    std::env::var_os(name)
+/// Whether this build honours the development overrides (`MTT_DATA_DIR`, `MTT_LEGACY_DB`):
+/// debug builds and end-to-end test builds do. A release build always reads and writes the
+/// real data, whatever environment it was started from.
+const DEV_OVERRIDES: bool = cfg!(any(debug_assertions, feature = "e2e"));
+
+/// The path an override variable names, when overrides are `honoured` and it is set and not
+/// empty. `lookup` reads the environment.
+fn override_path(
+    name: &str,
+    honoured: bool,
+    lookup: impl FnOnce(&str) -> Option<OsString>,
+) -> Option<PathBuf> {
+    if !honoured {
+        return None;
+    }
+    lookup(name)
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
+}
+
+fn env_path(name: &str) -> Option<PathBuf> {
+    override_path(name, DEV_OVERRIDES, |name| std::env::var_os(name))
 }
 
 fn data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, EngineError> {
@@ -59,8 +78,8 @@ fn data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, EngineError> {
     }
 }
 
-/// The previous version's database: `MTT_LEGACY_DB` when set, else `mtt.sqlite` in the
-/// data directory of its identifier, next to ours (on macOS,
+/// The previous version's database: `MTT_LEGACY_DB` when set (development and test builds
+/// only), else `mtt.sqlite` in the data directory of its identifier, next to ours (on macOS,
 /// `~/Library/Application Support/com.mtt.app/mtt.sqlite`).
 fn legacy_db<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     env_path(LEGACY_DB_ENV).or_else(|| {

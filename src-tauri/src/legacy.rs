@@ -22,7 +22,8 @@ use crate::error::EngineError;
 /// Bundle identifier of the previous version: its data directory sits next to ours.
 pub const LEGACY_IDENTIFIER: &str = "com.mtt.app";
 
-/// Environment variable that overrides the path of the previous version's database.
+/// Environment variable that overrides the path of the previous version's database, in
+/// development and test builds only (see `DEV_OVERRIDES` in lib.rs).
 pub const LEGACY_DB_ENV: &str = "MTT_LEGACY_DB";
 
 /// Starting stack of an imported tournament: the previous version did not track chips.
