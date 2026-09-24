@@ -35,8 +35,19 @@ fn with_handlers<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
         ])
 }
 
+/// Environment variable that overrides the data directory, the one holding `mtt.sqlite`.
+///
+/// Meant for development and tests, so that they run against a throwaway directory instead
+/// of the real tournament data, e.g. `MTT_DATA_DIR=/tmp/mtt-dev npm run tauri dev`. When it
+/// is unset or empty, the platform's app data directory is used (on macOS,
+/// `~/Library/Application Support/com.maynetee.mtt`).
+const DATA_DIR_ENV: &str = "MTT_DATA_DIR";
+
 fn data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    app.path().app_data_dir().map_err(|err| err.to_string())
+    match std::env::var_os(DATA_DIR_ENV) {
+        Some(dir) if !dir.is_empty() => Ok(PathBuf::from(dir)),
+        _ => app.path().app_data_dir().map_err(|err| err.to_string()),
+    }
 }
 
 /// Creates the data directory and the database if needed, and brings the schema up to date.

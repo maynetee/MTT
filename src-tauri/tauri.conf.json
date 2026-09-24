@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "MTT",
-  "version": "0.1.0",
-  "identifier": "com.mtt.app",
+  "productName": "MTT Tournament Director",
+  "version": "../package.json",
+  "identifier": "com.maynetee.mtt",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "MTT",
+        "title": "MTT Tournament Director",
         "width": 1400,
         "height": 900,
         "minWidth": 1200,

@@ -14,6 +14,8 @@ npm run tauri dev   # desktop app
 npm run dev         # browser demo only
 ```
 
+Set `MTT_DATA_DIR` to a throwaway directory (`MTT_DATA_DIR=/tmp/mtt-dev npm run tauri dev`) to keep development data apart from your real tournaments.
+
 ## Before opening a pull request
 
 ```bash
