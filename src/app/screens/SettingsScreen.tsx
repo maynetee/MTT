@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Config } from "../../engine/types";
 import { useI18n } from "../../i18n";
 import { Button } from "../components/Button";
@@ -14,26 +14,24 @@ import { firstBreakAfter } from "../utils/structure";
 export default function SettingsScreen() {
   const { t } = useI18n();
   const { view, run } = useTournament();
-  const [config, setConfig] = useState<Config>(view.config);
-  const [dirty, setDirty] = useState(false);
+  // The director's edits, null until the first one: until then the form follows the saved
+  // settings. Derived during render, never copied in an effect, which runs after the render
+  // and could overwrite an edit made in between with the settings of an older render.
+  const [draft, setDraft] = useState<Config | null>(null);
+  const config = draft ?? view.config;
+  const dirty = draft !== null;
   const toast = useToast();
   const started = view.phase !== "setup";
   const finished = view.phase === "finished";
   const locks: ConfigLocks = { started, registered: view.counts.unique > 0, payoutsLocked: view.money?.locked ?? false };
 
-  // Follow the saved settings until the director starts editing.
-  useEffect(() => {
-    if (!dirty) setConfig(view.config);
-  }, [view.config, dirty]);
-
   const edit = (next: Config) => {
-    setConfig(next);
-    setDirty(true);
+    setDraft(next);
   };
 
   const save = async () => {
     if (await run({ type: "update_config", config: sanitizeConfig(config) })) {
-      setDirty(false);
+      setDraft(null);
       toast.success(t("toast.settingsSaved"));
     }
   };
@@ -65,7 +63,7 @@ export default function SettingsScreen() {
       {dirty && !finished && (
         <div className="action-bar">
           <span className="action-bar-note">{t("settings.unsaved")}</span>
-          <Button variant="ghost" onClick={() => setDirty(false)}>
+          <Button variant="ghost" onClick={() => setDraft(null)}>
             {t("levels.discard")}
           </Button>
           <Button variant="primary" icon="check" onClick={() => void save()}>

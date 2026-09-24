@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import type { EngineError } from "../../engine/types";
 import { useI18n } from "../../i18n";
 import { Button } from "../components/Button";
@@ -15,16 +15,16 @@ export default function LevelsScreen() {
   const i18n = useI18n();
   const { t } = i18n;
   const { view, run } = useTournament();
-  const [rows, setRows] = useState<LevelDraft[]>(() => view.levels.map((row) => toDraft(row.level, row.index)));
-  const [dirty, setDirty] = useState(false);
+  // The director's edits, null until the first one: until then the rows follow the tournament.
+  // Derived during render, never copied in an effect: an effect runs after the render, and
+  // could overwrite an edit made in between with the structure of an older render.
+  const [draft, setDraft] = useState<LevelDraft[] | null>(null);
+  const saved = useMemo(() => view.levels.map((row) => toDraft(row.level, row.index)), [view.levels]);
+  const rows = draft ?? saved;
+  const dirty = draft !== null;
   const [rejectedRow, setRejectedRow] = useState<number | null>(null);
   const [confirming, setConfirming] = useState(false);
   const toast = useToast();
-
-  // Follow the tournament's structure until the director starts editing.
-  useEffect(() => {
-    if (!dirty) setRows(view.levels.map((row) => toDraft(row.level, row.index)));
-  }, [view.levels, dirty]);
 
   const started = view.phase !== "setup";
   const currentIndex = started ? view.clock.levelIndex : null;
@@ -33,16 +33,13 @@ export default function LevelsScreen() {
   const invalidRows = new Set<number>(structureWarnings.map((warning) => ("params" in warning ? warning.params.index : -1)));
   if (rejectedRow !== null) invalidRows.add(rejectedRow);
 
-  const edit = (next: LevelDraft[]) => {
-    setRows(next);
-    setDirty(true);
-  };
+  const edit = (next: LevelDraft[]) => setDraft(next);
 
   const save = async () => {
     setConfirming(false);
-    const saved = await run({ type: "update_structure", levels: rows.map(fromDraft) }, (error: EngineError) => setRejectedRow(errorRow(error)));
-    if (saved) {
-      setDirty(false);
+    const updated = await run({ type: "update_structure", levels: rows.map(fromDraft) }, (error: EngineError) => setRejectedRow(errorRow(error)));
+    if (updated) {
+      setDraft(null);
       setRejectedRow(null);
       toast.success(t("toast.structureSaved"));
     }
@@ -51,7 +48,7 @@ export default function LevelsScreen() {
   const requestSave = () => (view.phase === "running" ? setConfirming(true) : void save());
 
   const discard = () => {
-    setDirty(false);
+    setDraft(null);
     setRejectedRow(null);
   };
 

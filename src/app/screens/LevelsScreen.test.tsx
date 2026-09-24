@@ -1,7 +1,8 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { register, renderApp, withTournament } from "../../test/app";
+import { editAsViewArrives } from "../../test/busy";
 
 async function runningAtLevel(index: number) {
   const { engine, id } = await withTournament();
@@ -52,6 +53,48 @@ describe("LevelsScreen", () => {
     });
     expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
     expect(screen.getByText("Structure saved")).toBeInTheDocument();
+  });
+
+  it("keeps an edit made while the tournament changes elsewhere, on a busy machine", async () => {
+    // Regression: the screen copied each new view into its draft from an effect, with the
+    // "editing" flag of the render before; an edit made between that render and its effects was
+    // overwritten ("800" typed over a cleared "600" became "600800").
+    const { engine, id } = await runningAtLevel(3);
+    renderApp(engine, `/t/${id}/levels`);
+    const bigBlind = await screen.findByLabelText("Level 4 BB");
+
+    await editAsViewArrives({
+      watch: screen.getByRole("group", { name: "Tournament clock" }),
+      change: () => engine.dispatch(id, { type: "adjust_time", deltaMs: -60_000 }),
+      edit: () => fireEvent.change(bigBlind, { target: { value: "800" } })
+    });
+
+    expect(screen.getByLabelText("Level 4 BB")).toHaveValue("800");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+  });
+
+  it("follows changes made elsewhere until editing starts, then keeps the draft", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await runningAtLevel(3);
+    renderApp(engine, `/t/${id}/levels`);
+    expect(await screen.findByLabelText("Level 4 BB")).toHaveValue("600");
+
+    // Another window changes the structure: the screen shows it.
+    const levels = (await engine.getView(id)).levels.map((row) => row.level);
+    levels[4] = { type: "play", sb: 300, bb: 700, ante: { type: "none" }, durationMs: 20 * 60_000 };
+    await act(() => engine.dispatch(id, { type: "update_structure", levels }));
+    await waitFor(() => expect(screen.getByLabelText("Level 4 BB")).toHaveValue("700"));
+
+    // Once the director edits, another change elsewhere does not overwrite the draft.
+    await user.clear(screen.getByLabelText("Level 4 SB"));
+    await user.type(screen.getByLabelText("Level 4 SB"), "350");
+    await act(() => engine.dispatch(id, { type: "adjust_time", deltaMs: 60_000 }));
+    expect(screen.getByLabelText("Level 4 SB")).toHaveValue("350");
+    expect(screen.getByLabelText("Level 4 BB")).toHaveValue("700");
+
+    // Discarding goes back to the tournament's structure.
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(screen.getByLabelText("Level 4 SB")).toHaveValue("300");
   });
 
   it("saves without confirmation before the start", async () => {

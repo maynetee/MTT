@@ -1,7 +1,8 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { register, renderApp, withTournament } from "../../test/app";
+import { editAsViewArrives } from "../../test/busy";
 
 const money = { currency: { code: "EUR", exponent: 2 }, buyIn: { prize: 10_000, fee: 1_000 }, roundingUnit: 100 };
 
@@ -114,5 +115,26 @@ describe("SettingsScreen places paid", () => {
 
     expect(await screen.findByRole("spinbutton", { name: "Places paid" })).toBeDisabled();
     expect(screen.getByText("Set on the Payouts tab.")).toBeInTheDocument();
+  });
+});
+
+describe("SettingsScreen draft", () => {
+  it("keeps an edit made while the tournament changes elsewhere, on a busy machine", async () => {
+    // Regression: like the Levels tab, the form copied each new view into its draft from an
+    // effect, which could overwrite an edit made between a render and its effects.
+    const { engine, id } = await withTournament();
+    await register(engine, id, ["Ann", "Ben"]);
+    await engine.dispatch(id, { type: "start_clock" });
+    renderApp(engine, `/t/${id}/settings`);
+    const tables = await screen.findByRole("spinbutton", { name: "Tables" });
+
+    await editAsViewArrives({
+      watch: screen.getByRole("group", { name: "Tournament clock" }),
+      change: () => engine.dispatch(id, { type: "adjust_time", deltaMs: -60_000 }),
+      edit: () => fireEvent.change(tables, { target: { value: "5" } })
+    });
+
+    expect(screen.getByRole("spinbutton", { name: "Tables" })).toHaveValue("5");
+    expect(screen.getByRole("button", { name: "Save settings" })).toBeInTheDocument();
   });
 });
