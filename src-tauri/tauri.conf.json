@@ -44,7 +44,9 @@
         "base-uri": "'none'",
         "form-action": "'none'"
       },
-      "dangerousDisableAssetCspModification": ["style-src"]
+      "dangerousDisableAssetCspModification": [
+        "style-src"
+      ]
     }
   },
   "bundle": {
@@ -55,6 +57,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "signingIdentity": "-"
+    },
+    "category": "Utility",
+    "shortDescription": "Poker tournament director",
+    "longDescription": "Run live poker tournaments: clock, seating and table balancing, eliminations, payouts and a TV display.",
+    "copyright": "© 2026 Mendel Teichman",
+    "license": "MIT",
+    "homepage": "https://github.com/maynetee/MTT"
   }
 }
