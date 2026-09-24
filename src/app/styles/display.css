@@ -1,0 +1,161 @@
+/*
+ * The TV display (/display/:id) and its preview. Always rendered with the dark tokens
+ * (data-theme="dark"); its own redesign comes later, so sizes are unchanged.
+ */
+
+.display,
+.display-preview {
+  font-size: 1rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.display {
+  min-height: 100vh;
+  padding: 36px;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 28px;
+}
+
+.display-preview {
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 16px;
+}
+
+.display-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--color-border);
+}
+
+.display-card h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: var(--weight-bold);
+}
+
+.display-left {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.display-right {
+  min-height: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.display-time {
+  font-size: 180px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+
+.display-break {
+  font-size: 120px;
+  font-weight: 800;
+  color: var(--color-accent);
+  text-align: center;
+}
+
+.display-paused {
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--color-danger-fg);
+  text-align: center;
+  letter-spacing: 0.2em;
+}
+
+.display-level {
+  font-size: 48px;
+  font-weight: var(--weight-bold);
+  text-align: center;
+  margin-top: -20px;
+  color: var(--color-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.display-blinds {
+  font-size: 64px;
+  font-weight: var(--weight-bold);
+  text-align: center;
+}
+
+.display-next {
+  font-size: 32px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.display-card:has(.display-time) {
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  min-height: 500px;
+}
+
+.display-warning {
+  color: var(--color-accent-fg);
+  font-weight: var(--weight-semibold);
+}
+
+.display-success {
+  color: var(--color-success);
+  font-weight: var(--weight-semibold);
+}
+
+.display-list {
+  max-height: 560px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Specific adjustments to fit the small ranking sidebar */
+.display-right h2 {
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+.display-row {
+  font-size: 16px;
+  padding: 8px 12px;
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.display-exit {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  padding: 10px 16px;
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+}
+
+.display-exit:hover {
+  background: var(--color-surface-hover);
+}

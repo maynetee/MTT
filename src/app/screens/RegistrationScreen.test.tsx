@@ -18,7 +18,7 @@ describe("RegistrationScreen", () => {
     renderApp(engine, `/t/${id}/registration`);
 
     const label = await screen.findByText("Seats left");
-    expect(label.previousElementSibling).toHaveTextContent(/^1$/);
+    expect(label.nextElementSibling).toHaveTextContent(/^1$/);
   });
 
   it("registers a player at a random seat and says where", async () => {
@@ -31,7 +31,7 @@ describe("RegistrationScreen", () => {
     const feedback = await screen.findByRole("status");
     const dana = (await engine.getView(id)).ranking.find((row) => row.name === "Dana Scully")!;
     expect(within(feedback).getByText("Dana Scully")).toBeInTheDocument();
-    expect(within(feedback).getByText(`Table ${dana.seat!.table} — Seat ${dana.seat!.seat}`)).toBeInTheDocument();
+    expect(within(feedback).getByText(`Table ${dana.seat!.table}, seat ${dana.seat!.seat}`)).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Player name")).toHaveValue("");
   });
 
@@ -40,7 +40,7 @@ describe("RegistrationScreen", () => {
     const { engine, id } = await withTournament();
     renderApp(engine, `/t/${id}/registration`);
 
-    await user.click(await screen.findByRole("checkbox", { name: "Enabled" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Choose the seat" }));
     const table = screen.getByLabelText("Table");
     await user.clear(table);
     await user.type(table, "2");
@@ -49,7 +49,7 @@ describe("RegistrationScreen", () => {
     await user.type(seat, "7");
     await user.type(screen.getByPlaceholderText("Player name"), "Eve{Enter}");
 
-    expect(await screen.findByText("Table 2 — Seat 7")).toBeInTheDocument();
+    expect(await screen.findByText("Table 2, seat 7")).toBeInTheDocument();
     expect((await engine.getView(id)).ranking[0].seat).toEqual({ table: 2, seat: 7 });
 
     await user.type(screen.getByPlaceholderText("Player name"), "Finn{Enter}");
@@ -81,7 +81,7 @@ describe("RegistrationScreen", () => {
     await register(engine, id, ["Ann"]);
     renderApp(engine, `/t/${id}/registration`);
 
-    await user.click(await screen.findByRole("button", { name: "Remove" }));
+    await user.click(await screen.findByRole("button", { name: "Remove Ann" }));
 
     expect((await engine.getView(id)).counts.unique).toBe(0);
     expect(await screen.findByRole("button", { name: "Undo unregister a player" })).toBeInTheDocument();

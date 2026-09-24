@@ -402,6 +402,11 @@
 .checkbox--solo {
   padding: 10px;
   margin: -10px;
+  vertical-align: middle;
+}
+
+.checkbox--solo .checkbox-box {
+  margin-top: 0;
 }
 
 .radio-group {
@@ -526,7 +531,9 @@
 .segment.is-selected {
   background: var(--color-control);
   color: var(--color-text);
-  box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--color-border-strong);
+  box-shadow:
+    var(--shadow-sm),
+    inset 0 0 0 1px var(--color-border-strong);
 }
 
 /* The native radio covers the segment, invisible, so clicks and arrow keys work as usual. */
@@ -812,7 +819,7 @@ h1.section-title {
   border-spacing: 0;
 }
 
-.table th {
+.table thead th {
   padding: 0 var(--space-3) var(--space-2);
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text-muted);
@@ -822,37 +829,46 @@ h1.section-title {
   white-space: nowrap;
 }
 
-.table td {
+.table td,
+.table tbody th {
   height: 48px;
   padding: 4px var(--space-3);
   border-bottom: 1px solid var(--color-divider);
+  text-align: left;
   vertical-align: middle;
 }
 
-.table--compact td {
+.table tbody th {
+  font-weight: var(--weight-semibold);
+}
+
+.table--compact td,
+.table--compact tbody th {
   height: 40px;
 }
 
-.table tbody tr:last-child td {
+.table tbody tr:last-child > * {
   border-bottom: 0;
 }
 
-.table tbody tr:hover td {
+.table tbody tr:hover > * {
   background: var(--color-surface-hover);
 }
 
-.table th:first-child,
-.table td:first-child {
+.table tr > :first-child {
   padding-left: var(--space-5);
 }
 
-.table th:last-child,
-.table td:last-child {
+.table tr > :last-child {
   padding-right: var(--space-5);
 }
 
 .table .num {
   text-align: right;
+}
+
+.table .center {
+  text-align: center;
 }
 
 .table .actions {
@@ -865,11 +881,15 @@ h1.section-title {
   font-weight: var(--weight-semibold);
 }
 
-.table tr.is-selected td {
+.table .muted {
+  color: var(--color-text-muted);
+}
+
+.table tr.is-selected > * {
   background: var(--color-accent-soft);
 }
 
-.table tr.is-dimmed td {
+.table tr.is-dimmed > * {
   color: var(--color-text-muted);
 }
 

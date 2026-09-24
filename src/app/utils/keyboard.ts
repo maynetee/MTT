@@ -8,3 +8,9 @@ export function isEditableTarget(target: EventTarget | null): boolean {
   const editableHost = target.closest("[contenteditable]");
   return editableHost !== null && editableHost.getAttribute("contenteditable") !== "false";
 }
+
+/** Whether shortcuts use ⌘ (macOS, iPadOS) rather than Ctrl. */
+export function isMac(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+}

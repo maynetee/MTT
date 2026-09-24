@@ -3,13 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { playerId, register, renderApp, withTournament } from "../../test/app";
 
+/** The ranking's body rows, cell by cell: place, player, status. */
 function rows() {
-  return screen.getAllByText(/^(#\d+(–\d+)?|—)$/).map((pill) => {
-    const row = pill.closest(".list-row") as HTMLElement;
-    return within(row)
-      .getAllByText(/.+/)
-      .map((cell) => cell.textContent);
-  });
+  const [, ...body] = within(screen.getByRole("table", { name: "Exports" })).getAllByRole("row");
+  return body.map((row) => [...row.querySelectorAll("th, td")].map((cell) => cell.textContent));
 }
 
 async function fourPlayers() {

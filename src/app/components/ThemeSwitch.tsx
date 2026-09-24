@@ -19,7 +19,9 @@ export function ThemeSwitch() {
 
   useEffect(() => {
     if (!open) return;
-    items().find((item) => item.getAttribute("aria-checked") === "true")?.focus();
+    items()
+      .find((item) => item.getAttribute("aria-checked") === "true")
+      ?.focus();
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
       if (!menuRef.current?.contains(target) && !buttonRef.current?.contains(target)) setOpen(false);

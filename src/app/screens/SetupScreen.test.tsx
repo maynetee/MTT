@@ -12,7 +12,7 @@ describe("SetupScreen", () => {
 
     await user.type(await screen.findByLabelText("Level 1 SB"), "5");
 
-    expect(screen.getByLabelText("Level 1 SB")).toHaveValue(255);
+    expect(screen.getByLabelText("Level 1 SB")).toHaveValue("255");
     expect(screen.getByLabelText("Level 1 SB")).toHaveFocus();
   });
 
@@ -21,9 +21,9 @@ describe("SetupScreen", () => {
     renderApp(createTestEngine(), "/new");
 
     // Level 5 follows the first break of the default structure.
-    expect(await screen.findByLabelText("Level 5 SB")).toHaveValue(150);
+    expect(await screen.findByLabelText("Level 5 SB")).toHaveValue("150");
     await user.click(screen.getByLabelText("Level 2 Break"));
-    expect(screen.getByLabelText("Level 4 SB")).toHaveValue(150);
+    expect(screen.getByLabelText("Level 4 SB")).toHaveValue("150");
   });
 
   it("ships a default structure long enough for a full event", () => {

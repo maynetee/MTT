@@ -2,10 +2,24 @@ import type { ReactNode } from "react";
 import { Icon, type IconName } from "./Icon";
 
 /** What an empty screen is for, and the action that fills it. */
-export function EmptyState({ icon, title, description, action }: { icon?: IconName; title: ReactNode; description?: ReactNode; action?: ReactNode }) {
+export function EmptyState({
+  icon,
+  art,
+  title,
+  description,
+  action
+}: {
+  icon?: IconName;
+  /** A picture instead of the icon. */
+  art?: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+}) {
   return (
     <div className="empty-state">
-      {icon && (
+      {art}
+      {icon && !art && (
         <span className="empty-state-icon">
           <Icon name={icon} size={22} />
         </span>

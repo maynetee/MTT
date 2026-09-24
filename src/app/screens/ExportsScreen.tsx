@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useI18n } from "../../i18n";
+import { Button } from "../components/Button";
+import { Section } from "../components/Card";
+import { Callout } from "../components/Callout";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { Table } from "../components/Table";
 import { useEngine } from "../EngineContext";
 import { useTournament } from "../TournamentContext";
 import { exportCSV, exportPDF, type RankingExport } from "../utils/exports";
@@ -22,31 +26,45 @@ export default function ExportsScreen() {
   };
 
   return (
-    <div className="card">
-      {failure && <ErrorBanner message={failure} onDismiss={() => setFailure(null)} />}
-      <div className="card-header">
-        <h2>{t("exports.title")}</h2>
-        <div className="button-row">
-          <button className="btn primary" onClick={() => run(exportCSV)}>
-            {t("exports.csv")}
-          </button>
-          <button className="btn" onClick={() => run(exportPDF)}>
+    <Section
+      title={t("exports.title")}
+      description={t("exports.hint")}
+      flush
+      actions={
+        <>
+          <Button icon="download" onClick={() => run(exportPDF)}>
             {t("exports.pdf")}
-          </button>
-        </div>
-      </div>
-      {finished && <div className="muted">{t("exports.finalRanking")}</div>}
-      {provisional && <div className="muted">{t("exports.provisionalHint")}</div>}
-
-      <div className="list">
-        {view.ranking.map((row) => (
-          <div key={row.player} className="list-row">
-            <span className="pill">{formatPlace(row)}</span>
-            <span>{row.name}</span>
-            <span className="muted">{rankingStatus(i18n, row, view.winner)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
+          </Button>
+          <Button variant="primary" icon="download" onClick={() => run(exportCSV)}>
+            {t("exports.csv")}
+          </Button>
+        </>
+      }
+    >
+      {failure && <ErrorBanner message={failure} onDismiss={() => setFailure(null)} />}
+      {finished ? <Callout tone="success">{t("exports.finalRanking")}</Callout> : provisional && <Callout>{t("exports.provisionalHint")}</Callout>}
+      <Table caption={t("exports.title")} density="compact">
+        <thead>
+          <tr>
+            <th scope="col" className="num place-col">
+              {t("exports.place")}
+            </th>
+            <th scope="col">{t("exports.player")}</th>
+            <th scope="col">{t("exports.status")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {view.ranking.map((row) => (
+            <tr key={row.player}>
+              <td className="num place">{formatPlace(row)}</td>
+              <th scope="row" className="strong">
+                {row.name}
+              </th>
+              <td>{rankingStatus(i18n, row, view.winner)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+    </Section>
   );
 }

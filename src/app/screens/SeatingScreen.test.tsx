@@ -45,9 +45,12 @@ describe("SeatingScreen", () => {
 
     await screen.findByRole("heading", { name: "Table 2" });
     await user.click(within(tableCard(2)).getByRole("button", { name: "Break table" }));
-    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Break table" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Break table 2?" });
+    expect(dialog).toHaveAccessibleDescription("Its player is redrawn to a free seat at another table.");
+    await user.click(within(dialog).getByRole("button", { name: "Break table 2" }));
 
-    expect(await screen.findByText(/^Ben: Table 2 Seat 1 → Table 1 Seat [234]$/)).toBeInTheDocument();
+    const moved = await screen.findByRole("status", { name: "Players moved" });
+    expect(within(moved).getByRole("row", { name: /^Ben Table 2 Seat 1 Table 1 Seat [234]$/ })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Table 2" })).not.toBeInTheDocument();
 
     const others = screen.getByRole("heading", { name: "Other tables" }).closest(".card") as HTMLElement;

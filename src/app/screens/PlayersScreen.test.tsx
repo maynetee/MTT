@@ -25,7 +25,7 @@ async function eliminateAndPick(user: User, name: string) {
 }
 
 function row(name: string) {
-  return screen.getByText(name, { selector: ".list-title" }).closest(".list-row") as HTMLElement;
+  return screen.getByRole("rowheader", { name }).closest("tr") as HTMLElement;
 }
 
 describe("PlayersScreen revive", () => {
@@ -86,8 +86,7 @@ describe("PlayersScreen eliminations", () => {
     return { engine, id };
   }
 
-  const places = (view: View) =>
-    Object.fromEntries(view.ranking.filter((r) => !r.alive).map((r) => [r.name, [r.place, r.placeTo]]));
+  const places = (view: View) => Object.fromEntries(view.ranking.filter((r) => !r.alive).map((r) => [r.name, [r.place, r.placeTo]]));
 
   it("eliminates several players in the same hand, ranked by starting stack", async () => {
     const { engine, id } = await fourPlayers();
@@ -103,8 +102,9 @@ describe("PlayersScreen eliminations", () => {
     await user.click(screen.getByRole("button", { name: "Eliminate 2 players" }));
 
     await waitFor(async () => expect(places(await engine.getView(id))).toEqual({ Ben: [3, null], Ann: [4, null] }));
-    expect(within(row("Ben")).getByText("Eliminated · #3")).toBeInTheDocument();
-    expect(within(row("Ann")).getByText("Eliminated · #4")).toBeInTheDocument();
+    expect(within(row("Ben")).getByText("#3")).toBeInTheDocument();
+    expect(within(row("Ben")).getByText("Eliminated")).toBeInTheDocument();
+    expect(within(row("Ann")).getByText("#4")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Undo eliminate Ann and Ben" })).toBeInTheDocument();
   });
 
@@ -118,8 +118,8 @@ describe("PlayersScreen eliminations", () => {
     await user.click(screen.getByRole("checkbox", { name: "Select Dan" }));
     await user.click(screen.getByRole("button", { name: "Eliminate 2 players" }));
 
-    expect(await within(row("Cat")).findByText("Eliminated · #3–4")).toBeInTheDocument();
-    expect(within(row("Dan")).getByText("Eliminated · #3–4")).toBeInTheDocument();
+    expect(await within(row("Cat")).findByText("#3–4")).toBeInTheDocument();
+    expect(within(row("Dan")).getByText("#3–4")).toBeInTheDocument();
   });
 
   it("explains that every stack or none is needed", async () => {
@@ -133,9 +133,7 @@ describe("PlayersScreen eliminations", () => {
     await user.type(screen.getByLabelText("Starting stack Ann"), "3000");
     await user.click(screen.getByRole("button", { name: "Eliminate 2 players" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Enter the starting stack of every player eliminated in this hand, or none of them for a tie."
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Enter the starting stack of every player eliminated in this hand, or none of them for a tie.");
     expect((await engine.getView(id)).counts.alive).toBe(4);
     // The selection stays, to fix the stacks.
     expect(screen.getByRole("checkbox", { name: "Select Ann" })).toBeChecked();
@@ -145,7 +143,7 @@ describe("PlayersScreen eliminations", () => {
     const { engine, id } = await withTournament({ tables: 1 });
     const view = await register(engine, id, ["Ann", "Ben"]);
     const { unmount } = renderApp(engine, `/t/${id}/players`);
-    expect(await screen.findByText("Ann")).toBeInTheDocument();
+    expect(await screen.findByRole("rowheader", { name: "Ann" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Eliminate/ })).not.toBeInTheDocument();
     unmount();
 

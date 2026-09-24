@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toEngineError, type Config, type EngineError } from "../../engine/types";
 import { useI18n } from "../../i18n";
-import { AppShell } from "../components/AppShell";
+import { AppShell, PageTitle } from "../components/AppShell";
+import { Button } from "../components/Button";
+import { Section } from "../components/Card";
 import { ConfigFields, LateRegFields, sanitizeConfig } from "../components/ConfigForm";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { StructureEditor } from "../components/StructureEditor";
@@ -31,6 +33,21 @@ export function errorRow(error: EngineError | null): number | null {
   return typeof params.index === "number" ? params.index : null;
 }
 
+/** Add level / Add break, under the structure where the new row appears. */
+export function StructureActions({ rows, onChange }: { rows: LevelDraft[]; onChange(rows: LevelDraft[]): void }) {
+  const { t } = useI18n();
+  return (
+    <div className="structure-actions">
+      <Button icon="plus" onClick={() => onChange([...rows, newPlayDraft(rows)])}>
+        {t("structure.addLevel")}
+      </Button>
+      <Button icon="coffee" onClick={() => onChange([...rows, newBreakDraft()])}>
+        {t("structure.addBreak")}
+      </Button>
+    </div>
+  );
+}
+
 export default function SetupScreen() {
   const { t, error: describe } = useI18n();
   const engine = useEngine();
@@ -53,40 +70,27 @@ export default function SetupScreen() {
   };
 
   return (
-    <AppShell title={<Link to="/">{t("app.allTournaments")}</Link>}>
-      <main className="page setup">
-        {error && <ErrorBanner message={describe(error)} onDismiss={() => setError(null)} />}
-        <div className="card">
-          <h2>{t("setup.title")}</h2>
+    <AppShell title={<PageTitle name={t("setup.title")} />}>
+      {error && <ErrorBanner message={describe(error)} onDismiss={() => setError(null)} />}
+      <div className="setup-grid">
+        <Section title={t("config.section")} description={t("config.sectionHint")}>
           <ConfigFields config={config} onChange={setConfig} />
-        </div>
-
-        <div className="card">
-          <h3>{t("config.lateReg.title")}</h3>
+        </Section>
+        <Section title={t("config.lateReg.title")} description={t("config.lateReg.hint")}>
           <LateRegFields config={config} onChange={setConfig} />
-        </div>
+        </Section>
+      </div>
 
-        <div className="card">
-          <div className="card-header">
-            <h3>{t("structure.title")}</h3>
-            <div className="button-row">
-              <button className="btn" onClick={() => setRows([...rows, newPlayDraft(rows)])}>
-                {t("structure.addLevel")}
-              </button>
-              <button className="btn" onClick={() => setRows([...rows, newBreakDraft()])}>
-                {t("structure.addBreak")}
-              </button>
-            </div>
-          </div>
-          <StructureEditor rows={rows} onChange={setRows} invalidRows={invalidRow === null ? undefined : new Set([invalidRow])} />
-        </div>
+      <Section title={t("structure.title")} flush>
+        <StructureEditor rows={rows} onChange={setRows} invalidRows={invalidRow === null ? undefined : new Set([invalidRow])} />
+        <StructureActions rows={rows} onChange={setRows} />
+      </Section>
 
-        <div className="actions">
-          <button className="btn primary" onClick={handleCreate} disabled={creating}>
-            {t("setup.create")}
-          </button>
-        </div>
-      </main>
+      <div className="action-bar">
+        <Button variant="primary" size="lg" icon="check" onClick={() => void handleCreate()} loading={creating}>
+          {t("setup.create")}
+        </Button>
+      </div>
     </AppShell>
   );
 }

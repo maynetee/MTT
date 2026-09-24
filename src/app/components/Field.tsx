@@ -1,13 +1,4 @@
-import {
-  createContext,
-  forwardRef,
-  useContext,
-  useId,
-  type AriaAttributes,
-  type InputHTMLAttributes,
-  type ReactNode,
-  type SelectHTMLAttributes
-} from "react";
+import { createContext, forwardRef, useContext, useId, type AriaAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 import { Icon } from "./Icon";
 
 interface FieldControl {
@@ -78,10 +69,7 @@ export interface TextInputProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   inputSize?: "md" | "lg";
 }
 
-export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function TextInput(
-  { className, inputSize = "md", type = "text", ...props },
-  ref
-) {
+export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function TextInput({ className, inputSize = "md", type = "text", ...props }, ref) {
   const wired = useFieldProps(props);
   return <input ref={ref} type={type} className={["input", `input--${inputSize}`, className ?? ""].filter(Boolean).join(" ")} {...wired} />;
 });

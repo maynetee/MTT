@@ -18,7 +18,7 @@ describe("LevelsScreen", () => {
 
     expect(await screen.findByLabelText("Level 1 SB")).toBeDisabled();
     expect(screen.getByLabelText("Level 2 BB")).toBeDisabled();
-    expect(screen.getByLabelText("Break Mins")).toBeDisabled();
+    expect(screen.getByLabelText("Break Minutes")).toBeDisabled();
     // The level in progress stays editable but cannot be removed.
     expect(screen.getByLabelText("Level 3 BB")).toBeEnabled();
     expect(screen.getByRole("button", { name: "Remove level Level 3" })).toBeDisabled();
@@ -57,6 +57,6 @@ describe("LevelsScreen", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Row 2: the small blind must be more than 0");
     expect(screen.getByLabelText("Level 2 SB").closest(".level-row")).toHaveClass("invalid");
-    expect(screen.getByLabelText("Level 2 SB")).toHaveValue(null);
+    expect(screen.getByLabelText("Level 2 SB")).toHaveValue("");
   });
 });

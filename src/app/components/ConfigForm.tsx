@@ -1,11 +1,12 @@
 import type { Config, Deadline } from "../../engine/types";
 import { useI18n } from "../../i18n";
+import { Checkbox, Field, RadioGroup, TextInput } from "./Field";
+import { NumberInput } from "./NumberInput";
 
 const MINUTE_MS = 60_000;
 
-/** Integer input value: NaN while empty, so the core rejects it instead of reading 0. */
-const integer = (value: string) => (value === "" ? Number.NaN : Math.trunc(Number(value)));
-const shown = (value: number | null) => (value === null || Number.isNaN(value) ? "" : value);
+/** NaN while empty, so the core rejects it instead of reading 0. */
+const integer = (value: number | null) => (value === null ? Number.NaN : Math.trunc(value));
 
 /** Fits a number entered in a form into the core's integer type, so the core validates it. */
 function fit(value: number, max: number): number {
@@ -46,65 +47,56 @@ export function ConfigFields({ config, onChange, started = false }: Props) {
   const { t } = useI18n();
   const set = (changes: Partial<Config>) => onChange({ ...config, ...changes });
   const capacity = (config.seatsPerTable || 0) * (config.maxTables || 0);
+  const locked = started ? t("config.lockedHint") : undefined;
 
   return (
-    <>
-      <div className="grid-2">
-        <label>
-          {t("config.name")}
-          <input value={config.name} onChange={(event) => set({ name: event.target.value })} />
-        </label>
-        <label>
-          {t("config.placesPaid")}
-          <input type="number" min={1} value={shown(config.placesPaid)} onChange={(event) => set({ placesPaid: integer(event.target.value) })} />
-        </label>
-        <label>
-          {t("config.maxTables")}
-          <input type="number" min={1} value={shown(config.maxTables)} onChange={(event) => set({ maxTables: integer(event.target.value) })} />
-        </label>
-        <label title={started ? t("config.lockedHint") : undefined}>
-          {t("config.seatsPerTable")}
-          <input
-            type="number"
-            min={2}
-            max={12}
-            value={shown(config.seatsPerTable)}
-            onChange={(event) => set({ seatsPerTable: integer(event.target.value) })}
-            disabled={started}
-          />
-        </label>
-        <label title={started ? t("config.lockedHint") : undefined}>
-          {t("config.startingStack")}
-          <input
-            type="number"
-            min={1}
-            value={shown(config.startingStack)}
-            onChange={(event) => set({ startingStack: integer(event.target.value) })}
-            disabled={started}
-          />
-        </label>
-        <label>
-          {t("config.finalTableSize")}
-          <input
-            type="number"
-            min={2}
-            placeholder={t("config.finalTableSizeHint")}
-            value={shown(config.finalTableSize)}
-            onChange={(event) => set({ finalTableSize: event.target.value === "" ? null : integer(event.target.value) })}
-          />
-        </label>
-        <label>
-          {t("config.balanceTrigger")}
-          <input
-            type="number"
-            min={2}
-            value={shown(config.balanceTrigger)}
-            onChange={(event) => set({ balanceTrigger: integer(event.target.value) })}
-          />
-        </label>
+    <div className="form-grid">
+      <Field label={t("config.name")} className="span-2">
+        <TextInput value={config.name} onChange={(event) => set({ name: event.target.value })} />
+      </Field>
+      <Field label={t("config.startingStack")}>
+        <NumberInput
+          min={1}
+          step={1000}
+          value={config.startingStack}
+          onChange={(value) => set({ startingStack: integer(value) })}
+          disabled={started}
+          title={locked}
+        />
+      </Field>
+      <Field label={t("config.placesPaid")}>
+        <NumberInput min={1} value={config.placesPaid} onChange={(value) => set({ placesPaid: integer(value) })} />
+      </Field>
+      <Field label={t("config.maxTables")}>
+        <NumberInput min={1} value={config.maxTables} onChange={(value) => set({ maxTables: integer(value) })} />
+      </Field>
+      <Field label={t("config.seatsPerTable")}>
+        <NumberInput
+          min={2}
+          max={12}
+          value={config.seatsPerTable}
+          onChange={(value) => set({ seatsPerTable: integer(value) })}
+          disabled={started}
+          title={locked}
+        />
+      </Field>
+      <div className="readout" aria-live="polite">
+        <span className="readout-label">{t("config.capacity")}</span>
+        <span className="readout-value">{t("config.capacitySeats", { count: capacity })}</span>
       </div>
-      <div className="pill">{t("config.capacity", { count: capacity })}</div>
-    </>
+      <Field label={t("config.finalTableSize")} hint={t("config.finalTableSizeHint")}>
+        <NumberInput
+          min={2}
+          max={12}
+          placeholder={Number.isFinite(config.seatsPerTable) ? String(config.seatsPerTable) : undefined}
+          value={config.finalTableSize}
+          onChange={(value) => set({ finalTableSize: value === null ? null : integer(value) })}
+        />
+      </Field>
+      <Field label={t("config.balanceTrigger")} hint={t("config.balanceTriggerHint")} className="span-2">
+        <NumberInput digits={3} min={2} value={config.balanceTrigger} onChange={(value) => set({ balanceTrigger: integer(value) })} />
+      </Field>
+    </div>
   );
 }
 
@@ -126,47 +118,55 @@ export function LateRegFields({ config, onChange }: Props) {
   };
 
   return (
-    <div className="late-reg">
-      <label className="toggle">
-        <input type="radio" name="late-reg" checked={deadline.type === "end_of_play_level"} onChange={() => choose("end_of_play_level")} />
-        {t("config.lateReg.endOfLevel")}
-        <input
-          type="number"
-          min={1}
-          className="small-input"
-          aria-label={t("config.lateReg.endOfLevel")}
-          value={shown(level.n)}
-          onChange={(event) => set({ type: "end_of_play_level", n: integer(event.target.value), throughBreak: level.throughBreak })}
-          disabled={deadline.type !== "end_of_play_level"}
-        />
-      </label>
-      <label className="toggle nested">
-        <input
-          type="checkbox"
-          checked={level.throughBreak}
-          onChange={(event) => set({ type: "end_of_play_level", n: level.n, throughBreak: event.target.checked })}
-          disabled={deadline.type !== "end_of_play_level"}
-        />
-        {t("config.lateReg.throughBreak")}
-      </label>
-      <label className="toggle">
-        <input type="radio" name="late-reg" checked={deadline.type === "elapsed"} onChange={() => choose("elapsed")} />
-        {t("config.lateReg.elapsed")}
-        <input
-          type="number"
-          min={1}
-          className="small-input"
-          aria-label={t("config.lateReg.elapsed")}
-          value={shown(minutes)}
-          onChange={(event) => set({ type: "elapsed", ms: Math.round(integer(event.target.value) * MINUTE_MS) })}
-          disabled={deadline.type !== "elapsed"}
-        />
-        {t("config.lateReg.minutes")}
-      </label>
-      <label className="toggle">
-        <input type="radio" name="late-reg" checked={deadline.type === "manual"} onChange={() => choose("manual")} />
-        {t("config.lateReg.manual")}
-      </label>
-    </div>
+    <RadioGroup<Mode>
+      legend={t("config.lateReg.title")}
+      hideLegend
+      name="late-reg"
+      value={deadline.type}
+      onChange={choose}
+      options={[
+        {
+          value: "end_of_play_level",
+          label: t("config.lateReg.endOfLevel"),
+          inline: (
+            <NumberInput
+              digits={3}
+              min={1}
+              aria-label={t("config.lateReg.endOfLevel")}
+              value={level.n}
+              onChange={(value) => set({ type: "end_of_play_level", n: integer(value), throughBreak: level.throughBreak })}
+              disabled={deadline.type !== "end_of_play_level"}
+            />
+          ),
+          nested: (
+            <Checkbox
+              label={t("config.lateReg.throughBreak")}
+              checked={level.throughBreak}
+              onChange={(event) => set({ type: "end_of_play_level", n: level.n, throughBreak: event.target.checked })}
+              disabled={deadline.type !== "end_of_play_level"}
+            />
+          )
+        },
+        {
+          value: "elapsed",
+          label: t("config.lateReg.elapsed"),
+          inline: (
+            <>
+              <NumberInput
+                digits={4}
+                min={1}
+                step={15}
+                aria-label={t("config.lateReg.elapsed")}
+                value={minutes}
+                onChange={(value) => set({ type: "elapsed", ms: Math.round(integer(value) * MINUTE_MS) })}
+                disabled={deadline.type !== "elapsed"}
+              />
+              {t("config.lateReg.minutes")}
+            </>
+          )
+        },
+        { value: "manual", label: t("config.lateReg.manual") }
+      ]}
+    />
   );
 }

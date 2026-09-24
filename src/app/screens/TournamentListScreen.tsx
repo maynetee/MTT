@@ -1,14 +1,23 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { toEngineError, type TournamentSummary } from "../../engine/types";
+import { useNavigate } from "react-router-dom";
+import { toEngineError, type PhaseName, type TournamentSummary } from "../../engine/types";
 import { useI18n } from "../../i18n";
 import { AppShell } from "../components/AppShell";
-import { ConfirmBar, ErrorBanner } from "../components/ErrorBanner";
+import { BrandMark } from "../components/BrandMark";
+import { Button, ButtonLink, IconButton } from "../components/Button";
+import { Section } from "../components/Card";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
+import { ErrorBanner } from "../components/ErrorBanner";
+import { Pill, type PillTone } from "../components/Pill";
+import { Table } from "../components/Table";
 import { useEngine } from "../EngineContext";
 import { useTournamentList } from "../hooks/useTournamentList";
 
 /** Set once the previous version's tournament was imported, so the import is not offered again. */
 const LEGACY_IMPORTED_KEY = "mtt:legacy-imported";
+
+const PHASE_TONES: Record<PhaseName, PillTone> = { setup: "neutral", running: "success", finished: "muted" };
 
 function legacyImported(): boolean {
   try {
@@ -61,68 +70,96 @@ export default function TournamentListScreen() {
     }
   };
 
+  // The host keeps reporting the old data after an import: offer it on a fresh install only.
+  const offerImport = legacyAvailable && summaries?.length === 0 && !legacyImported();
+  const create = (
+    <ButtonLink variant="primary" icon="plus" to="/new">
+      {t("list.create")}
+    </ButtonLink>
+  );
+
   return (
     <AppShell>
-      <main className="page tournament-list">
-        {error && <ErrorBanner message={i18n.error(error)} onDismiss={() => setError(null)} />}
-        {confirming && (
-          <ConfirmBar
-            message={t("list.confirmDelete", { name: confirming.name })}
-            confirmLabel={t("list.delete")}
-            onCancel={() => setConfirming(null)}
-            onConfirm={() => void handleDelete(confirming)}
-          />
-        )}
-        <div className="card">
-          <div className="card-header">
-            <h2>{t("list.title")}</h2>
-            <div className="button-row">
-              {/* The host keeps reporting the old data after an import: offer it on a fresh install only. */}
-              {legacyAvailable && summaries?.length === 0 && !legacyImported() && (
-                <button className="btn" onClick={() => void handleImport()} title={t("list.importLegacyHint")}>
-                  {t("list.importLegacy")}
-                </button>
-              )}
-              <Link className="btn primary" to="/new">
-                {t("list.create")}
-              </Link>
-            </div>
-          </div>
-          {summaries === null ? (
-            <div className="muted">{t("common.loading")}</div>
-          ) : summaries.length === 0 ? (
-            <div className="muted">{t("list.empty")}</div>
-          ) : (
-            <div className="list">
+      {error && <ErrorBanner message={i18n.error(error)} onDismiss={() => setError(null)} />}
+      <Section
+        level={1}
+        title={t("list.title")}
+        flush={Boolean(summaries?.length)}
+        actions={
+          summaries?.length ? (
+            create
+          ) : offerImport ? (
+            <Button onClick={() => void handleImport()} title={t("list.importLegacyHint")}>
+              {t("list.importLegacy")}
+            </Button>
+          ) : undefined
+        }
+      >
+        {summaries === null ? (
+          <p className="page-loading">{t("common.loading")}</p>
+        ) : summaries.length === 0 ? (
+          <EmptyState art={<BrandMark size={56} />} title={t("list.emptyTitle")} description={t("list.emptyDescription")} action={create} />
+        ) : (
+          <Table caption={t("list.title")}>
+            <thead>
+              <tr>
+                <th scope="col">{t("list.name")}</th>
+                <th scope="col">{t("list.status")}</th>
+                <th scope="col" className="num">
+                  {t("list.playersColumn")}
+                </th>
+                <th scope="col" className="num">
+                  {t("list.aliveColumn")}
+                </th>
+                <th scope="col">{t("list.updatedColumn")}</th>
+                <th scope="col" className="actions">
+                  <span className="visually-hidden">{t("list.open")}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
               {summaries.map((summary) => (
-                <div key={summary.id} className="list-row">
-                  <div>
-                    <div className="list-title">{summary.name}</div>
-                    <div className="list-subtitle">
-                      {[
-                        t("list.players", { count: summary.players }),
-                        summary.phase === "running" ? t("list.alive", { count: summary.alive }) : null,
-                        t("list.updated", { time: i18n.dateTime(summary.updatedAtMs) })
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </div>
-                  </div>
-                  <div className="button-row">
-                    <span className="pill">{t(`phase.${summary.phase}`)}</span>
-                    <Link className="btn" to={`/t/${encodeURIComponent(summary.id)}`} aria-label={`${t("list.open")} ${summary.name}`}>
-                      {t("list.open")}
-                    </Link>
-                    <button className="btn" onClick={() => setConfirming(summary)} aria-label={`${t("list.delete")} ${summary.name}`}>
-                      {t("list.delete")}
-                    </button>
-                  </div>
-                </div>
+                <tr key={summary.id}>
+                  <th scope="row" className="strong tournament-name">
+                    {summary.name}
+                  </th>
+                  <td>
+                    <Pill tone={PHASE_TONES[summary.phase]} dot={summary.phase === "running"}>
+                      {t(`phase.${summary.phase}`)}
+                    </Pill>
+                  </td>
+                  <td className="num">{summary.players}</td>
+                  <td className="num">{summary.phase === "running" ? summary.alive : t("common.none")}</td>
+                  <td className="muted">{i18n.dateTime(summary.updatedAtMs)}</td>
+                  <td className="actions">
+                    <span className="row-actions">
+                      <ButtonLink size="sm" to={`/t/${encodeURIComponent(summary.id)}`} aria-label={`${t("list.open")} ${summary.name}`}>
+                        {t("list.open")}
+                      </ButtonLink>
+                      <IconButton
+                        icon="trash"
+                        size="sm"
+                        label={`${t("list.delete")} ${summary.name}`}
+                        tooltipAlign="end"
+                        onClick={() => setConfirming(summary)}
+                      />
+                    </span>
+                  </td>
+                </tr>
               ))}
-            </div>
-          )}
-        </div>
-      </main>
+            </tbody>
+          </Table>
+        )}
+      </Section>
+      <ConfirmDialog
+        open={confirming !== null}
+        tone="danger"
+        title={t("list.deleteTitle", { name: confirming?.name ?? "" })}
+        message={t("list.deleteMessage")}
+        confirmLabel={t("list.deleteConfirm")}
+        onCancel={() => setConfirming(null)}
+        onConfirm={() => (confirming ? handleDelete(confirming) : undefined)}
+      />
     </AppShell>
   );
 }

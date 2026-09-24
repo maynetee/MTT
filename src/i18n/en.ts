@@ -121,6 +121,7 @@ export const en = {
   common: {
     cancel: "Cancel",
     dismiss: "Dismiss",
+    close: "Close",
     loading: "Loading…",
     table: "Table",
     seat: "Seat",
@@ -129,8 +130,18 @@ export const en = {
     tableSeatShort: "T{table} S{seat}",
     selectPlayer: "Select player",
     selectSeat: "Select seat",
-    none: "—",
-    close: "Close"
+    none: "—"
+  },
+  app: {
+    brand: "MTT",
+    tagline: "Tournament Director",
+    demo: "DEMO",
+    demoHint: "Browser demo: tournaments are saved in this browser only.",
+    engineFailed: "The tournament engine could not start: {message}",
+    allTournaments: "Tournaments",
+    home: "All tournaments",
+    sections: "Tournament sections",
+    notFoundAction: "Back to the tournaments"
   },
   theme: {
     label: "Theme: {theme}",
@@ -139,21 +150,6 @@ export const en = {
     light: "Light",
     dark: "Dark"
   },
-  confirm: {
-    typeToConfirm: "Type “{text}” to confirm"
-  },
-  toast: {
-    region: "Notifications",
-    dismiss: "Dismiss notification"
-  },
-  app: {
-    brand: "MTT",
-    tagline: "Tournament Director",
-    demo: "DEMO",
-    demoHint: "Browser demo: tournaments are saved in this browser only.",
-    engineFailed: "The tournament engine could not start: {message}",
-    allTournaments: "← Tournaments"
-  },
   demo: {
     notice: "Browser demo — tournaments are saved in this browser only.",
     download: "Download the desktop app",
@@ -161,7 +157,7 @@ export const en = {
   },
   phase: {
     setup: "Setup",
-    running: "Running",
+    running: "In progress",
     finished: "Finished"
   },
   tabs: {
@@ -182,8 +178,20 @@ export const en = {
     redo: "Redo",
     undoAction: "Undo {action}",
     redoAction: "Redo {action}",
-    shortcuts: "{key}: ⌘Z / Ctrl+Z to undo, ⇧⌘Z / Ctrl+Shift+Z to redo",
-    clockUndoHint: "Undoing a clock change puts back the clock as it was recorded, as if the change never happened."
+    undoKeysMac: "⌘Z",
+    undoKeys: "Ctrl+Z",
+    redoKeysMac: "⇧⌘Z",
+    redoKeys: "Ctrl+Shift+Z",
+    clockUndoHint: "Undoing a clock change puts back the clock as it was recorded, as if the change never happened.",
+    clock: "Tournament clock",
+    notStarted: "Not started",
+    running: "Running",
+    paused: "Paused",
+    onBreak: "Break",
+    overtime: "Overtime",
+    finished: "Finished",
+    lateRegOpen: "Late reg open",
+    lateRegClosed: "Late reg closed"
   },
   actions: {
     tournament_created: "create tournament",
@@ -205,20 +213,35 @@ export const en = {
     /** Stands for the names when the log no longer knows them (an unregistered player). */
     somePlayer: "a player"
   },
+  confirm: {
+    typeToConfirm: "Type “{text}” to confirm"
+  },
+  toast: {
+    region: "Notifications",
+    dismiss: "Dismiss notification"
+  },
   list: {
     title: "Tournaments",
     create: "New tournament",
-    empty: "No tournament yet. Create one to get started.",
+    emptyTitle: "No tournament yet",
+    emptyDescription: "Create one to set its structure and start registering players.",
+    name: "Tournament",
+    status: "Status",
+    playersColumn: "Players",
+    aliveColumn: "In play",
+    updatedColumn: "Last change",
     open: "Open",
     delete: "Delete",
-    confirmDelete: "Delete “{name}”? Its players, results and history are removed for good.",
+    deleteTitle: "Delete “{name}”?",
+    deleteMessage: "Its players, results and history are removed for good. This cannot be undone.",
+    deleteConfirm: "Delete tournament",
     players: { one: "{count} player", other: "{count} players" },
-    alive: "{count} in play",
-    updated: "Updated {time}",
     importLegacy: "Import from the previous version",
     importLegacyHint: "A tournament from the previous version of the app was found on this computer."
   },
   config: {
+    section: "Tournament",
+    sectionHint: "Seats per table and the starting stack are fixed once the clock starts.",
     name: "Name",
     seatsPerTable: "Seats per table",
     maxTables: "Tables",
@@ -227,10 +250,13 @@ export const en = {
     finalTableSize: "Final table size",
     finalTableSizeHint: "Empty: seats per table",
     balanceTrigger: "Rebalance when tables differ by",
-    capacity: "Capacity: {count} seats",
+    balanceTriggerHint: "Players between the fullest and the emptiest table.",
+    capacity: "Capacity",
+    capacitySeats: { one: "{count} seat", other: "{count} seats" },
     lockedHint: "Seats per table and the starting stack are locked once the tournament has started.",
     lateReg: {
       title: "Late registration",
+      hint: "When registration closes on its own. You can also close or reopen it by hand while the clock runs.",
       endOfLevel: "Until the end of play level",
       throughBreak: "and the break that follows",
       elapsed: "For a set time of play",
@@ -244,12 +270,14 @@ export const en = {
   },
   settings: {
     title: "Settings",
-    save: "Save settings"
+    hint: "Changes apply when you save.",
+    save: "Save settings",
+    unsaved: "Unsaved changes"
   },
   structure: {
     title: "Levels & breaks",
     level: "Level",
-    minutes: "Mins",
+    minutes: "Minutes",
     sb: "SB",
     bb: "BB",
     anteType: "Ante",
@@ -264,15 +292,16 @@ export const en = {
     ante_none: "None",
     ante_classic: "Ante",
     ante_big_blind: "BB ante",
-    current: "Current level",
+    current: "Now",
     played: "Played"
   },
   levels: {
-    title: "Manage levels",
+    title: "Structure",
     skip: "Skip level",
     skipHint: "Skip to the next level now",
     save: "Save changes",
     discard: "Discard changes",
+    unsaved: "Unsaved changes",
     pastLocked: "Levels already played are locked."
   },
   registration: {
@@ -280,11 +309,10 @@ export const en = {
     placeholder: "Player name",
     register: "Register",
     registered: "Registered",
-    seatFeedback: "Table {table} — Seat {seat}",
+    seatTicket: "Table {table}, seat {seat}",
     forceSeat: "Choose the seat",
-    enabled: "Enabled",
     forceSeatHint: "Seats the player at this seat if it is free, opening the table if needed.",
-    capacity: "Capacity",
+    status: "Registration",
     registeredCount: "Registered",
     seatsLeft: "Seats left",
     open: "Registration open",
@@ -299,7 +327,8 @@ export const en = {
     close: "Close registration",
     reopen: "Reopen registration",
     players: "Players in play",
-    remove: "Remove"
+    remove: "Remove",
+    empty: "Registered players appear here with their seat."
   },
   seating: {
     tableTitle: "Table {table}",
@@ -309,24 +338,44 @@ export const en = {
     setButtonHint: "Click the seat that has the button.",
     buttonHere: "Put the button at seat {seat}",
     dealer: "D",
+    dealerName: "Dealer button",
     smallBlind: "SB",
     bigBlind: "BB",
     empty: "Empty",
     breakTable: "Break table",
-    confirmBreak: "Break table {table}? Its players are redrawn to the other tables.",
+    breakTitle: "Break table {table}?",
+    breakMessage: {
+      zero: "The table is empty: it closes.",
+      one: "Its player is redrawn to a free seat at another table.",
+      other: "Its {count} players are redrawn to free seats at the other tables."
+    },
+    breakConfirm: "Break table {table}",
     openTable: "Open table",
     otherTables: "Other tables",
     idle: "Not opened",
     closed: "Closed",
     moved: "Players moved",
-    move: "{name}: {from} → {to}"
+    movedHint: "Announce the new seats to the players.",
+    from: "From",
+    to: "To",
+    noTable: "No table is open yet: tables open as players register."
   },
   players: {
     title: "Players",
-    search: "Search player (Cmd+F)",
-    inPlay: "In play · {seat}",
-    eliminated: "Eliminated · {place}",
+    search: "Search players",
+    searchKeysMac: "⌘F",
+    searchKeys: "Ctrl+F",
+    filter: "Show",
+    filterAll: "All",
+    filterAlive: "In play",
+    filterOut: "Eliminated",
+    status: "Status",
+    place: "Place",
+    inPlay: "In play",
+    eliminated: "Eliminated",
     winner: "Winner",
+    noMatch: "No player matches “{search}”.",
+    noneInFilter: "No player in this list yet.",
     eliminate: "Eliminate",
     sameHand: "Eliminated in the same hand…",
     sameHandHint: "Tick every player eliminated in this hand. Enter each starting stack to rank them (the bigger stack finishes higher), or none for a tie.",
@@ -334,6 +383,8 @@ export const en = {
     startStackOptional: "Starting stack (optional)",
     eliminateSelected: { one: "Eliminate {count} player", other: "Eliminate {count} players" },
     select: "Select {name}",
+    summary: "Field",
+    entries: "Entries",
     reviveTitle: "Revive eliminated player",
     reviveHint: "Corrects a mistaken elimination that can no longer be undone.",
     selectEliminated: "Select eliminated player",
@@ -356,6 +407,7 @@ export const en = {
     apply: "Apply",
     balanced: "Tables are balanced.",
     manual: "Manual move",
+    manualHint: "Moves one player to an empty seat, for a seat change or a correction.",
     move: "Move"
   },
   clock: {
@@ -371,13 +423,18 @@ export const en = {
     nextBreakIn: "Next break in {duration}",
     noBreakLeft: "No break left",
     structureEndsIn: "Structure ends in {duration}",
+    breakIn: "Break in",
+    endsIn: "Structure ends in",
+    none: "None left",
     schedule: "Upcoming levels",
+    starts: "Starts",
     startsAt: "at {time}",
     startsIn: "in {duration}",
     endOfStructure: "End of structure",
     levelLabel: "Level {n}",
     breakLabel: "Break",
     blinds: "{sb}/{bb}",
+    blindsLabel: "Blinds",
     ante_classic: "Ante {amount}",
     ante_big_blind: "BBA {amount}",
     minutes: "{count} min"
@@ -409,10 +466,12 @@ export const en = {
     exit: "Exit display",
     exitKey: "Esc",
     preview: "Display preview",
+    previewHint: "What the players see on the TV.",
     openWindow: "Open display window"
   },
   exports: {
     title: "Exports",
+    hint: "The ranking as it stands, as a spreadsheet or a printable page.",
     csv: "Export CSV",
     pdf: "Export PDF",
     finalRanking: "Final ranking",

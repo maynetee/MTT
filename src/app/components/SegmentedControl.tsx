@@ -34,14 +34,7 @@ export function SegmentedControl<T extends string>({
         const selected = segment.value === value;
         return (
           <label key={segment.value} className={selected ? "segment is-selected" : "segment"}>
-            <input
-              type="radio"
-              className="segment-input"
-              name={name}
-              value={segment.value}
-              checked={selected}
-              onChange={() => onChange(segment.value)}
-            />
+            <input type="radio" className="segment-input" name={name} value={segment.value} checked={selected} onChange={() => onChange(segment.value)} />
             {segment.icon && <Icon name={segment.icon} size={16} />}
             <span className="segment-label">{segment.label}</span>
             {segment.count !== undefined && <span className="segment-count">{segment.count}</span>}

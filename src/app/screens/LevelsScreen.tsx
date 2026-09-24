@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import type { EngineError } from "../../engine/types";
 import { useI18n } from "../../i18n";
+import { Button } from "../components/Button";
+import { Section } from "../components/Card";
+import { Callout } from "../components/Callout";
 import { StructureEditor } from "../components/StructureEditor";
 import { useTournament } from "../TournamentContext";
-import { fromDraft, newBreakDraft, newPlayDraft, toDraft, type LevelDraft } from "../utils/structure";
-import { errorRow } from "./SetupScreen";
+import { fromDraft, toDraft, type LevelDraft } from "../utils/structure";
+import { errorRow, StructureActions } from "./SetupScreen";
 
 export default function LevelsScreen() {
   const i18n = useI18n();
@@ -45,40 +48,24 @@ export default function LevelsScreen() {
   };
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <h3>{t("levels.title")}</h3>
-        {!finished && (
-          <div className="button-row">
-            <button className="btn" onClick={() => void run({ type: "next_level" })} disabled={!started} title={t("levels.skipHint")}>
+    <>
+      <Section
+        title={t("levels.title")}
+        description={started ? t("levels.pastLocked") : undefined}
+        flush
+        actions={
+          !finished && (
+            <Button icon="skipForward" onClick={() => void run({ type: "next_level" })} disabled={!started} title={t("levels.skipHint")}>
               {t("levels.skip")}
-            </button>
-            <button className="btn" onClick={() => edit([...rows, newPlayDraft(rows)])}>
-              {t("structure.addLevel")}
-            </button>
-            <button className="btn" onClick={() => edit([...rows, newBreakDraft()])}>
-              {t("structure.addBreak")}
-            </button>
-            {dirty && (
-              <>
-                <button className="btn" onClick={discard}>
-                  {t("levels.discard")}
-                </button>
-                <button className="btn primary" onClick={() => void save()}>
-                  {t("levels.save")}
-                </button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-      {started && <div className="muted">{t("levels.pastLocked")}</div>}
-      {structureWarnings.map((warning, index) => (
-        <div key={index} className="warning-banner" role="status">
-          {i18n.warning(warning)}
-        </div>
-      ))}
-      <div className="levels-scroll">
+            </Button>
+          )
+        }
+      >
+        {structureWarnings.map((warning, index) => (
+          <Callout key={index} tone="warning" role="status">
+            {i18n.warning(warning)}
+          </Callout>
+        ))}
         <StructureEditor
           rows={rows}
           onChange={edit}
@@ -86,7 +73,19 @@ export default function LevelsScreen() {
           currentIndex={currentIndex}
           invalidRows={invalidRows}
         />
-      </div>
-    </div>
+        {!finished && <StructureActions rows={rows} onChange={edit} />}
+      </Section>
+      {dirty && (
+        <div className="action-bar">
+          <span className="action-bar-note">{t("levels.unsaved")}</span>
+          <Button variant="ghost" onClick={discard}>
+            {t("levels.discard")}
+          </Button>
+          <Button variant="primary" icon="check" onClick={() => void save()}>
+            {t("levels.save")}
+          </Button>
+        </div>
+      )}
+    </>
   );
 }

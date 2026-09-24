@@ -84,8 +84,8 @@ describe("MovesScreen suggestions", () => {
     const dialog = screen.getByRole("alertdialog");
     await user.click(within(dialog).getByRole("button", { name: "Break table 3" }));
 
-    const moved = await screen.findByRole("status");
-    expect(within(moved).getByText(/^Eve: Table 3 Seat 1 → Table [12] Seat [34]$/)).toBeInTheDocument();
+    const moved = await screen.findByRole("status", { name: "Players moved" });
+    expect(within(moved).getByRole("row", { name: /^Eve Table 3 Seat 1 Table [12] Seat [34]$/ })).toBeInTheDocument();
     const view = await engine.getView(id);
     expect(view.tables.map((table) => table.status)).toEqual(["open", "open", "closed"]);
   });
@@ -104,7 +104,8 @@ describe("MovesScreen suggestions", () => {
     expect(await screen.findByText("Final table: redraw the 3 remaining players at table 1.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Draw the final table" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent(/Cat: Table 2 Seat 1 → Table 1 Seat \d/);
+    const moved = await screen.findByRole("status", { name: "Players moved" });
+    expect(within(moved).getByRole("row", { name: /^Cat Table 2 Seat 1 Table 1 Seat \d$/ })).toBeInTheDocument();
     const view = await engine.getView(id);
     expect(view.tables.map((table) => [table.status, table.players])).toEqual([
       ["open", 3],

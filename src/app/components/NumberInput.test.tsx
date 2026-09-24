@@ -5,7 +5,17 @@ import { describe, expect, it, vi } from "vitest";
 import { Field } from "./Field";
 import { NumberInput } from "./NumberInput";
 
-function Controlled({ initial, onValue = () => {}, ...props }: { initial: number | null; onValue?: (value: number | null) => void; allowDecimal?: boolean; min?: number; max?: number }) {
+function Controlled({
+  initial,
+  onValue = () => {},
+  ...props
+}: {
+  initial: number | null;
+  onValue?: (value: number | null) => void;
+  allowDecimal?: boolean;
+  min?: number;
+  max?: number;
+}) {
   const [value, setValue] = useState<number | null>(initial);
   return (
     <Field label="Big blind">

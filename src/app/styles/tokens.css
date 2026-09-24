@@ -138,6 +138,9 @@
   --color-puck: #ffffff;
   --color-puck-text: #0c1631;
   --color-puck-ring: #aeb9cc;
+  /* The icon's navy and cream, for the chip dial in both themes. */
+  --color-ink: #0c1631;
+  --color-inlay: #fbf4e6;
 
   --color-focus: #b86e00;
   --color-backdrop: rgb(12 22 49 / 0.42);
@@ -195,6 +198,8 @@
   --color-puck: #f2ecdf;
   --color-puck-text: #0c1631;
   --color-puck-ring: #0c1631;
+  --color-ink: #0c1631;
+  --color-inlay: #f2ecdf;
 
   --color-focus: #f3a83b;
   --color-backdrop: rgb(3 8 20 / 0.66);

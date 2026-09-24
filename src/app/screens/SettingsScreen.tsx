@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { Config } from "../../engine/types";
 import { useI18n } from "../../i18n";
+import { Button } from "../components/Button";
+import { Section } from "../components/Card";
 import { ConfigFields, LateRegFields, sanitizeConfig } from "../components/ConfigForm";
 import { useTournament } from "../TournamentContext";
 
@@ -28,30 +30,26 @@ export default function SettingsScreen() {
   };
 
   return (
-    <div className="settings">
-      <div className="card">
-        <div className="card-header">
-          <h2>{t("settings.title")}</h2>
-          {!finished && (
-            <div className="button-row">
-              {dirty && (
-                <button className="btn" onClick={() => setDirty(false)}>
-                  {t("levels.discard")}
-                </button>
-              )}
-              <button className="btn primary" onClick={() => void save()} disabled={!dirty}>
-                {t("settings.save")}
-              </button>
-            </div>
-          )}
+    <>
+      <div className="setup-grid">
+        <Section title={t("settings.title")} description={started ? t("config.lockedHint") : t("settings.hint")}>
+          <ConfigFields config={config} onChange={edit} started={started} />
+        </Section>
+        <Section title={t("config.lateReg.title")} description={t("config.lateReg.hint")}>
+          <LateRegFields config={config} onChange={edit} />
+        </Section>
+      </div>
+      {dirty && !finished && (
+        <div className="action-bar">
+          <span className="action-bar-note">{t("settings.unsaved")}</span>
+          <Button variant="ghost" onClick={() => setDirty(false)}>
+            {t("levels.discard")}
+          </Button>
+          <Button variant="primary" icon="check" onClick={() => void save()}>
+            {t("settings.save")}
+          </Button>
         </div>
-        <ConfigFields config={config} onChange={edit} started={started} />
-        {started && <div className="muted">{t("config.lockedHint")}</div>}
-      </div>
-      <div className="card">
-        <h3>{t("config.lateReg.title")}</h3>
-        <LateRegFields config={config} onChange={edit} />
-      </div>
-    </div>
+      )}
+    </>
   );
 }

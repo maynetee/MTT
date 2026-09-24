@@ -1,6 +1,13 @@
 import { useRef, useState } from "react";
 import type { SeatRef, View } from "../../engine/types";
 import { useI18n } from "../../i18n";
+import { Button, IconButton } from "../components/Button";
+import { Section, Stat, StatGroup } from "../components/Card";
+import { Checkbox, Field, TextInput } from "../components/Field";
+import { Icon } from "../components/Icon";
+import { NumberInput } from "../components/NumberInput";
+import { Pill } from "../components/Pill";
+import { Table } from "../components/Table";
 import { useClock } from "../hooks/useClock";
 import { useTournament } from "../TournamentContext";
 import { seatsLeft } from "../utils/view";
@@ -41,14 +48,40 @@ function useDeadlineText(view: View, offsetMs: number): string {
   }
 }
 
+/** Where the new player sits, large enough to read out across the desk. */
+function SeatTicket({ name, seat, onDismiss }: { name: string; seat: SeatRef; onDismiss(): void }) {
+  const { t } = useI18n();
+  return (
+    <div className="seat-ticket" role="status">
+      <div className="seat-ticket-head">
+        <Icon name="checkCircle" size={18} />
+        <span>{t("registration.registered")}</span>
+        <IconButton icon="close" size="sm" label={t("common.dismiss")} hint={false} onClick={onDismiss} className="seat-ticket-close" />
+      </div>
+      <p className="seat-ticket-name">{name}</p>
+      <p className="visually-hidden">{t("registration.seatTicket", { table: seat.table, seat: seat.seat })}</p>
+      <div className="seat-ticket-seat" aria-hidden="true">
+        <span>
+          <small>{t("common.table")}</small>
+          <strong>{seat.table}</strong>
+        </span>
+        <span>
+          <small>{t("common.seat")}</small>
+          <strong>{seat.seat}</strong>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function RegistrationScreen() {
   const { t } = useI18n();
   const { view, offsetMs, run } = useTournament();
   const [name, setName] = useState("");
   const [feedback, setFeedback] = useState<{ name: string; seat: SeatRef } | null>(null);
   const [forceSeat, setForceSeat] = useState(false);
-  const [tableNo, setTableNo] = useState(1);
-  const [seatNo, setSeatNo] = useState(1);
+  const [tableNo, setTableNo] = useState<number | null>(1);
+  const [seatNo, setSeatNo] = useState<number | null>(1);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const { registration, phase } = view;
 
@@ -58,7 +91,7 @@ export default function RegistrationScreen() {
     const next = await run({
       type: "register",
       name: trimmed,
-      ...(forceSeat ? { seat: { table: tableNo, seat: seatNo } } : {})
+      ...(forceSeat ? { seat: { table: tableNo ?? 0, seat: seatNo ?? 0 } } : {})
     });
     if (!next) return;
     const player = newestPlayer(next);
@@ -70,119 +103,120 @@ export default function RegistrationScreen() {
   const alive = view.ranking.filter((row) => row.alive);
 
   return (
-    <div className="grid-2">
-      <div className="card">
-        <h2>{t("registration.title")}</h2>
-
-        {feedback && (
-          <div className="feedback-box" role="status">
-            <div className="feedback-title">{t("registration.registered")}</div>
-            <div className="feedback-player">{feedback.name}</div>
-            <div className="feedback-seat">{t("registration.seatFeedback", { table: feedback.seat.table, seat: feedback.seat.seat })}</div>
-            <button className="btn small" onClick={() => setFeedback(null)}>
-              {t("common.dismiss")}
-            </button>
-          </div>
-        )}
-
-        <input
-          ref={inputRef}
-          placeholder={t("registration.placeholder")}
-          aria-label={t("registration.placeholder")}
-          value={name}
-          onChange={(event) => {
-            setName(event.target.value);
-            if (feedback) setFeedback(null);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
+    <div className="registration-layout">
+      <div className="registration-main">
+        <Section title={t("registration.title")}>
+          <form
+            className="register-form"
+            onSubmit={(event) => {
               event.preventDefault();
               void handleAdd();
-            }
-          }}
-          autoFocus
-        />
-        <div className="card">
-          <div className="card-header">
-            <h3>{t("registration.forceSeat")}</h3>
-            <label className="toggle">
-              <input type="checkbox" checked={forceSeat} onChange={(event) => setForceSeat(event.target.checked)} />
-              {t("registration.enabled")}
-            </label>
-          </div>
-          <div className="grid-2">
-            <label>
-              {t("common.table")}
-              <input
-                type="number"
-                min={1}
-                value={tableNo}
-                onChange={(event) => setTableNo(Number(event.target.value))}
-                disabled={!forceSeat}
+            }}
+          >
+            <div className="register-row">
+              <TextInput
+                ref={inputRef}
+                inputSize="lg"
+                placeholder={t("registration.placeholder")}
+                aria-label={t("registration.placeholder")}
+                autoComplete="off"
+                spellCheck={false}
+                value={name}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  if (feedback) setFeedback(null);
+                }}
+                autoFocus
               />
-            </label>
-            <label>
-              {t("common.seat")}
-              <input type="number" min={1} value={seatNo} onChange={(event) => setSeatNo(Number(event.target.value))} disabled={!forceSeat} />
-            </label>
-          </div>
-          <div className="muted">{t("registration.forceSeatHint")}</div>
-        </div>
-        <button className="btn primary" onClick={() => void handleAdd()}>
-          {t("registration.register")}
-        </button>
+              <Button type="submit" variant="primary" size="lg">
+                {t("registration.register")}
+              </Button>
+            </div>
+            <Checkbox label={t("registration.forceSeat")} checked={forceSeat} onChange={(event) => setForceSeat(event.target.checked)} />
+            {forceSeat && (
+              <div className="seat-picker">
+                <Field label={t("common.table")}>
+                  <NumberInput digits={3} min={1} value={tableNo} onChange={setTableNo} />
+                </Field>
+                <Field label={t("common.seat")}>
+                  <NumberInput digits={3} min={1} max={12} value={seatNo} onChange={setSeatNo} />
+                </Field>
+                <p className="field-hint seat-picker-hint">{t("registration.forceSeatHint")}</p>
+              </div>
+            )}
+          </form>
+          {feedback && <SeatTicket name={feedback.name} seat={feedback.seat} onDismiss={() => setFeedback(null)} />}
+        </Section>
       </div>
 
-      <div className="card">
-        <h3>{t("registration.capacity")}</h3>
-        <div className="stats-grid">
-          <div>
-            <div className="stat-value">{view.counts.unique}</div>
-            <div className="stat-label">{t("registration.registeredCount")}</div>
-          </div>
-          <div>
-            <div className="stat-value">{seatsLeft(view)}</div>
-            <div className="stat-label">{t("registration.seatsLeft")}</div>
-          </div>
-          <div>
-            <div className={`pill ${registration.open ? "" : "muted"}`}>
-              {registration.open ? t("registration.open") : t("registration.closed")}
-            </div>
-          </div>
-        </div>
-        <div className="muted">
-          <RegistrationDeadline view={view} offsetMs={offsetMs} />
-          {registration.overrideOpen !== null && ` · ${t("registration.overridden")}`}
-        </div>
-        {phase === "running" && (
-          <div className="button-row">
-            {registration.open ? (
-              <button className="btn" onClick={() => void run({ type: "close_registration" })}>
-                {t("registration.close")}
-              </button>
+      <div className="registration-side">
+        <Section
+          title={t("registration.status")}
+          actions={
+            phase === "running" &&
+            (registration.open ? (
+              <Button onClick={() => void run({ type: "close_registration" })}>{t("registration.close")}</Button>
             ) : (
-              <button className="btn" onClick={() => void run({ type: "reopen_registration" })}>
-                {t("registration.reopen")}
-              </button>
-            )}
+              <Button onClick={() => void run({ type: "reopen_registration" })}>{t("registration.reopen")}</Button>
+            ))
+          }
+        >
+          <div className="registration-status">
+            <Pill tone={registration.open ? "success" : "muted"} dot={registration.open}>
+              {registration.open ? t("registration.open") : t("registration.closed")}
+            </Pill>
+            <span className="registration-deadline">
+              <RegistrationDeadline view={view} offsetMs={offsetMs} />
+            </span>
+            {registration.overrideOpen !== null && <Pill tone="neutral">{t("registration.overridden")}</Pill>}
           </div>
-        )}
-        <h4>{t("registration.players")}</h4>
-        <div className="list">
-          {alive.map((row) => (
-            <div key={row.player} className="list-row">
-              <span>{row.name}</span>
-              <span className="button-row">
-                {row.seat && <span className="muted">{t("common.tableSeatShort", { table: row.seat.table, seat: row.seat.seat })}</span>}
-                {phase === "setup" && (
-                  <button className="btn small" onClick={() => void run({ type: "unregister", player: row.player })}>
-                    {t("registration.remove")}
-                  </button>
-                )}
-              </span>
-            </div>
-          ))}
-        </div>
+          <StatGroup>
+            <Stat label={t("registration.registeredCount")} value={view.counts.unique} />
+            <Stat label={t("registration.seatsLeft")} value={seatsLeft(view)} />
+          </StatGroup>
+        </Section>
+
+        <Section title={t("registration.players")} flush>
+          {alive.length === 0 ? (
+            <p className="muted">{t("registration.empty")}</p>
+          ) : (
+            <Table caption={t("registration.players")} density="compact">
+              <thead>
+                <tr>
+                  <th scope="col">{t("common.player")}</th>
+                  <th scope="col" className="num">
+                    {t("common.seat")}
+                  </th>
+                  {phase === "setup" && (
+                    <th scope="col" className="actions">
+                      <span className="visually-hidden">{t("registration.remove")}</span>
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {alive.map((row) => (
+                  <tr key={row.player}>
+                    <td className="strong">{row.name}</td>
+                    <td className="num muted">{row.seat ? t("common.tableSeatShort", { table: row.seat.table, seat: row.seat.seat }) : t("common.none")}</td>
+                    {phase === "setup" && (
+                      <td className="actions">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`${t("registration.remove")} ${row.name}`}
+                          onClick={() => void run({ type: "unregister", player: row.player })}
+                        >
+                          {t("registration.remove")}
+                        </Button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Section>
       </div>
     </div>
   );

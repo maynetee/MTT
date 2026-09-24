@@ -9,7 +9,15 @@ function renderDialog(props: Partial<ConfirmDialogProps> = {}) {
   const onCancel = vi.fn();
   render(
     <I18nProvider>
-      <ConfirmDialog open title="Break table 2?" message="Its players are redrawn." confirmLabel="Break table 2" onConfirm={onConfirm} onCancel={onCancel} {...props} />
+      <ConfirmDialog
+        open
+        title="Break table 2?"
+        message="Its players are redrawn."
+        confirmLabel="Break table 2"
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+        {...props}
+      />
     </I18nProvider>
   );
   return { onConfirm, onCancel, dialog: screen.getByRole("alertdialog", { name: "Break table 2?" }) };

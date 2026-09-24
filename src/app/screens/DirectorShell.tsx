@@ -1,20 +1,44 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, NavLink, Outlet, useParams } from "react-router-dom";
-import { toEngineError, type Command, type EngineError } from "../../engine/types";
+import { Outlet, useParams } from "react-router-dom";
+import { toEngineError, type Command, type EngineError, type View } from "../../engine/types";
 import { useI18n } from "../../i18n";
-import { AppShell } from "../components/AppShell";
+import { AppShell, PageTitle } from "../components/AppShell";
+import { ButtonLink, Button, IconButton } from "../components/Button";
+import { Callout } from "../components/Callout";
+import { ClockPod } from "../components/ClockPod";
+import { EmptyState } from "../components/EmptyState";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { Pill } from "../components/Pill";
+import { Tabs } from "../components/Tabs";
 import { useTournamentView } from "../hooks/useTournamentView";
 import { TournamentContext, type TournamentContextValue } from "../TournamentContext";
-import { isEditableTarget } from "../utils/keyboard";
+import { isEditableTarget, isMac } from "../utils/keyboard";
 import { playerNames } from "../utils/view";
 
-const TABS = ["levels", "registration", "seating", "players", "moves", "clock", "display", "exports", "settings"] as const;
+/** Live work first, then the setup and output screens. */
+const TAB_GROUPS = [
+  ["registration", "seating", "players", "moves", "clock"],
+  ["levels", "settings", "display", "exports"]
+] as const;
 
 /** `/t/:id/*`: one director shell per tournament id. */
 export function DirectorRoute() {
   const { id = "" } = useParams();
   return <DirectorShell key={id} id={id} />;
+}
+
+/** The one status that matters most at the desk: setup, late registration, or finished. */
+function StatusPill({ view }: { view: View }) {
+  const { t } = useI18n();
+  if (view.phase === "setup") return <Pill tone="neutral">{t("phase.setup")}</Pill>;
+  if (view.phase === "finished") return <Pill tone="neutral">{t("phase.finished")}</Pill>;
+  return view.registration.open ? (
+    <Pill tone="success" dot>
+      {t("header.lateRegOpen")}
+    </Pill>
+  ) : (
+    <Pill tone="muted">{t("header.lateRegClosed")}</Pill>
+  );
 }
 
 export default function DirectorShell({ id }: { id: string }) {
@@ -40,12 +64,14 @@ export default function DirectorShell({ id }: { id: string }) {
     [dispatch]
   );
 
-  // Undo/redo shortcuts, except while typing in a field (native text undo wins there).
+  // Undo/redo shortcuts, except while typing in a field (native text undo wins there) or
+  // while a dialog asks for a decision.
   const runRef = useRef(run);
   runRef.current = run;
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (isEditableTarget(event.target) || isEditableTarget(document.activeElement)) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
       const key = event.key.toLowerCase();
       const command: Command | null =
@@ -65,77 +91,72 @@ export default function DirectorShell({ id }: { id: string }) {
 
   if (!view || !context) {
     return (
-      <AppShell title={<Link to="/">{t("app.allTournaments")}</Link>}>
-        <main className="page">
-          <div className="card">{loadError ? i18n.error(loadError) : t("common.loading")}</div>
-        </main>
+      <AppShell>
+        {loadError ? (
+          <EmptyState
+            icon="alert"
+            title={i18n.error(loadError)}
+            action={
+              <ButtonLink to="/" icon="chevronLeft">
+                {t("app.notFoundAction")}
+              </ButtonLink>
+            }
+          />
+        ) : (
+          <p className="page-loading">{t("common.loading")}</p>
+        )}
       </AppShell>
     );
   }
 
-  const { history, phase } = view;
-  const running = view.clock.running;
+  const { history } = view;
+  const mac = isMac();
   const undoLabel = history.undo ? t("header.undoAction", { action: i18n.action(history.undo) }) : t("header.undo");
   const redoLabel = history.redo ? t("header.redoAction", { action: i18n.action(history.redo) }) : t("header.redo");
-  const undoHint = [
-    t("header.shortcuts", { key: undoLabel }),
-    history.undo?.kind === "clock_changed" ? t("header.clockUndoHint") : null
-  ]
+  const undoHint = [mac ? t("header.undoKeysMac") : t("header.undoKeys"), history.undo?.kind === "clock_changed" ? t("header.clockUndoHint") : null]
     .filter(Boolean)
     .join("\n");
   const finishPending = view.warnings.some((warning) => warning.code === "FINISH_PENDING");
+  const base = `/t/${encodeURIComponent(id)}`;
 
   return (
     <AppShell
-      title={
-        <div className="header-title">
-          <Link to="/">{t("app.allTournaments")}</Link>
-          <strong>{view.config.name}</strong>
-        </div>
-      }
-      center={
-        phase !== "finished" && (
-          <button
-            className={`btn clock-toggle ${running ? "running" : "paused"}`}
-            onClick={() => void run(running ? { type: "pause_clock" } : { type: "start_clock" })}
-          >
-            {running ? t("header.pause") : t("header.start")}
-          </button>
-        )
-      }
+      title={<PageTitle name={view.config.name} />}
+      center={<ClockPod view={view} offsetMs={offsetMs} onStart={() => void run({ type: "start_clock" })} onPause={() => void run({ type: "pause_clock" })} />}
       actions={
         <>
-          <button className="btn" onClick={() => void run({ type: "undo" })} disabled={!history.undo} title={undoHint}>
-            {undoLabel}
-          </button>
-          <button className="btn" onClick={() => void run({ type: "redo" })} disabled={!history.redo} title={redoLabel}>
-            {redoLabel}
-          </button>
+          <span className="history-buttons">
+            <IconButton icon="undo" label={undoLabel} hint={undoHint} onClick={() => void run({ type: "undo" })} disabled={!history.undo} />
+            <IconButton
+              icon="redo"
+              label={redoLabel}
+              hint={mac ? t("header.redoKeysMac") : t("header.redoKeys")}
+              onClick={() => void run({ type: "redo" })}
+              disabled={!history.redo}
+            />
+          </span>
+          <StatusPill view={view} />
         </>
       }
-      status={<div className="status-pill">{t(`phase.${phase}`).toUpperCase()}</div>}
+      nav={<Tabs label={t("app.sections")} groups={TAB_GROUPS.map((group) => group.map((tab) => ({ to: `${base}/${tab}`, label: t(`tabs.${tab}`) })))} />}
     >
       {error && <ErrorBanner message={i18n.error(error, names)} onDismiss={() => setError(null)} />}
       {finishPending && (
-        <div className="warning-banner" role="status">
-          <span>{i18n.warning({ code: "FINISH_PENDING" })}</span>
-          <button className="btn" onClick={() => void run({ type: "close_registration" })}>
-            {t("players.finishPending")}
-          </button>
-        </div>
+        <Callout
+          tone="warning"
+          role="status"
+          action={
+            <Button variant="primary" size="sm" onClick={() => void run({ type: "close_registration" })}>
+              {t("players.finishPending")}
+            </Button>
+          }
+        >
+          {i18n.warning({ code: "FINISH_PENDING" })}
+        </Callout>
       )}
-      <nav className="tabs">
-        {TABS.map((tab) => (
-          <NavLink key={tab} to={`/t/${encodeURIComponent(id)}/${tab}`} className={({ isActive }) => (isActive ? "tab active" : "tab")}>
-            {t(`tabs.${tab}`)}
-          </NavLink>
-        ))}
-      </nav>
-      <main className="page">
-        <TournamentContext.Provider value={context}>
-          <Outlet />
-        </TournamentContext.Provider>
-      </main>
+      <TournamentContext.Provider value={context}>
+        <Outlet />
+      </TournamentContext.Provider>
     </AppShell>
   );
 }

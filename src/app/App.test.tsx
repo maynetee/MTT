@@ -4,13 +4,15 @@ import { describe, expect, it, vi } from "vitest";
 import { register, renderApp, withTournament } from "../test/app";
 import { createTestEngine, tournamentInput } from "../test/wasm";
 
-const playerRow = { selector: ".list-row span" };
+// A player in the registration list (the name alone also shows in the seat ticket).
+const alice = { name: "Alice" };
 
 describe("App", () => {
   it("opens on the tournament list, in demo mode in a browser", async () => {
     renderApp(createTestEngine(), "/");
     expect(await screen.findByRole("heading", { name: "Tournaments" })).toBeInTheDocument();
-    expect(screen.getByText("No tournament yet. Create one to get started.")).toBeInTheDocument();
+    expect(screen.getByText("No tournament yet")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "New tournament" })).toBeInTheDocument();
     expect(screen.getByText("DEMO")).toBeInTheDocument();
   });
 
@@ -42,9 +44,7 @@ describe("App", () => {
     await user.type(bigBlind, "10");
     await user.click(screen.getByRole("button", { name: "Create tournament" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Row 2: the small blind must be more than 0 and the big blind at least the small blind."
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Row 2: the small blind must be more than 0 and the big blind at least the small blind.");
     expect(bigBlind.closest(".level-row")).toHaveClass("invalid");
   });
 
@@ -54,10 +54,10 @@ describe("App", () => {
     renderApp(engine, "/");
 
     await user.click(await screen.findByRole("button", { name: "Delete Test event" }));
-    expect(screen.getByRole("alertdialog")).toHaveTextContent("Delete “Test event”?");
-    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Delete “Test event”?" });
+    await user.click(within(dialog).getByRole("button", { name: "Delete tournament" }));
 
-    expect(await screen.findByText("No tournament yet. Create one to get started.")).toBeInTheDocument();
+    expect(await screen.findByText("No tournament yet")).toBeInTheDocument();
     expect(await engine.listTournaments()).toEqual([]);
   });
 
@@ -68,20 +68,20 @@ describe("App", () => {
 
     const nameInput = await screen.findByPlaceholderText("Player name");
     await user.type(nameInput, "Alice{Enter}");
-    expect(await screen.findByText("Alice", playerRow)).toBeInTheDocument();
+    expect(await screen.findByRole("cell", alice)).toBeInTheDocument();
 
     await user.type(nameInput, "Bo");
     await user.keyboard("{Meta>}z{/Meta}");
-    expect(screen.getByText("Alice", playerRow)).toBeInTheDocument();
+    expect(screen.getByRole("cell", alice)).toBeInTheDocument();
 
     await user.click(document.body);
     expect(document.body).toHaveFocus();
     await user.keyboard("{Meta>}z{/Meta}");
-    await waitFor(() => expect(screen.queryByText("Alice", playerRow)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("cell", alice)).not.toBeInTheDocument());
 
     // Shift+Cmd+Z redoes.
     await user.keyboard("{Meta>}{Shift>}z{/Shift}{/Meta}");
-    expect(await screen.findByText("Alice", playerRow)).toBeInTheDocument();
+    expect(await screen.findByRole("cell", alice)).toBeInTheDocument();
   });
 
   it("labels Undo and Redo with the action from the history", async () => {
@@ -124,7 +124,7 @@ describe("App", () => {
     // The host still reports the old data: the offer does not come back.
     await engine.deleteTournament((await engine.listTournaments())[0].id);
     renderApp(engine, "/");
-    expect(await screen.findByText("No tournament yet. Create one to get started.")).toBeInTheDocument();
+    expect(await screen.findByText("No tournament yet")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Import from the previous version" })).not.toBeInTheDocument();
   });
 

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import type { Ante, LevelRow, View } from "../../engine/types";
 import { useI18n, type I18n } from "../../i18n";
+import { Button } from "../components/Button";
+import { Section } from "../components/Card";
 import { useEngine } from "../EngineContext";
 import { useClock } from "../hooks/useClock";
 import { useTournamentView } from "../hooks/useTournamentView";
@@ -192,15 +194,17 @@ export default function DisplayScreen({ view, offsetMs, preview = false }: Displ
 
   if (preview) {
     return (
-      <div className="card">
-        <div className="card-header">
-          <h2>{t("display.preview")}</h2>
-          <button className="btn" onClick={() => void engine.openDisplayWindow(view.id).catch(() => undefined)}>
+      <Section
+        title={t("display.preview")}
+        description={t("display.previewHint")}
+        actions={
+          <Button icon="external" onClick={() => void engine.openDisplayWindow(view.id).catch(() => undefined)}>
             {t("display.openWindow")}
-          </button>
-        </div>
+          </Button>
+        }
+      >
         <div className="display-wrapper">{content}</div>
-      </div>
+      </Section>
     );
   }
 
@@ -216,7 +220,12 @@ export function DisplayPreview() {
 function DisplayWindow({ id }: { id: string }) {
   const { t, error } = useI18n();
   const { view, offsetMs, loadError } = useTournamentView(id);
-  if (!view) return <div className="display" data-theme="dark">{loadError ? error(loadError) : t("common.loading")}</div>;
+  if (!view)
+    return (
+      <div className="display" data-theme="dark">
+        {loadError ? error(loadError) : t("common.loading")}
+      </div>
+    );
   return <DisplayScreen view={view} offsetMs={offsetMs} />;
 }
 
