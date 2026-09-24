@@ -81,10 +81,36 @@ fn context<R: Runtime>() -> tauri::Context<R> {
     tauri::generate_context!()
 }
 
+/// End-to-end test builds (`--features e2e`): an embedded WebDriver server, on the port in
+/// `TAURI_WEBDRIVER_PORT`, lets WebdriverIO drive both windows (e2e/desktop). Its permission
+/// is granted here rather than in `capabilities/`, which must stay valid without the plugin.
+#[cfg(feature = "e2e")]
+mod e2e {
+    use tauri::ipc::CapabilityBuilder;
+    use tauri::{Manager, Runtime};
+
+    pub fn plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
+        tauri_plugin_wdio_webdriver::init()
+    }
+
+    pub fn grant<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
+        app.add_capability(
+            CapabilityBuilder::new("e2e-webdriver")
+                .windows(["main", "display"])
+                .permission("wdio-webdriver:default"),
+        )
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    with_handlers(tauri::Builder::default())
+    let builder = with_handlers(tauri::Builder::default());
+    #[cfg(feature = "e2e")]
+    let builder = builder.plugin(e2e::plugin());
+    builder
         .setup(|app| {
+            #[cfg(feature = "e2e")]
+            e2e::grant(app)?;
             let host = open_host(&data_dir(app.handle())?)?;
             app.manage(host);
             app.manage(LegacySource {

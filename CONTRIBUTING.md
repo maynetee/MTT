@@ -41,6 +41,18 @@ CI runs the same checks on every pull request. `cargo test` regenerates the Type
 [docs/architecture.md](docs/architecture.md) explains how the pieces fit together and lists the
 steps to add a new command.
 
+### End-to-end tests
+
+- `npm run e2e` builds the browser demo and runs `e2e/web` with Playwright against
+  `vite preview` (Chromium: `npx playwright install chromium` once). CI runs it on every pull
+  request.
+- `npm run e2e:desktop` builds the desktop app in debug with the `e2e` cargo feature, which
+  embeds a WebDriver server (tauri-plugin-wdio-webdriver), then drives it with WebdriverIO
+  (`e2e/desktop`). The same setup runs on macOS and Linux, with no external driver; on a
+  Linux machine without a display, run it under `xvfb-run -a`. Each run uses a fresh
+  temporary data directory, never your tournaments. The windows open on screen while it runs.
+  CI runs it on Linux on `main` and on demand. Release builds never include the feature.
+
 ## Guidelines
 
 - One topic per pull request, linked to an issue (`Closes #123`).
