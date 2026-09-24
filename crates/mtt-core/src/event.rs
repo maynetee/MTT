@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::clock::{Clock, ClockReason};
 use crate::command::MoveReason;
 use crate::config::Config;
-use crate::ids::{BustGroup, PlayerId, SeatRef, Seq, TableNo, TournamentId};
+use crate::ids::{BustGroup, PlayerId, SeatNo, SeatRef, Seq, TableNo, TournamentId};
 use crate::money::Chips;
 use crate::structure::Level;
 
@@ -39,6 +39,15 @@ pub struct Bust {
     pub player: PlayerId,
     pub start_stack: Option<Chips>,
     pub seat: SeatRef,
+}
+
+/// A player's seat change inside a table break or final table draw.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
+pub struct SeatMove {
+    pub player: PlayerId,
+    pub from: SeatRef,
+    pub to: SeatRef,
 }
 
 /// Domain events.
@@ -100,6 +109,23 @@ pub enum Event {
         #[serde(default)]
         starts_tournament: bool,
     },
+    #[serde(rename = "button_set")]
+    ButtonSet { table: TableNo, seat: SeatNo },
+    #[serde(rename = "table_opened")]
+    TableOpened { table: TableNo },
+    /// The table closes after its players are dealt to the other tables.
+    #[serde(rename = "table_broken")]
+    TableBroken {
+        table: TableNo,
+        moves: Vec<SeatMove>,
+    },
+    /// Everyone redrawn at `table`; the `closed` tables close.
+    #[serde(rename = "final_table_formed")]
+    FinalTableFormed {
+        table: TableNo,
+        moves: Vec<SeatMove>,
+        closed: Vec<TableNo>,
+    },
 }
 
 impl Event {
@@ -117,6 +143,22 @@ impl Event {
             Event::RegistrationOverridden { .. } => "registration_overridden",
             Event::TournamentFinished { .. } => "tournament_finished",
             Event::ClockChanged { .. } => "clock_changed",
+            Event::ButtonSet { .. } => "button_set",
+            Event::TableOpened { .. } => "table_opened",
+            Event::TableBroken { .. } => "table_broken",
+            Event::FinalTableFormed { .. } => "final_table_formed",
+        }
+    }
+
+    /// Table this event is about, for table operations and moves.
+    pub fn table(&self) -> Option<TableNo> {
+        match self {
+            Event::ButtonSet { table, .. }
+            | Event::TableOpened { table }
+            | Event::TableBroken { table, .. }
+            | Event::FinalTableFormed { table, .. } => Some(*table),
+            Event::PlayerMoved { to, .. } => Some(to.table),
+            _ => None,
         }
     }
 

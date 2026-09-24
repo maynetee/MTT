@@ -165,6 +165,13 @@ pub fn duration_at(levels: &[Level], index: usize) -> i64 {
     levels.get(index).map_or(0, Level::duration_ms)
 }
 
+/// Total duration of `levels`.
+pub fn total_ms(levels: &[Level]) -> i64 {
+    levels
+        .iter()
+        .fold(0i64, |sum, l| sum.saturating_add(l.duration_ms()))
+}
+
 /// Big blind in force at `index`: the level itself, or the next play level during a break.
 pub fn reference_big_blind(levels: &[Level], index: usize) -> Option<Chips> {
     levels.iter().skip(index).find_map(Level::big_blind)

@@ -58,6 +58,10 @@ pub fn decide(state: &State, cmd: &Command, ctx: &Ctx) -> Result<Event, DomainEr
         | Command::JumpToNextBreak {}
         | Command::AdjustTime { .. }
         | Command::SetRemaining { .. } => clock::decide(state, cmd, now),
+        Command::SetButton { table, seat } => seating::decide_set_button(state, *table, *seat),
+        Command::OpenTable { table } => seating::decide_open_table(state, *table),
+        Command::BreakTable { table } => seating::decide_break(state, *table, &mut rng),
+        Command::FormFinalTable { table } => seating::decide_final_table(state, *table, &mut rng),
         Command::Undo {} | Command::Redo {} => Err(DomainError::Internal {
             reason: "undo and redo are handled by the engine".to_owned(),
         }),

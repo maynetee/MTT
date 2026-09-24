@@ -8,6 +8,7 @@ use crate::ids::{PlayerId, SeatNo, SeatRef, Seq, TableNo, TournamentId};
 use crate::money::Chips;
 use crate::ranking;
 use crate::registration;
+use crate::seating::{self, Suggestions};
 use crate::state::{Phase, State, TableStatus};
 use crate::structure::{self, Ante, Level};
 use crate::warning::Warning;
@@ -34,6 +35,8 @@ pub struct ActionLabel {
     pub kind: String,
     /// Names of the players involved.
     pub names: Vec<String>,
+    /// Table involved, for table operations and moves.
+    pub table: Option<TableNo>,
 }
 
 /// Undo/redo cursor.
@@ -170,6 +173,9 @@ pub struct TableView {
     pub status: TableStatus,
     pub players: u8,
     pub button: Option<SeatNo>,
+    /// Blinds of the next hand, when the button is known.
+    pub next_sb: Option<SeatNo>,
+    pub next_bb: Option<SeatNo>,
     pub seats: Vec<SeatView>,
 }
 
@@ -193,6 +199,7 @@ pub struct View {
     pub itm: Itm,
     pub ranking: Vec<RankingRow>,
     pub tables: Vec<TableView>,
+    pub suggestions: Suggestions,
     pub warnings: Vec<Warning>,
 }
 
@@ -231,6 +238,7 @@ pub fn view(state: &State, now_ms: i64) -> View {
         itm: itm(state.phase, counts.alive, places_paid),
         ranking: ranking_rows(state, registration_open, places_paid),
         tables: tables(state),
+        suggestions: seating::suggestions(state),
         counts,
     }
 }
@@ -380,6 +388,8 @@ fn tables(state: &State) -> Vec<TableView> {
             status: t.status,
             players: t.count() as u8,
             button: t.button,
+            next_sb: seating::blinds(t).map(|b| b.small),
+            next_bb: seating::blinds(t).map(|b| b.big),
             seats: (1..=t.seats)
                 .map(SeatNo)
                 .map(|seat| {
@@ -408,7 +418,10 @@ fn warnings(state: &State, registration_open: bool, clock: &ClockView) -> Vec<Wa
     if registration_open && state.alive_count() == 1 {
         out.push(Warning::FinishPending);
     }
-    let levels_left = state.structure.len() - 1 - usize::from(clock.level_index);
+    let levels_left = state
+        .structure
+        .len()
+        .saturating_sub(1 + usize::from(clock.level_index));
     if levels_left == 0 && clock.remaining_ms == 0 {
         out.push(Warning::StructureExhausted);
     } else if levels_left <= ENDING_LEVELS {

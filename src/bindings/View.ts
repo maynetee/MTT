@@ -10,6 +10,7 @@ import type { PhaseName } from "./PhaseName";
 import type { PlayerId } from "./PlayerId";
 import type { RankingRow } from "./RankingRow";
 import type { RegistrationView } from "./RegistrationView";
+import type { Suggestions } from "./Suggestions";
 import type { TableView } from "./TableView";
 import type { TournamentId } from "./TournamentId";
 import type { Warning } from "./Warning";
@@ -21,4 +22,4 @@ export type View = { generated_at_ms: number, id: TournamentId, phase: PhaseName
 /**
  * Places paid, capped by the number of players.
  */
-places_paid: number, itm: Itm, ranking: Array<RankingRow>, tables: Array<TableView>, warnings: Array<Warning>, };
+places_paid: number, itm: Itm, ranking: Array<RankingRow>, tables: Array<TableView>, suggestions: Suggestions, warnings: Array<Warning>, };

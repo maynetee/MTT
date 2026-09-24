@@ -4,9 +4,11 @@ import type { Config } from "./Config";
 import type { Level } from "./Level";
 import type { MoveReason } from "./MoveReason";
 import type { PlayerId } from "./PlayerId";
+import type { SeatNo } from "./SeatNo";
 import type { SeatRef } from "./SeatRef";
+import type { TableNo } from "./TableNo";
 
 /**
  * Everything the director can do.
  */
-export type Command = { "type": "update_config", config: Config, } | { "type": "update_structure", levels: Array<Level>, } | { "type": "register", name: string, seat?: SeatRef, } | { "type": "unregister", player: PlayerId, } | { "type": "bust_players", busts: Array<BustInput>, } | { "type": "revive_player", player: PlayerId, seat: SeatRef, } | { "type": "move_player", player: PlayerId, to: SeatRef, reason?: MoveReason, } | { "type": "close_registration", } | { "type": "reopen_registration", } | { "type": "finish_tournament", } | { "type": "start_clock", } | { "type": "pause_clock", } | { "type": "next_level", } | { "type": "prev_level", } | { "type": "jump_to", level: number, } | { "type": "jump_to_next_break", } | { "type": "adjust_time", delta_ms: number, } | { "type": "set_remaining", ms: number, } | { "type": "undo", } | { "type": "redo", };
+export type Command = { "type": "update_config", config: Config, } | { "type": "update_structure", levels: Array<Level>, } | { "type": "register", name: string, seat?: SeatRef, } | { "type": "unregister", player: PlayerId, } | { "type": "bust_players", busts: Array<BustInput>, } | { "type": "revive_player", player: PlayerId, seat: SeatRef, } | { "type": "move_player", player: PlayerId, to: SeatRef, reason?: MoveReason, } | { "type": "close_registration", } | { "type": "reopen_registration", } | { "type": "finish_tournament", } | { "type": "start_clock", } | { "type": "pause_clock", } | { "type": "next_level", } | { "type": "prev_level", } | { "type": "jump_to", level: number, } | { "type": "jump_to_next_break", } | { "type": "adjust_time", delta_ms: number, } | { "type": "set_remaining", ms: number, } | { "type": "set_button", table: TableNo, seat: SeatNo, } | { "type": "open_table", table: TableNo, } | { "type": "break_table", table: TableNo, } | { "type": "form_final_table", table: TableNo, } | { "type": "undo", } | { "type": "redo", };

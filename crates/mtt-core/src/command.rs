@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
-use crate::ids::{PlayerId, SeatRef, TournamentId};
+use crate::ids::{PlayerId, SeatNo, SeatRef, TableNo, TournamentId};
 use crate::money::Chips;
 use crate::structure::Level;
 
@@ -117,6 +117,17 @@ pub enum Command {
     AdjustTime { delta_ms: i64 },
     #[serde(rename = "set_remaining")]
     SetRemaining { ms: i64 },
+    /// Button position for the next hand (may be an empty seat).
+    #[serde(rename = "set_button")]
+    SetButton { table: TableNo, seat: SeatNo },
+    #[serde(rename = "open_table")]
+    OpenTable { table: TableNo },
+    /// Deals the table's players to the other open tables and closes it.
+    #[serde(rename = "break_table")]
+    BreakTable { table: TableNo },
+    /// Redraws every remaining player at `table` and closes the others.
+    #[serde(rename = "form_final_table")]
+    FormFinalTable { table: TableNo },
     #[serde(rename = "undo")]
     Undo {},
     #[serde(rename = "redo")]

@@ -3,10 +3,12 @@
 mod common;
 
 use common::*;
+use mtt_core::seating::BalanceStep;
 use mtt_core::state::TableStatus;
 use mtt_core::view::Itm;
 use mtt_core::{
-    Clock, Command, Config, Ctx, Deadline, DomainError, Phase, SeatRef, TableNo, Warning, decide,
+    Clock, Command, Config, Deadline, DomainError, MoveReason, Phase, PlayerId, SeatNo, SeatRef,
+    TableNo, Warning,
 };
 
 #[test]
@@ -69,24 +71,19 @@ fn forced_seat_rejects_closed_table() {
     let mut h = Harness::standard(6, 3);
     h.register_at("A", 1, 1);
     h.register_at("B", 2, 1);
-    let mut state = h.agg.state().clone();
-    let table = state.tables.get_mut(&TableNo(2)).unwrap();
-    table.occupants.clear();
-    table.status = TableStatus::Closed;
-    let cmd = Command::Register {
-        name: "C".into(),
-        seat: Some(SeatRef::new(2, 3)),
-    };
+    h.ok(Command::BreakTable { table: TableNo(2) });
     assert_eq!(
-        decide(&state, &cmd, &Ctx::new(h.now, 1)),
-        Err(DomainError::TableClosed { table: TableNo(2) })
+        h.err(Command::Register {
+            name: "C".into(),
+            seat: Some(SeatRef::new(2, 3)),
+        }),
+        DomainError::TableClosed { table: TableNo(2) }
     );
     // A never-opened table is fine: the forced seat opens it.
-    let idle = Command::Register {
-        name: "C".into(),
-        seat: Some(SeatRef::new(3, 3)),
-    };
-    assert!(decide(&state, &idle, &Ctx::new(h.now, 1)).is_ok());
+    h.register_at("C", 3, 3);
+    // A broken table must be reopened explicitly.
+    h.ok(Command::OpenTable { table: TableNo(2) });
+    h.register_at("D", 2, 3);
 }
 
 #[test]
@@ -373,4 +370,142 @@ fn adjust_below_zero_advances() {
     assert_eq!(level_and_remaining(&h), (1, 0));
     h.ok(Command::StartClock {});
     assert_eq!(level_and_remaining(&h), (2, 10 * MIN));
+}
+
+fn set_button(h: &mut Harness, table: u16, seat: u8) {
+    h.ok(Command::SetButton {
+        table: TableNo(table),
+        seat: SeatNo(seat),
+    });
+}
+
+fn counts(h: &Harness) -> Vec<(u16, u8)> {
+    h.view()
+        .tables
+        .iter()
+        .filter(|t| t.status == TableStatus::Open)
+        .map(|t| (t.table.0, t.players))
+        .collect()
+}
+
+#[test]
+fn balance_moves_bb_due_player() {
+    let mut h = Harness::standard(9, 2);
+    for seat in 1..=9 {
+        h.register_at(&format!("A{seat}"), 1, seat);
+    }
+    for seat in [1, 2, 4, 6, 7] {
+        h.register_at(&format!("B{seat}"), 2, seat);
+    }
+    h.start();
+    set_button(&mut h, 1, 3);
+    set_button(&mut h, 2, 1);
+    let table = &h.view().tables[0];
+    assert_eq!(
+        (table.next_sb, table.next_bb),
+        (Some(SeatNo(4)), Some(SeatNo(5)))
+    );
+    // Table 1's next big blind goes to seat 3 of table 2, between its blinds (2 and 4):
+    // the worst position, big blind on the very next hand.
+    let step = |player: u32, from_seat: u8, to_seat: u8| BalanceStep {
+        from_table: TableNo(1),
+        to_table: TableNo(2),
+        player: Some(PlayerId(player)),
+        from_seat: Some(SeatNo(from_seat)),
+        to_seat: Some(SeatNo(to_seat)),
+        waits_for_bb: false,
+        needs_button: Vec::new(),
+    };
+    assert_eq!(
+        h.view().suggestions.balance,
+        vec![step(5, 5, 3), step(6, 6, 5)]
+    );
+    h.ok(Command::MovePlayer {
+        player: PlayerId(5),
+        to: SeatRef::new(2, 3),
+        reason: Some(MoveReason::Balance),
+    });
+    // The plan is recomputed after each move.
+    assert_eq!(h.view().suggestions.balance, vec![step(6, 6, 5)]);
+    h.ok(Command::MovePlayer {
+        player: PlayerId(6),
+        to: SeatRef::new(2, 5),
+        reason: Some(MoveReason::Balance),
+    });
+    assert!(h.view().suggestions.balance.is_empty());
+    assert_eq!(counts(&h), vec![(1, 7), (2, 7)]);
+}
+
+#[test]
+fn break_table_balances() {
+    let mut h = Harness::standard(9, 3);
+    for (table, players) in [(1, 6), (2, 5), (3, 3)] {
+        for seat in 1..=players {
+            h.register_at(&format!("T{table}S{seat}"), table, seat);
+        }
+    }
+    h.start();
+    set_button(&mut h, 3, 2);
+    // 14 players fit on two tables of 9: break the highest-numbered table.
+    assert_eq!(h.view().suggestions.break_table, Some(TableNo(3)));
+    h.ok(Command::BreakTable { table: TableNo(3) });
+    // Dealt to the tables with the fewest players: 6 + 1 and 5 + 2.
+    assert_eq!(counts(&h), vec![(1, 7), (2, 7)]);
+    let broken = &h.view().tables[2];
+    assert_eq!(
+        (broken.status, broken.players, broken.button),
+        (TableStatus::Closed, 0, None)
+    );
+    assert_eq!(h.view().suggestions, Default::default());
+    assert_eq!(
+        h.err(Command::BreakTable { table: TableNo(3) }),
+        DomainError::TableNotOpen { table: TableNo(3) }
+    );
+    check_invariants(h.agg.state(), &h.view());
+}
+
+#[test]
+fn final_table_redraw_closes_other_tables() {
+    let mut h = Harness::standard(6, 3);
+    let ids = h.register_many(14);
+    h.start();
+    set_button(&mut h, 2, 1);
+    for id in &ids[..7] {
+        h.bust(&[*id]);
+    }
+    assert_eq!(h.view().suggestions.break_table, Some(TableNo(3)));
+    assert_eq!(
+        h.err(Command::FormFinalTable { table: TableNo(2) }),
+        DomainError::TooManyForFinalTable { alive: 7, seats: 6 }
+    );
+    h.bust(&[ids[7]]);
+    // Six left: the table that would be broken last hosts the final table.
+    assert_eq!(h.view().suggestions.final_table, Some(TableNo(1)));
+    h.ok(Command::FormFinalTable { table: TableNo(2) });
+    let view = h.view();
+    let statuses: Vec<_> = view
+        .tables
+        .iter()
+        .map(|t| (t.status, t.players, t.button))
+        .collect();
+    assert_eq!(
+        statuses,
+        vec![
+            (TableStatus::Closed, 0, None),
+            (TableStatus::Open, 6, None),
+            (TableStatus::Closed, 0, None)
+        ]
+    );
+    let alive_tables: Vec<_> = view
+        .ranking
+        .iter()
+        .filter(|r| r.alive)
+        .map(|r| r.seat.map(|s| s.table))
+        .collect();
+    assert_eq!(alive_tables, vec![Some(TableNo(2)); 6]);
+    assert_eq!(view.suggestions, Default::default());
+    assert!(h.agg.state().final_table_formed);
+    h.ok(Command::Undo {});
+    assert!(!h.agg.state().final_table_formed);
+    assert_eq!(h.view().suggestions.final_table, Some(TableNo(1)));
 }

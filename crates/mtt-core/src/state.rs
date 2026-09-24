@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::clock::Clock;
 use crate::config::Config;
-use crate::event::{Event, Finish};
+use crate::event::{Event, Finish, SeatMove};
 use crate::ids::{BustGroup, PlayerId, SeatNo, SeatRef, TableNo, TournamentId};
 use crate::money::Chips;
 use crate::name;
@@ -184,7 +184,7 @@ impl State {
     }
 
     /// Tables currently open.
-    pub fn open_tables(&self) -> impl Iterator<Item = &Table> {
+    pub fn open_tables(&self) -> impl DoubleEndedIterator<Item = &Table> {
         self.tables
             .values()
             .filter(|t| t.status == TableStatus::Open)
@@ -253,6 +253,35 @@ impl State {
         Ok(())
     }
 
+    fn table_mut(&mut self, no: TableNo) -> Result<&mut Table, ApplyError> {
+        self.tables.get_mut(&no).ok_or(ApplyError("unknown table"))
+    }
+
+    /// Moves several players at once: everyone leaves first, then everyone sits.
+    fn relocate(&mut self, moves: &[SeatMove]) -> Result<(), ApplyError> {
+        for m in moves {
+            if self.player(m.player).and_then(Player::seat) != Some(m.from) {
+                return Err(ApplyError("player not at seat"));
+            }
+            self.unseat_player(m.player, m.from)?;
+        }
+        for m in moves {
+            self.seat_player(m.player, m.to)?;
+            self.player_mut(m.player)?.status = PlayerStatus::Seated { seat: m.to };
+        }
+        Ok(())
+    }
+
+    fn close_table(&mut self, no: TableNo) -> Result<(), ApplyError> {
+        let table = self.table_mut(no)?;
+        if !table.occupants.is_empty() {
+            return Err(ApplyError("closing a table with players"));
+        }
+        table.status = TableStatus::Closed;
+        table.button = None;
+        Ok(())
+    }
+
     fn finish(&mut self, finish: &Finish) {
         self.phase = Phase::Finished {
             winner: finish.winner,
@@ -270,6 +299,9 @@ pub fn apply(state: &mut State, event: &Event) -> Result<(), ApplyError> {
             state.sync_tables();
         }
         Event::StructureUpdated { levels, clock } => {
+            if levels.is_empty() {
+                return Err(ApplyError("empty structure"));
+            }
             state.structure = levels.clone();
             state.clock = *clock;
         }
@@ -352,6 +384,26 @@ pub fn apply(state: &mut State, event: &Event) -> Result<(), ApplyError> {
             if *starts_tournament {
                 state.phase = Phase::Running;
             }
+        }
+        Event::ButtonSet { table, seat } => state.table_mut(*table)?.button = Some(*seat),
+        Event::TableOpened { table } => state.table_mut(*table)?.status = TableStatus::Open,
+        Event::TableBroken { table, moves } => {
+            state.relocate(moves)?;
+            state.close_table(*table)?;
+        }
+        Event::FinalTableFormed {
+            table,
+            moves,
+            closed,
+        } => {
+            state.relocate(moves)?;
+            for no in closed {
+                state.close_table(*no)?;
+            }
+            let target = state.table_mut(*table)?;
+            target.status = TableStatus::Open;
+            target.button = None;
+            state.final_table_formed = true;
         }
     }
     Ok(())

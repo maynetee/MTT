@@ -16,7 +16,9 @@ pub fn deadline_in_ms(state: &State, now_ms: i64) -> Option<i64> {
     let levels = &state.structure;
     match state.config.late_reg {
         Deadline::Manual => None,
-        Deadline::Elapsed { ms } => Some(ms - clock::elapsed_ms(&state.clock, levels, now_ms)),
+        Deadline::Elapsed { ms } => {
+            Some(ms.saturating_sub(clock::elapsed_ms(&state.clock, levels, now_ms)))
+        }
         Deadline::EndOfPlayLevel { n, through_break } => {
             let mut close = structure::play_level_index(levels, n)? + 1;
             if through_break && levels.get(close).is_some_and(Level::is_break) {
@@ -26,11 +28,8 @@ pub fn deadline_in_ms(state: &State, now_ms: i64) -> Option<i64> {
             if eff.level >= close {
                 return Some(0);
             }
-            let between: i64 = levels[eff.level + 1..close]
-                .iter()
-                .map(Level::duration_ms)
-                .sum();
-            Some(eff.remaining_ms + between)
+            let between = structure::total_ms(&levels[eff.level + 1..close]);
+            Some(eff.remaining_ms.saturating_add(between))
         }
     }
 }

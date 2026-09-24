@@ -95,6 +95,37 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
 - `Unregister` only in setup. `MovePlayer { player, to, reason? }` to any empty seat of a
   non-closed table.
 
+## Tables, buttons and balancing
+
+- `Table.button` is the button seat for the next hand, set by the director (`SetButton`,
+  open tables only; an empty seat is a dead button). Counting occupied seats clockwise
+  after it (the button seat last): next small blind = 1st, big blind = 2nd; heads-up with
+  the button occupied, the button posts the small blind and the other player the big
+  blind. The view shows `next_sb` / `next_bb` per table.
+- `OpenTable` opens an idle or broken table (`TABLE_ALREADY_OPEN`).
+- Balance plan (`seating::balance_plan`, a query, no event): while the largest and the
+  smallest open tables differ by at least `balance_trigger`, move the next big blind of the
+  largest table (ties: lowest number) to the worst position of the smallest (ties: lowest
+  number). Worst position: walking clockwise from the first occupied seat after the
+  receiver's button, the first empty seat (between small and big blind it takes the big
+  blind immediately); seats from the button up to the small blind come last and are
+  flagged `waits_for_bb`. Unknown buttons give steps with `player` / `to_seat` = `None` and
+  `needs_button`. Before the start buttons are ignored (highest seat to lowest free seat).
+  The director confirms each step with `MovePlayer { reason: balance }`; the plan is
+  recomputed after every move. A player is never moved twice by one plan.
+- Suggestions (view), highest priority only: final table (running, 2 <= alive <=
+  `final_table_size`, not yet formed, and the field was ever larger than a final table),
+  on the table that would be broken last; else break a table (at least two open and the
+  others can seat everyone: `alive <= (open - 1) * seats_per_table`), the first open table
+  in `break_order` then highest number first; else the balance plan.
+- `BreakTable { table }`: the table's players are shuffled and dealt one by one to the
+  remaining table with the fewest players (ties drawn) at a random empty seat, blinds and
+  button included (TDA). The table closes and its button is cleared (`TABLE_NOT_OPEN`,
+  `LAST_TABLE`, `NOT_ENOUGH_SEATS`).
+- `FormFinalTable { table }`: every remaining player is redrawn to a random seat at
+  `table` (not closed; an idle table opens), every other open table closes, the button is
+  cleared for the director to set after the draw (`TOO_MANY_FOR_FINAL_TABLE`).
+
 ## Busts, ranking, finish
 
 - `BustPlayers { busts: [{ player, start_stack? }] }` is one hand = one bust group.
@@ -157,8 +188,8 @@ Late registration deadlines, evaluated at `now` when running without override:
 
 ## View
 
-`view(state, now_ms)`: phase, winner, history (head, undo/redo labels with event kind and
-player names), config, levels with play numbers, clock (level index, play level, break,
+`view(state, now_ms)`: phase, winner, history (head, undo/redo labels with event kind,
+player names and table), config, levels with play numbers, clock (level index, play level, break,
 running, blinds and ante, duration, remaining, `ends_at_ms`, overtime, next level, next
 break, schedule, structure end, `recompute_at_ms` = next level change or registration
 close while running: the UI counts down locally and refetches then), registration (open,
@@ -166,8 +197,9 @@ override, deadline, `closes_in_ms`, `closes_at_ms`), counts (unique, entries, al
 (starting stack, in play = sum of stacks bought, average, average in big blinds x100 using
 the next play level during a break), places paid (capped by N), ITM status
 (`not_yet { to_money }` / `bubble` when alive == paid + 1 / `in_money`), ranking rows (alive
-first, then by place, with ties, provisional and in-money flags), tables with seats and
-names, warnings.
+first, then by place, with ties, provisional and in-money flags), tables with seats,
+names, button and next blinds, suggestions (final table, table break, balance plan),
+warnings.
 
 ## Determinism
 
@@ -181,8 +213,9 @@ no `getrandom`. The host passes a fresh seed per command; outcomes are stored in
   seating consistent (nobody in two seats, only open tables occupied, capacity respected),
   counts and places consistent, rejected commands leave the aggregate unchanged,
   undo/redo are inverses, the JSON log replays to the same aggregate, the effective level
-  never decreases with time, schedules are strictly increasing and pause/resume keeps the
-  remaining time.
+  never decreases with time, schedules are strictly increasing, pause/resume keeps the
+  remaining time, and once every button is known the full balance plan applies cleanly,
+  moves nobody twice and leaves the open tables within `balance_trigger - 1` players.
 - JSON scenarios (`tests/scenarios/*.json`) with partial view matching:
   `{ name, seed, tournament, steps: [{ at_ms, cmd, expect?, view? }], checks: [{ now_ms, view }] }`.
 

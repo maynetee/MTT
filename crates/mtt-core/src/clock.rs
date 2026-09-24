@@ -177,8 +177,10 @@ pub fn schedule(clock: &Clock, levels: &[Level], now_ms: i64) -> Schedule {
 /// overtime. Pauses do not count; time adjustments do.
 pub fn elapsed_ms(clock: &Clock, levels: &[Level], now_ms: i64) -> i64 {
     let eff = effective(clock, levels, now_ms);
-    let before: i64 = levels[..eff.level].iter().map(Level::duration_ms).sum();
-    before + structure::duration_at(levels, eff.level) - eff.remaining_ms + eff.overtime_ms
+    structure::total_ms(&levels[..eff.level])
+        .saturating_add(structure::duration_at(levels, eff.level))
+        .saturating_sub(eff.remaining_ms)
+        .saturating_add(eff.overtime_ms)
 }
 
 /// Current level index at `now_ms`.
@@ -207,7 +209,8 @@ pub(crate) fn rebase(clock: &Clock, old: &[Level], new: &[Level], now_ms: i64) -
             remaining_ms: structure::duration_at(new, last),
         };
     }
-    let delta = structure::duration_at(new, level) - structure::duration_at(old, level);
+    let delta =
+        structure::duration_at(new, level).saturating_sub(structure::duration_at(old, level));
     match eff.ends_at_ms {
         Some(_) if eff.overtime_ms > 0 && new.len() > old.len() => Clock::Running {
             level: level as u16,
@@ -219,7 +222,10 @@ pub(crate) fn rebase(clock: &Clock, old: &[Level], new: &[Level], now_ms: i64) -
         },
         None => Clock::Paused {
             level: level as u16,
-            remaining_ms: (eff.remaining_ms + delta).clamp(0, MAX_LEVEL_MS),
+            remaining_ms: eff
+                .remaining_ms
+                .saturating_add(delta)
+                .clamp(0, MAX_LEVEL_MS),
         },
     }
 }
@@ -325,7 +331,7 @@ pub(crate) fn decide(state: &State, cmd: &Command, now_ms: i64) -> Result<Event,
         }
         Command::AdjustTime { delta_ms } => {
             let delta = *delta_ms;
-            if delta == 0 || delta.abs() > MAX_LEVEL_MS {
+            if delta == 0 || !(-MAX_LEVEL_MS..=MAX_LEVEL_MS).contains(&delta) {
                 return Err(DomainError::InvalidTimeAdjustment {
                     max_ms: MAX_LEVEL_MS,
                 });
@@ -340,7 +346,10 @@ pub(crate) fn decide(state: &State, cmd: &Command, now_ms: i64) -> Result<Event,
                 },
                 None => Clock::Paused {
                     level,
-                    remaining_ms: (eff.remaining_ms + delta).clamp(0, MAX_LEVEL_MS),
+                    remaining_ms: eff
+                        .remaining_ms
+                        .saturating_add(delta)
+                        .clamp(0, MAX_LEVEL_MS),
                 },
             };
             if clock == normalize(&state.clock, levels, now_ms) {

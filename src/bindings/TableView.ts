@@ -7,4 +7,8 @@ import type { TableStatus } from "./TableStatus";
 /**
  * One table.
  */
-export type TableView = { table: TableNo, status: TableStatus, players: number, button: SeatNo | null, seats: Array<SeatView>, };
+export type TableView = { table: TableNo, status: TableStatus, players: number, button: SeatNo | null, 
+/**
+ * Blinds of the next hand, when the button is known.
+ */
+next_sb: SeatNo | null, next_bb: SeatNo | null, seats: Array<SeatView>, };

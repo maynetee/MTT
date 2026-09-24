@@ -9,6 +9,8 @@ import type { Finish } from "./Finish";
 import type { Level } from "./Level";
 import type { MoveReason } from "./MoveReason";
 import type { PlayerId } from "./PlayerId";
+import type { SeatMove } from "./SeatMove";
+import type { SeatNo } from "./SeatNo";
 import type { SeatRef } from "./SeatRef";
 import type { TableNo } from "./TableNo";
 import type { TournamentId } from "./TournamentId";
@@ -24,4 +26,4 @@ opened_table: TableNo | null, } | { "type": "player_unregistered", player: Playe
 /**
  * True for the first start, which moves the tournament out of setup.
  */
-starts_tournament: boolean, };
+starts_tournament: boolean, } | { "type": "button_set", table: TableNo, seat: SeatNo, } | { "type": "table_opened", table: TableNo, } | { "type": "table_broken", table: TableNo, moves: Array<SeatMove>, } | { "type": "final_table_formed", table: TableNo, moves: Array<SeatMove>, closed: Array<TableNo>, };

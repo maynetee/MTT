@@ -130,6 +130,21 @@ pub enum DomainError {
         seat: SeatNo,
     },
     SameSeat,
+    TableNotOpen {
+        table: TableNo,
+    },
+    TableAlreadyOpen {
+        table: TableNo,
+    },
+    LastTable,
+    NotEnoughSeats {
+        needed: u32,
+        available: u32,
+    },
+    TooManyForFinalTable {
+        alive: u32,
+        seats: u8,
+    },
 
     // Players.
     PlayerNotFound {

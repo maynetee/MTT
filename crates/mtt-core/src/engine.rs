@@ -146,7 +146,16 @@ impl Aggregate {
         else {
             return Err(LogError::MissingCreation);
         };
-        let mut state = State::genesis(id.clone(), config.clone(), structure.clone());
+        let new = NewTournament {
+            id: id.clone(),
+            config: config.clone(),
+            structure: structure.clone(),
+        };
+        decide_create(&new).map_err(|e| LogError::Inconsistent {
+            seq: 1,
+            reason: e.to_string(),
+        })?;
+        let mut state = State::genesis(new.id, new.config, new.structure);
         let mut at_head = None;
         for (i, env) in events.iter().enumerate().skip(1) {
             if i == head {
@@ -325,6 +334,7 @@ impl Aggregate {
             at_ms: env.at_ms,
             kind: env.event.kind().to_owned(),
             names,
+            table: env.event.table(),
         }
     }
 }
@@ -470,14 +480,82 @@ mod tests {
 
     #[test]
     fn event_kind_matches_the_serialized_tag() {
-        let mut kit = Kit::new(9, 1);
-        let a = kit.register("A");
-        kit.register("B");
-        kit.ok(Command::StartClock {});
-        kit.ok(bust(&[a]));
-        for env in kit.agg.events() {
-            let json = serde_json::to_value(&env.event).unwrap();
-            assert_eq!(json["type"], env.event.kind());
+        use crate::clock::{Clock, ClockReason};
+        use crate::command::MoveReason;
+        use crate::event::{Finish, SeatMove};
+        use crate::ids::{PlayerId, SeatNo, SeatRef, TableNo};
+
+        let kit = Kit::new(9, 1);
+        let Event::TournamentCreated { config, .. } = kit.agg.events()[0].event.clone() else {
+            panic!("first event is the creation");
+        };
+        let (p, table, seat) = (PlayerId(1), TableNo(1), SeatRef::new(1, 1));
+        let clock = Clock::Paused {
+            level: 0,
+            remaining_ms: 1,
+        };
+        let finish = Finish { winner: p, clock };
+        let moves = vec![SeatMove {
+            player: p,
+            from: seat,
+            to: SeatRef::new(2, 1),
+        }];
+        let mut events = vec![
+            kit.agg.events()[0].event.clone(),
+            Event::ConfigUpdated { config },
+            Event::StructureUpdated {
+                levels: Vec::new(),
+                clock,
+            },
+            Event::PlayerRegistered {
+                player: p,
+                name: "A".into(),
+                seat,
+                stack: crate::money::Chips(1),
+                opened_table: None,
+            },
+            Event::PlayerUnregistered { player: p },
+            Event::PlayersBusted {
+                group: crate::ids::BustGroup(1),
+                busts: Vec::new(),
+                finish: None,
+            },
+            Event::PlayerRevived { player: p, seat },
+            Event::PlayerMoved {
+                player: p,
+                from: seat,
+                to: seat,
+                reason: MoveReason::Balance,
+            },
+            Event::RegistrationOverridden {
+                open: false,
+                finish: None,
+            },
+            Event::TournamentFinished { finish },
+            Event::ClockChanged {
+                reason: ClockReason::Start,
+                clock,
+                starts_tournament: true,
+            },
+            Event::ButtonSet {
+                table,
+                seat: SeatNo(1),
+            },
+            Event::TableOpened { table },
+            Event::TableBroken {
+                table,
+                moves: moves.clone(),
+            },
+        ];
+        events.push(Event::FinalTableFormed {
+            table,
+            moves,
+            closed: vec![TableNo(2)],
+        });
+        for event in events {
+            let json = serde_json::to_value(&event).unwrap();
+            assert_eq!(json["type"], event.kind());
+            assert_eq!(serde_json::from_value::<Event>(json).unwrap(), event);
         }
     }
 }

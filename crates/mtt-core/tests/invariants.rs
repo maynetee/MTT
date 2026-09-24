@@ -2,15 +2,23 @@
 
 mod common;
 
+use std::collections::BTreeSet;
+
 use common::*;
 use mtt_core::clock::{Clock, effective, schedule};
+use mtt_core::seating::balance_plan;
 use mtt_core::{
-    Aggregate, BustInput, Chips, Command, Config, Deadline, Level, PlayerId, SeatRef, State,
+    Aggregate, BustInput, Chips, Command, Config, Ctx, Deadline, Level, MoveReason, Phase,
+    PlayerId, SeatNo, SeatRef, State, TableNo,
 };
 use proptest::prelude::*;
 
 const SEATS: u8 = 4;
 const TABLES: u16 = 3;
+
+fn table() -> impl Strategy<Value = TableNo> {
+    (1u16..=TABLES + 1).prop_map(TableNo)
+}
 
 #[derive(Debug, Clone)]
 enum Op {
@@ -75,6 +83,10 @@ fn command() -> impl Strategy<Value = Command> {
         1 => Just(Command::JumpToNextBreak {}),
         1 => (-30 * MIN..=30 * MIN).prop_map(|delta_ms| Command::AdjustTime { delta_ms }),
         1 => (-MIN..=30 * MIN).prop_map(|ms| Command::SetRemaining { ms }),
+        2 => (table(), 1u8..=SEATS + 1).prop_map(|(table, seat)| Command::SetButton { table, seat: SeatNo(seat) }),
+        1 => table().prop_map(|table| Command::OpenTable { table }),
+        2 => table().prop_map(|table| Command::BreakTable { table }),
+        1 => table().prop_map(|table| Command::FormFinalTable { table }),
         3 => Just(Command::Undo {}),
         1 => Just(Command::Redo {}),
         1 => (1u16..=5, 2u16..=TABLES + 1, 3u8..=SEATS + 1).prop_map(|(paid, tables, seats)| {
@@ -122,10 +134,60 @@ fn check_clock(state: &State, now: i64) {
     );
 }
 
-fn run_ops(late_reg: Deadline, players: u32, start: bool, ops: Vec<Op>) {
+/// Once every button is known, playing the whole balance plan leaves the open tables
+/// within `balance_trigger - 1` players of each other, moving nobody twice.
+fn check_balance_plan(agg: &Aggregate, now: i64) {
+    if matches!(agg.state().phase, Phase::Finished { .. }) {
+        return;
+    }
+    let mut agg = agg.clone();
+    let ctx = Ctx::new(now, 0);
+    let unknown: Vec<TableNo> = agg
+        .state()
+        .open_tables()
+        .filter(|t| t.button.is_none())
+        .map(|t| t.no)
+        .collect();
+    for table in unknown {
+        let cmd = Command::SetButton {
+            table,
+            seat: SeatNo(1),
+        };
+        agg.dispatch(cmd, &ctx).expect("button on an open table");
+    }
+    let plan = balance_plan(agg.state());
+    let mut moved = BTreeSet::new();
+    for step in &plan {
+        let (Some(player), Some(seat)) = (step.player, step.to_seat) else {
+            panic!("incomplete step with every button known: {step:?}");
+        };
+        assert!(moved.insert(player), "{player:?} moved twice: {plan:?}");
+        let to = SeatRef {
+            table: step.to_table,
+            seat,
+        };
+        let cmd = Command::MovePlayer {
+            player,
+            to,
+            reason: Some(MoveReason::Balance),
+        };
+        agg.dispatch(cmd, &ctx).expect("balance step applies");
+    }
+    let counts: Vec<usize> = agg.state().open_tables().map(|t| t.count()).collect();
+    if let (Some(max), Some(min)) = (counts.iter().max(), counts.iter().min()) {
+        let trigger = usize::from(agg.state().config.balance_trigger);
+        assert!(
+            max - min < trigger,
+            "still unbalanced after {plan:?}: {counts:?}"
+        );
+    }
+}
+
+fn run_ops(late_reg: Deadline, trigger: u8, players: u32, start: bool, ops: Vec<Op>) {
     let config = Config {
         places_paid: 2,
         late_reg,
+        balance_trigger: trigger,
         ..Config::new("Prop", SEATS, TABLES, 10_000)
     };
     let mut h = Harness::new(config, levels());
@@ -166,23 +228,24 @@ fn run_ops(late_reg: Deadline, players: u32, start: bool, ops: Vec<Op>) {
         }
         check_invariants(h.agg.state(), &h.view());
         check_clock(h.agg.state(), h.now);
+        check_balance_plan(&h.agg, h.now);
     }
     let json = h.agg.to_json().expect("serializable log");
     let reloaded = Aggregate::from_json(&json).expect("replayable log");
     assert_eq!(reloaded, h.agg, "replay after a JSON round trip differs");
 }
 
+// 256 cases by default; set PROPTEST_CASES for longer runs.
 proptest! {
-    #![proptest_config(ProptestConfig { cases: 256, ..ProptestConfig::default() })]
-
     #[test]
     fn random_sequences_keep_invariants(
         late_reg in deadline(),
+        trigger in 2u8..=SEATS,
         players in 2u32..=12,
         start in any::<bool>(),
         ops in prop::collection::vec(op(), 1..80),
     ) {
-        run_ops(late_reg, players, start, ops);
+        run_ops(late_reg, trigger, players, start, ops);
     }
 
     #[test]
