@@ -1,7 +1,8 @@
 name: Release
 
 # Builds the desktop app for macOS, Windows and Linux.
-# - A pushed `v*` tag attaches the installers to a draft GitHub Release; publishing it stays manual.
+# - A pushed `v*` tag creates one draft GitHub Release and every build attaches its installers
+#   to it; publishing it stays manual.
 # - A manual run builds the same installers as workflow artifacts without touching Releases.
 on:
   push:
@@ -30,9 +31,37 @@ jobs:
             exit 1
           fi
 
+  draft:
+    name: Create the draft release
+    needs: version
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    outputs:
+      id: ${{ steps.draft.outputs.id }}
+    steps:
+      # One draft, created before the builds: when each build job looked for the release
+      # itself, jobs finishing at the same time each created their own draft.
+      - id: draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          id="$(gh api "repos/${GITHUB_REPOSITORY}/releases" --jq ".[] | select(.draft and .tag_name == \"${TAG}\") | .id" | head -n 1)"
+          if [ -z "$id" ]; then
+            id="$(gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
+              -f tag_name="$TAG" \
+              -f name="MTT Tournament Director ${TAG#v}" \
+              -F draft=true \
+              -f body='Installers for macOS (universal), Windows and Linux. These builds are not code-signed yet: see "Download and install" in the README to open them on macOS and Windows.' \
+              --jq .id)"
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build (${{ matrix.name }})
-    needs: version
+    needs: [version, draft]
+    # The draft job is skipped on manual runs; build anyway.
+    if: ${{ !cancelled() && needs.version.result == 'success' && needs.draft.result != 'failure' }}
     strategy:
       fail-fast: false
       matrix:
@@ -77,14 +106,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: MTT Tournament Director ${{ github.ref_name }}
-          releaseBody: |
-            Installers for macOS (universal), Windows and Linux.
-
-            These builds are not code-signed yet: see "Download and install" in the README to open them on macOS and Windows.
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.draft.outputs.id }}
           args: ${{ matrix.args }}
 
       - name: Build installers
