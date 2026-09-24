@@ -49,7 +49,7 @@ const result = spawnSync(
     cwd: root,
     stdio: "inherit",
     shell: process.platform === "win32",
-    env: { ...process.env, CARGO_PROFILE_RELEASE_OPT_LEVEL: "z" }
+    env: { ...process.env, CARGO_PROFILE_RELEASE_OPT_LEVEL: "z", CARGO_PROFILE_RELEASE_LTO: "true", CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1" }
   }
 );
 

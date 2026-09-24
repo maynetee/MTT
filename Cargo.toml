@@ -8,8 +8,9 @@ license = "MIT"
 edition = "2024"
 rust-version = "1.85"
 
+# Thin LTO keeps release builds of the desktop app (twice for the universal macOS
+# bundle) within CI limits; scripts/wasm.mjs turns on full LTO for the smaller wasm build.
 [profile.release]
-lto = true
-codegen-units = 1
+lto = "thin"
 panic = "abort"
 strip = true
