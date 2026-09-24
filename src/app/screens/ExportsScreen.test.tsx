@@ -88,6 +88,36 @@ describe("ExportsScreen", () => {
     );
   });
 
+  it("adds the prizes to the ranking and its exports when money is tracked", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await withTournament({
+      tables: 1,
+      placesPaid: 2,
+      config: { money: { currency: { code: "EUR", exponent: 2 }, buyIn: { prize: 5_000, fee: 500 }, roundingUnit: 100 } }
+    });
+    const view = await register(engine, id, ["Anna", "Bob", "Chloé"]);
+    await engine.dispatch(id, { type: "start_clock" });
+    await engine.dispatch(id, { type: "close_registration" });
+    await engine.dispatch(id, { type: "bust_players", busts: [{ player: playerId(view, "Chloé") }] });
+    await engine.dispatch(id, { type: "bust_players", busts: [{ player: playerId(view, "Bob") }] });
+    const save = vi.spyOn(engine, "saveExport").mockResolvedValue(true);
+    renderApp(engine, `/t/${id}/exports`);
+
+    await screen.findByRole("table", { name: "Exports" });
+    // Two places paid out of EUR 150 on the default curve (65 %), rounded to whole euros.
+    expect(rows()).toEqual([
+      ["#1", "Anna", "Winner", "€98.00"],
+      ["#2", "Bob", "Eliminated", "€52.00"],
+      ["#3", "Chloé", "Eliminated", ""]
+    ]);
+    await user.click(screen.getByRole("button", { name: "Export CSV" }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(new TextDecoder().decode(save.mock.calls[0][0].bytes)).toBe(
+      "Place,Player,Status,Prize (EUR)\r\n1,Anna,Winner,98.00\r\n2,Bob,Eliminated,52.00\r\n3,Chloé,Eliminated,\r\n"
+    );
+  });
+
   it("shows an export failure", async () => {
     const user = userEvent.setup();
     const { engine, id } = await fourPlayers();

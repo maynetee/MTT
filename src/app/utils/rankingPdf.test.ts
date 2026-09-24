@@ -42,6 +42,19 @@ describe("buildRankingPdf", () => {
     expect((await PDFDocument.load(bytes)).getTitle()).toBe("Final ranking - Main Event");
   });
 
+  it("adds a prize column when money is tracked", async () => {
+    const withPrizes = rows.map((r, index) => ({ ...r, prize: [75_050, 45_000, 15_000, 15_000][index] }));
+    const bytes = await buildRankingPdf(withPrizes, {
+      tournamentName: "Main Event",
+      finished: false,
+      winner: null,
+      loadFonts: loadFontsFromDisk,
+      currency: { code: "EUR", exponent: 2 }
+    });
+
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+  });
+
   it("paginates long rankings", async () => {
     const many = Array.from({ length: 120 }, (_, index) => row(index + 1, `Игрок ${index + 1}`, index + 1));
     const bytes = await buildRankingPdf(many, { tournamentName: "Deep Stack", finished: true, winner: 1, loadFonts: loadFontsFromDisk });

@@ -97,7 +97,7 @@ describe("director shortcuts", () => {
     await user.keyboard("3");
     await waitFor(() => expect(screen.getByRole("link", { name: "Players" })).toHaveAttribute("aria-current", "page"));
     await user.keyboard("9");
-    await waitFor(() => expect(screen.getByRole("link", { name: "Exports" })).toHaveAttribute("aria-current", "page"));
+    await waitFor(() => expect(screen.getByRole("link", { name: "Display" })).toHaveAttribute("aria-current", "page"));
     await user.keyboard("1");
     await waitFor(() => expect(screen.getByRole("link", { name: "Registration" })).toHaveAttribute("aria-current", "page"));
   });
@@ -232,6 +232,8 @@ describe("director shortcuts", () => {
     expect(screen.getByRole("button", { name: "Undo register Ben" })).toHaveAttribute("aria-keyshortcuts", "Control+Z");
     expect(screen.getByRole("button", { name: "Redo" })).toHaveAttribute("aria-keyshortcuts", "Shift+Control+Z Control+Y");
     expect(screen.getByRole("link", { name: "Registration" })).toHaveAttribute("aria-keyshortcuts", "1");
-    expect(screen.getByRole("link", { name: "Exports" })).toHaveAttribute("aria-keyshortcuts", "9");
+    expect(screen.getByRole("link", { name: "Display" })).toHaveAttribute("aria-keyshortcuts", "9");
+    // Only the first nine tabs get a number key.
+    expect(screen.getByRole("link", { name: "Exports" })).not.toHaveAttribute("aria-keyshortcuts");
   });
 });

@@ -6,11 +6,15 @@ import { useFieldProps } from "./Field";
 
 type NativeProps = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "size">;
 
-export interface MoneyInputProps extends NativeProps {
-  /** Minor units (cents); `null` (or NaN) while empty. */
+interface DecimalInputProps extends NativeProps {
+  /** An integer count of `10^-exponent` units (cents, basis points); `null` (or NaN) while empty. */
   value: number | null;
   onChange(value: number | null): void;
-  currency: Currency;
+  /** Decimals the director may type. */
+  exponent: number;
+  /** Shown inside the field, before or after the number. */
+  symbol: string;
+  symbolBefore: boolean;
   /** Width in characters, for inputs sized to their content; fills its container otherwise. */
   digits?: number;
 }
@@ -20,18 +24,16 @@ function same(a: number | null, b: number | null): boolean {
 }
 
 /**
- * An amount typed in major units ("12.50") and handed over in minor units (1250), converted
- * through strings so no cent is ever lost to floating point. Accepts a dot or a comma, at most
- * the currency's decimals; the currency symbol sits inside the field.
+ * A decimal typed by the director ("12.50") handed over as an integer (1250), converted
+ * through strings so no unit is ever lost to floating point. Accepts a dot or a comma and at
+ * most `exponent` decimals; the unit symbol sits inside the field.
  */
-export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(function MoneyInput(
-  { value, onChange, currency, digits, className, style, onBlur, ...rest },
+const DecimalInput = forwardRef<HTMLInputElement, DecimalInputProps>(function DecimalInput(
+  { value, onChange, exponent, symbol, symbolBefore, digits, className, style, onBlur, ...rest },
   ref
 ) {
-  const { locale } = useI18n();
   const props = useFieldProps(rest);
   const current = value === null || Number.isNaN(value) ? null : value;
-  const { exponent } = currency;
   // What is typed, and the value it was typed for (like NumberInput): "12." survives a re-render.
   const [draft, setDraft] = useState(() => ({ text: toInputText(current, exponent), value: current, exponent }));
   if (!same(draft.value, current) || draft.exponent !== exponent) {
@@ -45,12 +47,11 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(function
     if (!same(next, current)) onChange(next);
   };
 
-  const { symbol, before } = currencySymbol(locale, currency);
   const wrapperStyle = { ...style, "--symbol-chars": symbol.length, ...(digits ? { "--digits": digits } : {}) } as CSSProperties;
 
   return (
     <span
-      className={["money-input", before ? "money-input--before" : "money-input--after", digits ? "money-input--sized" : "", className ?? ""]
+      className={["money-input", symbolBefore ? "money-input--before" : "money-input--after", digits ? "money-input--sized" : "", className ?? ""]
         .filter(Boolean)
         .join(" ")}
       style={wrapperStyle}
@@ -77,4 +78,20 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(function
       </span>
     </span>
   );
+});
+
+export interface MoneyInputProps extends Omit<DecimalInputProps, "exponent" | "symbol" | "symbolBefore"> {
+  currency: Currency;
+}
+
+/** An amount typed in major units ("12.50") and handed over in minor units (1250). */
+export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(function MoneyInput({ currency, ...rest }, ref) {
+  const { locale } = useI18n();
+  const { symbol, before } = currencySymbol(locale, currency);
+  return <DecimalInput ref={ref} exponent={currency.exponent} symbol={symbol} symbolBefore={before} {...rest} />;
+});
+
+/** A percentage typed with up to two decimals ("12.5") and handed over in basis points (1250). */
+export const PercentInput = forwardRef<HTMLInputElement, Omit<DecimalInputProps, "exponent" | "symbol" | "symbolBefore">>(function PercentInput(props, ref) {
+  return <DecimalInput ref={ref} exponent={2} symbol="%" symbolBefore={false} {...props} />;
 });

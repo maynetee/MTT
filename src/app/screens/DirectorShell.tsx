@@ -18,7 +18,7 @@ import { playerNames } from "../utils/view";
 
 /** Live work first, then the setup and output screens. */
 const TAB_GROUPS = [
-  ["registration", "seating", "players", "moves", "clock"],
+  ["registration", "seating", "players", "moves", "clock", "payouts"],
   ["levels", "settings", "display", "exports"]
 ] as const;
 

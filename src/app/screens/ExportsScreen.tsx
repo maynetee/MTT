@@ -9,6 +9,7 @@ import { useEngine } from "../EngineContext";
 import { useTournament } from "../TournamentContext";
 import { exportCSV, exportPDF, type RankingExport } from "../utils/exports";
 import { formatPlace, rankingStatus } from "../utils/labels";
+import { moneyFormatter } from "../utils/money";
 
 type Format = "CSV" | "PDF";
 
@@ -20,7 +21,9 @@ export default function ExportsScreen() {
   const { view } = useTournament();
   const [busy, setBusy] = useState<Format | null>(null);
   const finished = view.phase === "finished";
-  const data: RankingExport = { tournamentName: view.config.name, finished, winner: view.winner, rows: view.ranking };
+  const currency = view.money?.currency;
+  const data: RankingExport = { tournamentName: view.config.name, finished, winner: view.winner, rows: view.ranking, currency };
+  const format = currency ? moneyFormatter(i18n.locale, currency) : null;
   const provisional = view.ranking.some((row) => row.provisional);
 
   const run = async (format: Format) => {
@@ -61,6 +64,11 @@ export default function ExportsScreen() {
             </th>
             <th scope="col">{t("exports.player")}</th>
             <th scope="col">{t("exports.status")}</th>
+            {format && (
+              <th scope="col" className="num">
+                {t("exports.prizeColumn")}
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -71,6 +79,7 @@ export default function ExportsScreen() {
                 {row.name}
               </th>
               <td>{rankingStatus(i18n, row, view.winner)}</td>
+              {format && <td className="num">{row.prize === undefined ? "" : format(row.prize)}</td>}
             </tr>
           ))}
         </tbody>

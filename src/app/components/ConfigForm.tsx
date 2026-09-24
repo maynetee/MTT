@@ -93,7 +93,9 @@ export function ConfigFields({ config, onChange, locks = NO_LOCKS }: Props) {
   const capacity = (config.seatsPerTable || 0) * (config.maxTables || 0);
   const started = locks.started;
   const locked = started ? t("config.lockedHint") : undefined;
-  const placesHint = locks.payoutsLocked ? t("money.payoutsLockedHint") : undefined;
+  // A share of the entries or a custom payout table decides the places paid instead.
+  const placesRule = config.payout.placesPaid !== undefined || (config.payout.amounts !== undefined && config.payout.amounts.type !== "curve");
+  const placesHint = locks.payoutsLocked ? t("money.payoutsLockedHint") : placesRule ? t("config.placesPaidElsewhere") : undefined;
 
   return (
     <div className="form-grid">
@@ -111,12 +113,7 @@ export function ConfigFields({ config, onChange, locks = NO_LOCKS }: Props) {
         />
       </Field>
       <Field label={t("config.placesPaid")} hint={placesHint}>
-        <NumberInput
-          min={1}
-          value={config.placesPaid}
-          onChange={(value) => set({ placesPaid: integer(value) })}
-          disabled={locks.payoutsLocked}
-        />
+        <NumberInput min={1} value={config.placesPaid} onChange={(value) => set({ placesPaid: integer(value) })} disabled={locks.payoutsLocked || placesRule} />
       </Field>
       <Field label={t("config.maxTables")}>
         <NumberInput min={1} value={config.maxTables} onChange={(value) => set({ maxTables: integer(value) })} />

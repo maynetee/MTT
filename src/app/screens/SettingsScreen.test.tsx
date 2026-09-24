@@ -106,3 +106,13 @@ describe("SettingsScreen purchases", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Check when re-entries, rebuys and add-ons are available");
   });
 });
+
+describe("SettingsScreen places paid", () => {
+  it("points to the Payouts tab when a share of the entries sets the places paid", async () => {
+    const { engine, id } = await withTournament({ config: { payout: { placesPaid: { type: "percent", bps: 1_500 } } } });
+    renderApp(engine, `/t/${id}/settings`);
+
+    expect(await screen.findByRole("spinbutton", { name: "Places paid" })).toBeDisabled();
+    expect(screen.getByText("Set on the Payouts tab.")).toBeInTheDocument();
+  });
+});

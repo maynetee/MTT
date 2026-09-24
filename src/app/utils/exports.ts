@@ -1,4 +1,5 @@
 import { isEngineError, type Engine, type RankingRow } from "../../engine/types";
+import type { Currency } from "../../bindings/Currency";
 import { i18n as english, type I18n } from "../../i18n";
 import { buildRankingCsv } from "./csv";
 import { rankingFileName } from "./fileName";
@@ -9,6 +10,8 @@ export interface RankingExport {
   finished: boolean;
   winner: number | null;
   rows: readonly RankingRow[];
+  /** With money tracking: the exports add a prize column in this currency. */
+  currency?: Currency;
 }
 
 /** An export failure, with a message ready for the user. */
@@ -26,7 +29,7 @@ function failure(i18n: I18n, format: "CSV" | "PDF", error: unknown): ExportError
  */
 export async function exportCSV(engine: Engine, data: RankingExport, i18n: I18n = english): Promise<boolean> {
   try {
-    const content = buildRankingCsv(data.rows, data.winner, i18n);
+    const content = buildRankingCsv(data.rows, data.winner, i18n, data.currency);
     return await engine.saveExport({
       fileName: rankingFileName(data.tournamentName, "csv"),
       bytes: new TextEncoder().encode(content),

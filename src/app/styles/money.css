@@ -118,3 +118,129 @@
   gap: var(--space-2);
   margin-top: var(--space-4);
 }
+
+/* Payouts: the ladder and pool on the left, the settings on the right. */
+.payouts-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+/* Side by side down to small windows: the ladder follows the controls in view. */
+@media (max-width: 860px) {
+  .payouts-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.pool-stats .stat-value {
+  font-size: var(--text-2xl);
+  font-variant-numeric: tabular-nums;
+}
+
+.ladder-table td.num,
+.ladder-table th.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.ladder-player + .ladder-player::before {
+  content: " · ";
+  color: var(--color-text-subtle);
+}
+
+/* The first-place share on the curve. */
+.share-slider {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-1) 0 var(--space-2);
+}
+
+.share-slider-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.share-slider-value {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.share-slider .button {
+  justify-self: start;
+}
+
+.range {
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.range:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.range:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* Custom shares or amounts, place by place. */
+.place-table {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-1) 0 var(--space-2);
+}
+
+.place-table-rows {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.place-table-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.place-table-place {
+  min-width: 3ch;
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.place-table-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.place-table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.place-table-total {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}

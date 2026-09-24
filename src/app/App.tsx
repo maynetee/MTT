@@ -7,6 +7,7 @@ import { DisplayPreview, DisplayRoute } from "./screens/DisplayScreen";
 import ExportsScreen from "./screens/ExportsScreen";
 import LevelsScreen from "./screens/LevelsScreen";
 import MovesScreen from "./screens/MovesScreen";
+import PayoutsScreen from "./screens/PayoutsScreen";
 import PlayersScreen from "./screens/PlayersScreen";
 import RegistrationScreen from "./screens/RegistrationScreen";
 import SeatingScreen from "./screens/SeatingScreen";
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="players" element={<PlayersScreen />} />
           <Route path="moves" element={<MovesScreen />} />
           <Route path="clock" element={<ClockScreen />} />
+          <Route path="payouts" element={<PayoutsScreen />} />
           <Route path="display" element={<DisplayPreview />} />
           <Route path="exports" element={<ExportsScreen />} />
           <Route path="settings" element={<SettingsScreen />} />

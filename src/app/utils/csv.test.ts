@@ -79,6 +79,18 @@ describe("buildRankingCsv", () => {
     ]);
   });
 
+  it("adds the prize in major units when money is tracked", () => {
+    const rows = [row(1, "Ann", 1, { alive: true, prize: 75_050 }), row(2, "Ben", 2, { prize: 45_000 }), row(3, "Cat", 3)];
+
+    expect(buildRankingCsv(rows, 1, undefined, { code: "EUR", exponent: 2 }).split("\r\n")).toEqual([
+      "\uFEFFPlace,Player,Status,Prize (EUR)",
+      "1,Ann,Winner,750.50",
+      "2,Ben,Eliminated,450.00",
+      "3,Cat,Eliminated,",
+      ""
+    ]);
+  });
+
   it("joins rows of mixed fields", () => {
     expect(toCsvRow([1, "a,b", null, "@x"])).toBe('1,"a,b",,\'@x');
   });
