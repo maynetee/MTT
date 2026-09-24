@@ -81,7 +81,7 @@ jobs:
           releaseBody: |
             Installers for macOS (universal), Windows and Linux.
 
-            These builds are not code-signed yet: see "Installing" in the README to open them on macOS and Windows.
+            These builds are not code-signed yet: see "Download and install" in the README to open them on macOS and Windows.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

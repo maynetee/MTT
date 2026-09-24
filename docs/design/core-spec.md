@@ -362,7 +362,8 @@ no `getrandom`. The host passes a fresh seed per command; outcomes are stored in
   guarantee, curve payouts, rounding and a bubble tie) with partial view matching:
   `{ name, seed, tournament, steps: [{ atMs, cmd, expect?, view? }], checks: [{ nowMs, view }] }`.
 
-## Not implemented yet
+## Hosts
 
-WASM crate and Tauri integration (the hosts will expose `icm::quote` next to `dispatch`
-and `view`).
+The desktop app (`src-tauri`) and the browser demo (`crates/mtt-wasm`) both wrap `Aggregate`;
+see [../architecture.md](../architecture.md). Exposing `icm::quote` to the UI comes with the
+deal calculator screen.
