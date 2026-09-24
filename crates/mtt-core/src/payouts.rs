@@ -160,11 +160,7 @@ pub fn split(pool: Money, weights: &[u64], unit: Money) -> Vec<Money> {
     let mut out: Vec<Money> = weights
         .iter()
         .map(|&w| {
-            let raw = if total == 0 {
-                0
-            } else {
-                amount * u128::from(w) / total
-            };
+            let raw = (amount * u128::from(w)).checked_div(total).unwrap_or(0);
             Money((raw / unit * unit) as i64)
         })
         .collect();
