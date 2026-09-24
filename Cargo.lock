@@ -1925,7 +1925,7 @@ dependencies = [
 
 [[package]]
 name = "mtt"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "getrandom 0.3.4",
  "mtt-core",
@@ -1943,7 +1943,7 @@ dependencies = [
 
 [[package]]
 name = "mtt-core"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "libm",
  "proptest",
@@ -1955,7 +1955,7 @@ dependencies = [
 
 [[package]]
 name = "mtt-wasm"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "mtt-core",
  "serde",
