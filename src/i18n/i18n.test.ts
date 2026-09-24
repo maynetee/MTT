@@ -131,6 +131,8 @@ describe("t", () => {
     expect(i18n.action(label)).toBe("eliminate Ann, Ben, and Cat");
     expect(i18n.action({ ...label, kind: "table_broken", names: [], table: 3 })).toBe("break table 3");
     expect(i18n.action({ ...label, kind: "rebuy_added", names: [] })).toBe("rebuy_added");
+    expect(i18n.action({ ...label, kind: "player_reentered", names: ["Ann"] })).toBe("re-entry of Ann");
+    expect(i18n.action({ ...label, kind: "addon_recorded", names: ["Ben"] })).toBe("add-on for Ben");
   });
 });
 

@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { renderApp } from "../../test/app";
@@ -131,6 +131,46 @@ describe("SetupScreen", () => {
       buyIn: { prize: 100, fee: 15 },
       roundingUnit: 1
     });
+  });
+
+  it("offers re-entries, rebuys and add-ons with their price, chips, limit and window", async () => {
+    const user = userEvent.setup();
+    const engine = createTestEngine();
+    renderApp(engine, "/new");
+
+    await user.click(await screen.findByRole("checkbox", { name: /Track buy-ins and the prize pool/ }));
+    await user.click(screen.getByRole("checkbox", { name: /Offer re-entries/ }));
+    // A re-entry costs the buy-in and gives a starting stack by default.
+    expect(screen.getByLabelText("Re-entries: Price")).toHaveValue("100");
+    expect(screen.getByLabelText("Re-entries: Chips")).toHaveValue("20000");
+    await user.type(screen.getByLabelText("Re-entries: Re-entries per player"), "2");
+    await user.click(within(screen.getByRole("group", { name: "Re-entries: Available" })).getByRole("radio", { name: "Until the end of play level" }));
+    const level = screen.getByLabelText("Re-entries: until the end of play level");
+    await user.clear(level);
+    await user.type(level, "4");
+
+    await user.click(screen.getByRole("checkbox", { name: /Offer an add-on/ }));
+    const addonPrice = screen.getByLabelText("Add-ons: Price");
+    await user.clear(addonPrice);
+    await user.type(addonPrice, "50");
+    const addonChips = screen.getByLabelText("Add-ons: Chips");
+    await user.clear(addonChips);
+    await user.type(addonChips, "30000");
+    await user.click(screen.getByRole("button", { name: "Create tournament" }));
+
+    await screen.findByRole("heading", { name: "Register player" });
+    const [summary] = await engine.listTournaments();
+    const { config } = await engine.getView(summary.id);
+    expect(config.reentry).toEqual({
+      prize: 10_000,
+      fee: 0,
+      stack: 20_000,
+      max: 2,
+      window: { type: "until", deadline: { type: "end_of_play_level", n: 4, throughBreak: true } }
+    });
+    // The add-on defaults to once, during the first break (after play level 4).
+    expect(config.addon).toEqual({ prize: 5_000, fee: 0, stack: 30_000, max: 1, window: { type: "break_after", n: 4 } });
+    expect(config.rebuy).toBeUndefined();
   });
 
   it("reports the core's configuration errors", async () => {

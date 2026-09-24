@@ -5,8 +5,10 @@ import { Button } from "../components/Button";
 import { Section } from "../components/Card";
 import { ConfigFields, LateRegFields, sanitizeConfig } from "../components/ConfigForm";
 import { MoneyFields, type ConfigLocks } from "../components/MoneyFields";
+import { PurchaseFields } from "../components/PurchaseFields";
 import { useToast } from "../components/Toast";
 import { useTournament } from "../TournamentContext";
+import { firstBreakAfter } from "../utils/structure";
 
 /** Tournament settings (UpdateConfig): places paid, tables, late registration... */
 export default function SettingsScreen() {
@@ -53,6 +55,13 @@ export default function SettingsScreen() {
           </Section>
         </div>
       </div>
+      <Section title={t("purchases.section")} description={t("purchases.sectionHint")}>
+        <PurchaseFields
+          config={config}
+          onChange={edit}
+          firstBreakAfter={firstBreakAfter(view.levels.map((row) => ({ isBreak: row.level.type === "break" })))}
+        />
+      </Section>
       {dirty && !finished && (
         <div className="action-bar">
           <span className="action-bar-note">{t("settings.unsaved")}</span>

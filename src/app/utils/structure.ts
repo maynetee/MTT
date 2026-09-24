@@ -70,6 +70,13 @@ export function playNumbers(rows: readonly Pick<LevelDraft, "isBreak">[]): Array
   return rows.map((row) => (row.isBreak ? null : ++n));
 }
 
+/** Play-level number right before the first break (an add-on's usual moment), or null. */
+export function firstBreakAfter(rows: readonly Pick<LevelDraft, "isBreak">[]): number | null {
+  const numbers = playNumbers(rows);
+  const index = rows.findIndex((row, i) => i > 0 && row.isBreak && !rows[i - 1].isBreak);
+  return index > 0 ? numbers[index - 1] : null;
+}
+
 function play(sb: number, bb: number, bigBlindAnte = false): Level {
   return {
     type: "play",

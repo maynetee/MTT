@@ -1,7 +1,10 @@
+import { useId } from "react";
 import type { Config, Deadline } from "../../engine/types";
 import type { MoneyConfig } from "../../bindings/MoneyConfig";
+import type { Purchase } from "../../bindings/Purchase";
+import type { PurchaseWindow } from "../../bindings/PurchaseWindow";
 import { useI18n } from "../../i18n";
-import { Checkbox, Field, RadioGroup, TextInput } from "./Field";
+import { Checkbox, Field, RadioGroup, TextInput, type RadioOption } from "./Field";
 import { NO_LOCKS, type ConfigLocks } from "./MoneyFields";
 import { NumberInput } from "./NumberInput";
 
@@ -33,16 +36,33 @@ function sanitizeMoney(money: MoneyConfig | undefined): MoneyConfig | undefined 
   };
 }
 
+function sanitizeDeadline(deadline: Deadline): Deadline {
+  if (deadline.type === "end_of_play_level") return { ...deadline, n: fit(deadline.n, 65_535) };
+  if (deadline.type === "elapsed") return { type: "elapsed", ms: fit(deadline.ms, Number.MAX_SAFE_INTEGER) };
+  return deadline;
+}
+
+function sanitizePurchase(purchase: Purchase | undefined): Purchase | undefined {
+  if (!purchase) return undefined;
+  const window: PurchaseWindow | undefined =
+    purchase.window?.type === "break_after"
+      ? { type: "break_after", n: fit(purchase.window.n, 65_535) }
+      : purchase.window && { type: "until", deadline: sanitizeDeadline(purchase.window.deadline) };
+  return {
+    prize: fit(purchase.prize, MAX_AMOUNT),
+    fee: fit(purchase.fee, MAX_AMOUNT),
+    stack: fit(purchase.stack, MAX_AMOUNT),
+    // Empty: unlimited.
+    max: purchase.max === undefined || Number.isNaN(purchase.max) ? undefined : fit(purchase.max, 255),
+    window
+  };
+}
+
 /** The config as sent to the core: empty or out-of-range numbers become values it rejects with a clear error. */
 export function sanitizeConfig(config: Config): Config {
   const U8 = 255;
   const U16 = 65_535;
-  const lateReg: Deadline =
-    config.lateReg.type === "end_of_play_level"
-      ? { ...config.lateReg, n: fit(config.lateReg.n, U16) }
-      : config.lateReg.type === "elapsed"
-        ? { type: "elapsed", ms: fit(config.lateReg.ms, Number.MAX_SAFE_INTEGER) }
-        : config.lateReg;
+  const lateReg = sanitizeDeadline(config.lateReg);
   return {
     ...config,
     seatsPerTable: fit(config.seatsPerTable, U8),
@@ -52,7 +72,10 @@ export function sanitizeConfig(config: Config): Config {
     startingStack: fit(config.startingStack, Number.MAX_SAFE_INTEGER),
     placesPaid: fit(config.placesPaid, U16),
     lateReg,
-    money: sanitizeMoney(config.money)
+    money: sanitizeMoney(config.money),
+    reentry: sanitizePurchase(config.reentry),
+    rebuy: sanitizePurchase(config.rebuy),
+    addon: sanitizePurchase(config.addon)
   };
 }
 
@@ -128,73 +151,120 @@ export function ConfigFields({ config, onChange, locks = NO_LOCKS }: Props) {
   );
 }
 
-type Mode = Deadline["type"];
+/** A late registration deadline, or when a purchase window closes (`break_after`: during one break). */
+export type WindowChoice = Deadline | { type: "break_after"; n: number };
+type Mode = WindowChoice["type"];
+
+export interface DeadlineFieldsProps {
+  legend: string;
+  value: WindowChoice;
+  onChange(value: WindowChoice): void;
+  /** Label of the `manual` option (late registration: until closed by hand). */
+  manualLabel: string;
+  /** Offers "during the break after play level n" (add-ons). */
+  breakAfter?: boolean;
+  /** Prefixes the labels of the numbers, when several of these share a page. */
+  labelPrefix?: string;
+  disabled?: boolean;
+}
+
+/**
+ * When something closes on its own: at the end of a play level (optionally through the break
+ * that follows), after a set time of play, or by hand. Shared by late registration and the
+ * re-entry, rebuy and add-on windows.
+ */
+export function DeadlineFields({ legend, value, onChange, manualLabel, breakAfter = false, labelPrefix, disabled = false }: DeadlineFieldsProps) {
+  const { t } = useI18n();
+  const name = useId();
+  const label = (text: string) => (labelPrefix ? `${labelPrefix}: ${text.charAt(0).toLowerCase()}${text.slice(1)}` : text);
+  // Remember the values of the other modes while switching.
+  const level = value.type === "end_of_play_level" ? value : { n: value.type === "break_after" ? value.n : 6, throughBreak: true };
+  const minutes = value.type === "elapsed" ? value.ms / MINUTE_MS : 120;
+  const breakLevel = value.type === "break_after" ? value.n : value.type === "end_of_play_level" ? value.n : 4;
+
+  const choose = (mode: Mode) => {
+    if (mode === "end_of_play_level") onChange({ type: mode, n: level.n, throughBreak: level.throughBreak });
+    else if (mode === "elapsed") onChange({ type: mode, ms: Math.round(minutes * MINUTE_MS) });
+    else if (mode === "break_after") onChange({ type: mode, n: breakLevel });
+    else onChange({ type: "manual" });
+  };
+
+  const options: RadioOption<Mode>[] = [
+    {
+      value: "end_of_play_level",
+      label: t("config.lateReg.endOfLevel"),
+      disabled,
+      inline: (
+        <NumberInput
+          digits={3}
+          min={1}
+          aria-label={label(t("config.lateReg.endOfLevel"))}
+          value={level.n}
+          onChange={(n) => onChange({ type: "end_of_play_level", n: integer(n), throughBreak: level.throughBreak })}
+          disabled={disabled || value.type !== "end_of_play_level"}
+        />
+      ),
+      nested: (
+        <Checkbox
+          label={t("config.lateReg.throughBreak")}
+          aria-label={labelPrefix ? label(t("config.lateReg.throughBreak")) : undefined}
+          checked={level.throughBreak}
+          onChange={(event) => onChange({ type: "end_of_play_level", n: level.n, throughBreak: event.target.checked })}
+          disabled={disabled || value.type !== "end_of_play_level"}
+        />
+      )
+    },
+    {
+      value: "elapsed",
+      label: t("config.lateReg.elapsed"),
+      disabled,
+      inline: (
+        <>
+          <NumberInput
+            digits={4}
+            min={1}
+            step={15}
+            aria-label={label(t("config.lateReg.elapsed"))}
+            value={minutes}
+            onChange={(n) => onChange({ type: "elapsed", ms: Math.round(integer(n) * MINUTE_MS) })}
+            disabled={disabled || value.type !== "elapsed"}
+          />
+          {t("config.lateReg.minutes")}
+        </>
+      )
+    }
+  ];
+  if (breakAfter) {
+    options.push({
+      value: "break_after",
+      label: t("purchases.breakAfter"),
+      disabled,
+      inline: (
+        <NumberInput
+          digits={3}
+          min={1}
+          aria-label={label(t("purchases.breakAfter"))}
+          value={breakLevel}
+          onChange={(n) => onChange({ type: "break_after", n: integer(n) })}
+          disabled={disabled || value.type !== "break_after"}
+        />
+      )
+    });
+  }
+  options.push({ value: "manual", label: manualLabel, disabled });
+
+  return <RadioGroup<Mode> legend={legend} hideLegend name={name} value={value.type} onChange={choose} options={options} />;
+}
 
 /** When late registration closes: end of a play level, a play time, or by hand. */
 export function LateRegFields({ config, onChange }: Props) {
   const { t } = useI18n();
-  const deadline = config.lateReg;
-  const set = (lateReg: Deadline) => onChange({ ...config, lateReg });
-  // Remember the values of the other modes while switching.
-  const level = deadline.type === "end_of_play_level" ? deadline : { n: 6, throughBreak: true };
-  const minutes = deadline.type === "elapsed" ? deadline.ms / MINUTE_MS : 120;
-
-  const choose = (mode: Mode) => {
-    if (mode === "end_of_play_level") set({ type: mode, n: level.n, throughBreak: level.throughBreak });
-    else if (mode === "elapsed") set({ type: mode, ms: Math.round(minutes * MINUTE_MS) });
-    else set({ type: "manual" });
-  };
-
   return (
-    <RadioGroup<Mode>
+    <DeadlineFields
       legend={t("config.lateReg.title")}
-      hideLegend
-      name="late-reg"
-      value={deadline.type}
-      onChange={choose}
-      options={[
-        {
-          value: "end_of_play_level",
-          label: t("config.lateReg.endOfLevel"),
-          inline: (
-            <NumberInput
-              digits={3}
-              min={1}
-              aria-label={t("config.lateReg.endOfLevel")}
-              value={level.n}
-              onChange={(value) => set({ type: "end_of_play_level", n: integer(value), throughBreak: level.throughBreak })}
-              disabled={deadline.type !== "end_of_play_level"}
-            />
-          ),
-          nested: (
-            <Checkbox
-              label={t("config.lateReg.throughBreak")}
-              checked={level.throughBreak}
-              onChange={(event) => set({ type: "end_of_play_level", n: level.n, throughBreak: event.target.checked })}
-              disabled={deadline.type !== "end_of_play_level"}
-            />
-          )
-        },
-        {
-          value: "elapsed",
-          label: t("config.lateReg.elapsed"),
-          inline: (
-            <>
-              <NumberInput
-                digits={4}
-                min={1}
-                step={15}
-                aria-label={t("config.lateReg.elapsed")}
-                value={minutes}
-                onChange={(value) => set({ type: "elapsed", ms: Math.round(integer(value) * MINUTE_MS) })}
-                disabled={deadline.type !== "elapsed"}
-              />
-              {t("config.lateReg.minutes")}
-            </>
-          )
-        },
-        { value: "manual", label: t("config.lateReg.manual") }
-      ]}
+      value={config.lateReg}
+      manualLabel={t("config.lateReg.manual")}
+      onChange={(lateReg) => lateReg.type !== "break_after" && onChange({ ...config, lateReg })}
     />
   );
 }

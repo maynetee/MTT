@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { BustInput, RankingRow } from "../../engine/types";
+import type { BustInput, RankingRow, SeatRef } from "../../engine/types";
+import type { PurchaseKind } from "../../bindings/PurchaseKind";
 import { useI18n } from "../../i18n";
 import { Button } from "../components/Button";
 import { Section, Stat, StatGroup } from "../components/Card";
@@ -8,6 +9,7 @@ import { Checkbox, Field, Select, TextInput } from "../components/Field";
 import { Icon } from "../components/Icon";
 import { NumberInput } from "../components/NumberInput";
 import { Pill } from "../components/Pill";
+import { ReEnterDialog } from "../components/ReEnterDialog";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { Table } from "../components/Table";
 import { useToast } from "../components/Toast";
@@ -15,6 +17,9 @@ import { useTournament } from "../TournamentContext";
 import { isMac } from "../utils/keyboard";
 import { formatPlace } from "../utils/labels";
 import { freeSeatsAtOpenTables, seatKey } from "../utils/view";
+
+/** Rebuys and add-ons: bought by a player still in. */
+type Buy = Exclude<PurchaseKind, "reentry">;
 
 /** Selected players of a same-hand elimination, with the starting stack typed for each. */
 type Selection = Map<number, number | null>;
@@ -32,6 +37,7 @@ export default function PlayersScreen() {
   const [revivePlayer, setRevivePlayer] = useState<number | "">("");
   // null follows the first free seat, "" is an explicit empty choice.
   const [reviveSeatChoice, setReviveSeatChoice] = useState<string | null>(null);
+  const [reentering, setReentering] = useState<RankingRow | null>(null);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -75,6 +81,70 @@ export default function PlayersScreen() {
   };
 
   const eliminate = (player: number) => void bust([{ player }]);
+
+  // Purchases, offered while the view says their window is open; a player at the limit gets
+  // a disabled button saying so.
+  const { registration, config } = view;
+  const open: Record<PurchaseKind, boolean> = {
+    reentry: registration.reentryOpen === true,
+    rebuy: registration.rebuyOpen === true,
+    addon: registration.addonOpen === true
+  };
+  const used = (kind: PurchaseKind, row: RankingRow) => (kind === "reentry" ? row.entries - 1 : kind === "rebuy" ? (row.rebuys ?? 0) : (row.addons ?? 0));
+  const atLimit = (kind: PurchaseKind, row: RankingRow) => {
+    const max = config[kind]?.max;
+    return max !== undefined && used(kind, row) >= max;
+  };
+
+  /** Records the purchase, then offers to take it back like an elimination. */
+  const undoToast = (message: string, seq: number | undefined) =>
+    toast.show({
+      message,
+      tone: "success",
+      action: seq === undefined ? undefined : { label: t("toast.undo"), onAction: () => void undoIfLast(seq) }
+    });
+
+  const buy = async (kind: Buy, row: RankingRow) => {
+    const next = await run({ type: kind, player: row.player });
+    if (!next) return;
+    const purchase = t(`purchases.${kind}.action`);
+    undoToast(t("purchases.bought", { purchase, name: row.name, chips: i18n.number(config[kind]?.stack ?? 0) }), next.history.undo?.seq);
+  };
+
+  const reenter = async (seat: SeatRef | undefined) => {
+    if (!reentering) return;
+    const next = await run({ type: "reenter", player: reentering.player, ...(seat ? { seat } : {}) });
+    if (!next) return;
+    const back = next.ranking.find((candidate) => candidate.player === reentering.player);
+    setReentering(null);
+    if (back?.seat) undoToast(t("purchases.reentered", { name: back.name, table: back.seat.table, seat: back.seat.seat }), next.history.undo?.seq);
+  };
+
+  const purchaseButton = (kind: PurchaseKind, row: RankingRow) => {
+    const limited = atLimit(kind, row);
+    const label = t(`purchases.${kind}.action`);
+    return (
+      <Button
+        key={kind}
+        size="sm"
+        variant="ghost"
+        icon={kind === "reentry" ? "userCheck" : "plus"}
+        aria-label={`${label} ${row.name}`}
+        title={limited ? t("purchases.limitReached") : undefined}
+        disabled={limited}
+        onClick={() => (kind === "reentry" ? setReentering(row) : void buy(kind, row))}
+      >
+        {label}
+      </Button>
+    );
+  };
+
+  const buys = (row: RankingRow) =>
+    [
+      row.entries > 1 ? t("purchases.entries", { count: row.entries }) : null,
+      row.rebuys ? t("purchases.rebuys", { count: row.rebuys }) : null,
+      row.addons ? t("purchases.addons", { count: row.addons }) : null
+    ].filter(Boolean);
 
   const toggle = (player: number, selected: boolean) => {
     const next = new Map(selection ?? []);
@@ -202,6 +272,7 @@ export default function PlayersScreen() {
                     )}
                     <th scope="row" className="player-name">
                       {row.name}
+                      {buys(row).length > 0 && <span className="player-buys">{buys(row).join(" · ")}</span>}
                     </th>
                     <td className="muted">{row.seat ? t("common.tableSeat", { table: row.seat.table, seat: row.seat.seat }) : t("common.none")}</td>
                     <td>{status(row)}</td>
@@ -218,10 +289,17 @@ export default function PlayersScreen() {
                           onChange={(value) => setSelection(new Map(selection).set(row.player, value))}
                         />
                       )}
-                      {!selection && canEliminate && row.alive && (
-                        <Button size="sm" icon="userX" onClick={() => eliminate(row.player)} aria-label={`${t("players.eliminate")} ${row.name}`}>
-                          {t("players.eliminate")}
-                        </Button>
+                      {!selection && (
+                        <span className="row-actions">
+                          {row.alive
+                            ? (["rebuy", "addon"] as const).filter((kind) => open[kind]).map((kind) => purchaseButton(kind, row))
+                            : open.reentry && purchaseButton("reentry", row)}
+                          {canEliminate && row.alive && (
+                            <Button size="sm" icon="userX" onClick={() => eliminate(row.player)} aria-label={`${t("players.eliminate")} ${row.name}`}>
+                              {t("players.eliminate")}
+                            </Button>
+                          )}
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -238,7 +316,21 @@ export default function PlayersScreen() {
             <Stat label={t("players.filterAlive")} value={view.counts.alive} tone="success" />
             <Stat label={t("players.filterOut")} value={view.counts.busted} />
             <Stat label={t("players.entries")} value={view.counts.entries} />
+            {view.counts.reentries !== undefined && <Stat label={t("purchases.reentry.title")} value={view.counts.reentries} />}
+            {view.counts.rebuys !== undefined && <Stat label={t("purchases.rebuy.title")} value={view.counts.rebuys} />}
+            {view.counts.addons !== undefined && <Stat label={t("purchases.addon.title")} value={view.counts.addons} />}
           </StatGroup>
+          {running && (
+            <div className="purchase-status">
+              {(["reentry", "rebuy", "addon"] as const)
+                .filter((kind) => config[kind] !== undefined)
+                .map((kind) => (
+                  <Pill key={kind} tone={open[kind] ? "success" : "muted"} dot={open[kind]}>
+                    {t(open[kind] ? `purchases.${kind}.open` : `purchases.${kind}.closed`)}
+                  </Pill>
+                ))}
+            </div>
+          )}
         </Section>
 
         {running && eliminated.length > 0 && (
@@ -269,6 +361,7 @@ export default function PlayersScreen() {
           </Section>
         )}
       </aside>
+      <ReEnterDialog view={view} row={reentering} onCancel={() => setReentering(null)} onConfirm={reenter} />
     </div>
   );
 }

@@ -7,10 +7,11 @@ import { Button } from "../components/Button";
 import { Section } from "../components/Card";
 import { ConfigFields, LateRegFields, sanitizeConfig } from "../components/ConfigForm";
 import { MoneyFields } from "../components/MoneyFields";
+import { PurchaseFields } from "../components/PurchaseFields";
 import { StructureEditor } from "../components/StructureEditor";
 import { useToast } from "../components/Toast";
 import { useEngine } from "../EngineContext";
-import { defaultStructure, fromDraft, newBreakDraft, newPlayDraft, toDraft, type LevelDraft } from "../utils/structure";
+import { defaultStructure, firstBreakAfter, fromDraft, newBreakDraft, newPlayDraft, toDraft, type LevelDraft } from "../utils/structure";
 
 export function defaultConfig(): Config {
   return {
@@ -91,6 +92,10 @@ export default function SetupScreen() {
           </Section>
         </div>
       </div>
+
+      <Section title={t("purchases.section")} description={t("purchases.sectionHint")}>
+        <PurchaseFields config={config} onChange={setConfig} firstBreakAfter={firstBreakAfter(rows)} />
+      </Section>
 
       <Section title={t("structure.title")} flush>
         <StructureEditor rows={rows} onChange={setRows} invalidRows={invalidRow === null ? undefined : new Set([invalidRow])} />

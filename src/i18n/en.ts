@@ -78,7 +78,7 @@ const errors = {
   INVALID_PURCHASE: "Check the price, chips and limit of the re-entry, rebuy and add-on settings.",
   INVALID_PURCHASE_WINDOW: "Check when re-entries, rebuys and add-ons are available: that level does not exist.",
   REENTRY_CLOSED: "Re-entries are closed.",
-  MAX_ENTRIES: "This player has already used the maximum of {max} entries.",
+  MAX_ENTRIES: "This player has already re-entered the maximum of {max} times.",
   REBUY_CLOSED: "Rebuys are closed.",
   REBUY_LIMIT: "This player has already used the maximum of {max} rebuys.",
   ADDON_CLOSED: "Add-ons are not available now.",
@@ -205,6 +205,9 @@ export const en = {
     table_opened: "open table {table}",
     table_broken: "break table {table}",
     final_table_formed: "final table draw",
+    player_reentered: "re-entry of {names}",
+    rebuy_recorded: "rebuy for {names}",
+    addon_recorded: "add-on for {names}",
     unknown: "{kind}",
     /** Stands for the names when the log no longer knows them (an unregistered player). */
     somePlayer: "a player"
@@ -310,6 +313,57 @@ export const en = {
     minCashHint: "Optional: fewer places are paid so that every payout reaches it.",
     payoutsLockedHint: "Payouts are locked: unlock them to change this.",
     none: "None"
+  },
+  purchases: {
+    section: "Re-entries, rebuys and add-ons",
+    sectionHint: "Optional. Each purchase keeps the price and chips it gave, so later changes never rewrite it.",
+    price: "Price",
+    playerPays: "Player pays {amount}.",
+    chips: "Chips",
+    maxHint: "Per player. Empty: unlimited.",
+    unlimited: "Unlimited",
+    window: "Available",
+    whileRegistrationOpen: "While registration is open",
+    breakAfter: "During the break after play level",
+    reentry: {
+      title: "Re-entries",
+      offer: "Offer re-entries",
+      hint: "An eliminated player buys a new entry and draws a new seat.",
+      max: "Re-entries per player",
+      action: "Re-enter",
+      open: "Re-entries open",
+      closed: "Re-entries closed"
+    },
+    rebuy: {
+      title: "Rebuys",
+      offer: "Offer rebuys",
+      hint: "A player still in buys more chips.",
+      max: "Rebuys per player",
+      action: "Rebuy",
+      open: "Rebuys open",
+      closed: "Rebuys closed"
+    },
+    addon: {
+      title: "Add-ons",
+      offer: "Offer an add-on",
+      hint: "A player still in buys extra chips, usually once at a break.",
+      max: "Add-ons per player",
+      action: "Add-on",
+      open: "Add-ons open",
+      closed: "Add-ons closed"
+    },
+    limitReached: "Limit reached for this player",
+    reenterTitle: "Re-enter {name}",
+    reenterEntry: "Entry {entry}, {chips} chips.",
+    reenterEntryPrice: "Entry {entry}: {price} for {chips} chips.",
+    drawSeat: "Draw a seat",
+    drawSeatHint: "Like a registration: the table with the fewest players, then a random seat.",
+    chooseSeat: "Choose the seat",
+    reentered: "{name} re-entered: table {table}, seat {seat}",
+    bought: "{purchase} for {name}: +{chips} chips",
+    entries: { one: "{count} entry", other: "{count} entries" },
+    rebuys: { one: "{count} rebuy", other: "{count} rebuys" },
+    addons: { one: "{count} add-on", other: "{count} add-ons" }
   },
   setup: {
     title: "New tournament",
