@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { LANGUAGE_STORAGE_KEY } from "../../i18n";
 import { playerId, register, renderApp, withTournament } from "../../test/app";
 
 /** The ranking's body rows, cell by cell: place, player, status. */
@@ -68,6 +69,33 @@ describe("ExportsScreen", () => {
       ["#4", "Chloé", "Eliminated"]
     ]);
     expect(screen.getByText("Final ranking")).toBeInTheDocument();
+  });
+
+  it("ranks and exports in French", async () => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "fr");
+    const user = userEvent.setup();
+    const { engine, id, bust } = await fourPlayers();
+    await engine.dispatch(id, { type: "close_registration" });
+    await bust("Bob", "Chloé");
+    await bust("Anna");
+    const save = vi.spyOn(engine, "saveExport").mockResolvedValue(true);
+    renderApp(engine, `/t/${id}/exports`);
+
+    await screen.findByText("Anna");
+    expect(rows()).toEqual([
+      ["1er", "Łukasz", "Vainqueur"],
+      ["2e", "Anna", "Éliminé"],
+      ["3e–4e", "Bob", "Éliminé (ex æquo 3e–4e)"],
+      ["3e–4e", "Chloé", "Éliminé (ex æquo 3e–4e)"]
+    ]);
+    expect(screen.getByText("Classement final")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Exporter en CSV" }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    const [{ fileName, bytes }] = save.mock.calls[0];
+    expect(fileName).toBe("Test event-classement.csv");
+    expect(new TextDecoder().decode(bytes).split("\r\n")[0]).toBe("Place,Joueur,État");
+    expect(await screen.findByText("Classement exporté en CSV")).toBeInTheDocument();
   });
 
   it("exports the ranking as CSV through the engine", async () => {

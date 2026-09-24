@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "../../i18n";
 import { Field } from "./Field";
 import { NumberInput } from "./NumberInput";
 
@@ -65,6 +66,23 @@ describe("NumberInput", () => {
     expect(input).toHaveValue("12.");
     await user.type(input, "5");
     expect(onValue).toHaveBeenLastCalledWith(12.5);
+  });
+
+  it("writes decimals with a comma in French, whichever separator is typed", async () => {
+    const user = userEvent.setup();
+    const onValue = vi.fn();
+    render(
+      <I18nProvider locale="fr">
+        <Controlled initial={7.5} onValue={onValue} allowDecimal />
+      </I18nProvider>
+    );
+    const input = screen.getByRole("spinbutton", { name: "Big blind" });
+    expect(input).toHaveValue("7,5");
+
+    await user.clear(input);
+    await user.type(input, "12.25");
+    expect(input).toHaveValue("12,25");
+    expect(onValue).toHaveBeenLastCalledWith(12.25);
   });
 
   it("ignores letters and signs", async () => {

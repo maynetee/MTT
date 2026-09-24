@@ -100,7 +100,9 @@ The engine already handles the following; the screens to use them are coming in 
 
 ### Languages
 
-English. French is coming in 1.0.
+English and French. The app speaks French when the first language of the system it knows is
+French, English otherwise; Preferences switches it for this computer, and an open display
+follows at once.
 
 ### Privacy
 

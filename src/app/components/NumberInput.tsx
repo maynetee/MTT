@@ -1,4 +1,6 @@
 import { forwardRef, useState, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent } from "react";
+import { useI18n } from "../../i18n";
+import { decimalSeparator } from "../utils/money";
 import { useFieldProps } from "./Field";
 
 type NativeProps = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "min" | "max" | "step" | "size">;
@@ -11,7 +13,7 @@ export interface NumberInputProps extends NativeProps {
   max?: number;
   /** Arrow keys add or remove this much (ten times with Shift). */
   step?: number;
-  /** Accepts one decimal separator (e.g. minutes). */
+  /** Accepts one decimal separator (e.g. minutes), shown as the language writes it ("," in French). */
   allowDecimal?: boolean;
   /** Width in digits, for inputs sized to their content; fills its container otherwise. */
   digits?: number;
@@ -19,13 +21,14 @@ export interface NumberInputProps extends NativeProps {
 
 const MAX_LENGTH = 15;
 
-function toText(value: number | null): string {
-  return value === null || Number.isNaN(value) ? "" : String(value);
+function toText(value: number | null, separator: string): string {
+  return value === null || Number.isNaN(value) ? "" : String(value).replace(".", separator);
 }
 
 function parse(text: string): number | null {
-  if (text === "" || text === ".") return null;
-  const value = Number(text);
+  const normalized = text.replace(",", ".");
+  if (normalized === "" || normalized === ".") return null;
+  const value = Number(normalized);
   return Number.isFinite(value) ? value : null;
 }
 
@@ -33,15 +36,18 @@ function same(a: number | null, b: number | null): boolean {
   return a === b || (a !== null && b !== null && Number.isNaN(a) && Number.isNaN(b));
 }
 
-/** Keeps digits (and one decimal point when allowed): letters and signs never reach the value. */
-function sanitize(raw: string, allowDecimal: boolean): string {
+/**
+ * Keeps digits (and one decimal separator when allowed, a dot or a comma typed as `separator`):
+ * letters and signs never reach the value.
+ */
+function sanitize(raw: string, allowDecimal: boolean, separator: string): string {
   let seenPoint = false;
   let text = "";
-  for (const char of raw.replace(",", allowDecimal ? "." : "")) {
+  for (const char of raw) {
     if (char >= "0" && char <= "9") text += char;
-    else if (char === "." && allowDecimal && !seenPoint) {
+    else if ((char === "." || char === ",") && allowDecimal && !seenPoint) {
       seenPoint = true;
-      text += char;
+      text += separator;
     }
   }
   return text.slice(0, MAX_LENGTH);
@@ -57,17 +63,21 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
   ref
 ) {
   const props = useFieldProps(rest);
+  const { locale } = useI18n();
+  const separator = allowDecimal ? decimalSeparator(locale) : ".";
   const current = value === null || Number.isNaN(value) ? null : value;
   // What is typed, and the value it was typed for: the text survives re-renders that bring
-  // the same value back ("12." stays "12."), and follows the value when it changes elsewhere.
-  const [draft, setDraft] = useState(() => ({ text: toText(current), value: current }));
-  if (!same(draft.value, current)) {
-    setDraft({ text: same(parse(draft.text), current) ? draft.text : toText(current), value: current });
+  // the same value back ("12." stays "12."), and follows the value when it changes elsewhere
+  // (or the language, for its decimal separator).
+  const [draft, setDraft] = useState(() => ({ text: toText(current, separator), value: current, separator }));
+  if (!same(draft.value, current) || draft.separator !== separator) {
+    const keep = draft.separator === separator && same(parse(draft.text), current);
+    setDraft({ text: keep ? draft.text : toText(current, separator), value: current, separator });
   }
 
   const commit = (text: string) => {
     const next = parse(text);
-    setDraft({ text, value: next });
+    setDraft({ text, value: next, separator });
     if (!same(next, current)) onChange(next);
   };
 
@@ -79,7 +89,7 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
     event.preventDefault();
     const delta = (event.key === "ArrowUp" ? step : -step) * (event.shiftKey ? 10 : 1);
-    commit(toText(clamp((current ?? min ?? 0) + delta)));
+    commit(toText(clamp((current ?? min ?? 0) + delta), separator));
   };
 
   const widthStyle = digits ? ({ ...style, "--digits": digits } as CSSProperties) : style;
@@ -98,11 +108,11 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
       className={["input", "number-input", digits ? "number-input--sized" : "", className ?? ""].filter(Boolean).join(" ")}
       style={widthStyle}
       value={draft.text}
-      onChange={(event) => commit(sanitize(event.target.value, allowDecimal))}
+      onChange={(event) => commit(sanitize(event.target.value, allowDecimal, separator))}
       onKeyDown={handleKeyDown}
       onBlur={(event) => {
         // "007" becomes "7" once the director moves on.
-        if (draft.text !== toText(current)) setDraft({ text: toText(current), value: current });
+        if (draft.text !== toText(current, separator)) setDraft({ text: toText(current, separator), value: current, separator });
         onBlur?.(event);
       }}
       {...props}

@@ -313,12 +313,12 @@ export default function PlayersScreen() {
       <aside className="players-aside">
         <Section title={t("players.summary")}>
           <StatGroup>
-            <Stat label={t("players.filterAlive")} value={view.counts.alive} tone="success" />
-            <Stat label={t("players.filterOut")} value={view.counts.busted} />
-            <Stat label={t("players.entries")} value={view.counts.entries} />
-            {view.counts.reentries !== undefined && <Stat label={t("purchases.reentry.title")} value={view.counts.reentries} />}
-            {view.counts.rebuys !== undefined && <Stat label={t("purchases.rebuy.title")} value={view.counts.rebuys} />}
-            {view.counts.addons !== undefined && <Stat label={t("purchases.addon.title")} value={view.counts.addons} />}
+            <Stat label={t("players.filterAlive")} value={i18n.number(view.counts.alive)} tone="success" />
+            <Stat label={t("players.filterOut")} value={i18n.number(view.counts.busted)} />
+            <Stat label={t("players.entries")} value={i18n.number(view.counts.entries)} />
+            {view.counts.reentries !== undefined && <Stat label={t("purchases.reentry.title")} value={i18n.number(view.counts.reentries)} />}
+            {view.counts.rebuys !== undefined && <Stat label={t("purchases.rebuy.title")} value={i18n.number(view.counts.rebuys)} />}
+            {view.counts.addons !== undefined && <Stat label={t("purchases.addon.title")} value={i18n.number(view.counts.addons)} />}
           </StatGroup>
           {running && (
             <div className="purchase-status">

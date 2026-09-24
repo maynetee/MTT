@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName } from "pdf-lib";
 import { describe, expect, it, vi } from "vitest";
 import type { RankingRow } from "../../engine/types";
+import { getI18n } from "../../i18n";
 import type { PdfFontLoader } from "./pdfFonts";
 import { buildRankingPdf } from "./rankingPdf";
 
@@ -40,6 +41,20 @@ describe("buildRankingPdf", () => {
     const bytes = await buildRankingPdf(rows, { tournamentName: "Main Event", finished: true, winner: 1, loadFonts: loadFontsFromDisk });
 
     expect((await PDFDocument.load(bytes)).getTitle()).toBe("Final ranking - Main Event");
+  });
+
+  it("titles the ranking and tags the document in the language of the export", async () => {
+    const i18n = getI18n("fr");
+    const final = await PDFDocument.load(
+      await buildRankingPdf(rows, { tournamentName: "Main Event", finished: true, winner: 1, loadFonts: loadFontsFromDisk, i18n })
+    );
+    expect(final.getTitle()).toBe("Classement final - Main Event");
+    expect(final.catalog.get(PDFName.of("Lang"))?.toString()).toBe("(fr)");
+
+    const snapshot = await PDFDocument.load(
+      await buildRankingPdf(rows, { tournamentName: "Main Event", finished: false, winner: null, loadFonts: loadFontsFromDisk, i18n })
+    );
+    expect(snapshot.getTitle()).toMatch(/^Classement — \d{4}-\d{2}-\d{2} \d{2}:\d{2} - Main Event$/);
   });
 
   it("adds a prize column when money is tracked", async () => {

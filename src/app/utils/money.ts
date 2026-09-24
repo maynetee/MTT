@@ -113,29 +113,47 @@ export function toDecimal(amount: number, exponent: number): string {
   return `${sign}${digits.slice(0, -exponent)}.${digits.slice(-exponent)}`;
 }
 
-/** What a money field shows for an amount: "110" for a whole amount, "12.50" otherwise. */
-export function toInputText(amount: number | null, exponent: number): string {
-  if (amount === null || !Number.isFinite(amount)) return "";
-  const text = toDecimal(amount, exponent);
-  return amount % majorUnit(exponent) === 0 ? text.replace(/\.0+$/, "") : text;
+const separators = new Map<string, string>();
+
+/** The decimal separator of the locale: "." in English, "," in French. */
+export function decimalSeparator(locale: string): string {
+  let separator = separators.get(locale);
+  if (separator === undefined) {
+    separator = new Intl.NumberFormat(locale).formatToParts(1.5).find((part) => part.type === "decimal")?.value ?? ".";
+    separators.set(locale, separator);
+  }
+  return separator;
 }
 
-/** Keeps what can be part of an amount: digits and one separator, `exponent` decimals at most. */
-export function sanitizeMoneyText(raw: string, exponent: number): string {
+/**
+ * What a money field shows for an amount: "110" for a whole amount, "12.50" otherwise, with the
+ * locale's decimal `separator` ("12,50" in French).
+ */
+export function toInputText(amount: number | null, exponent: number, separator = "."): string {
+  if (amount === null || !Number.isFinite(amount)) return "";
+  const text = toDecimal(amount, exponent);
+  return (amount % majorUnit(exponent) === 0 ? text.replace(/\.0+$/, "") : text).replace(".", separator);
+}
+
+/**
+ * Keeps what can be part of an amount: digits and one separator, `exponent` decimals at most.
+ * A dot or a comma becomes the locale's decimal `separator`.
+ */
+export function sanitizeMoneyText(raw: string, exponent: number, separator = "."): string {
   let text = "";
-  let separator = false;
+  let separated = false;
   let decimals = 0;
   let digits = 0;
   for (const char of raw) {
     if (char >= "0" && char <= "9") {
-      if (separator && decimals >= exponent) continue;
+      if (separated && decimals >= exponent) continue;
       if (digits >= MAX_MONEY_DIGITS) continue;
-      if (separator) decimals += 1;
+      if (separated) decimals += 1;
       digits += 1;
       text += char;
-    } else if ((char === "." || char === ",") && exponent > 0 && !separator) {
-      separator = true;
-      text += ".";
+    } else if ((char === "." || char === ",") && exponent > 0 && !separated) {
+      separated = true;
+      text += separator;
     }
   }
   return text;

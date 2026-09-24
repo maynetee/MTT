@@ -39,8 +39,10 @@
 
 .app-header-bar {
   display: grid;
-  /* Equal side columns keep the clock centered whatever the name's length. */
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  /* Equal side columns keep the clock centered whatever the name's length; the actions
+     never shrink under their width (a longer language moves the clock left instead of
+     covering it). */
+  grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
   align-items: center;
   gap: var(--space-4);
   max-width: var(--page-max);
@@ -70,11 +72,15 @@
 }
 
 .app-header-nav {
+  --tab-padding: 14px;
   max-width: var(--page-max);
   margin: 0 auto;
   /* Tab labels line up with the page content. */
-  padding: 0 calc(var(--page-gutter) - 14px);
+  padding: 0 calc(var(--page-gutter) - var(--tab-padding));
   border-top: 1px solid var(--color-divider);
+  /* Past the narrowest layout, the tabs scroll rather than the page. */
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .brand {
@@ -357,5 +363,11 @@
 
   .clock-pod-toggle {
     min-width: 92px;
+  }
+
+  /* Tighter tabs, so that longer labels (French) and the Deal tab fit at 1024 px. */
+  .app-header-nav {
+    --tab-padding: 10px;
+    --tabs-divider-gap: var(--space-2);
   }
 }

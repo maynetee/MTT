@@ -15,7 +15,7 @@ it is built that way, and what to touch when you add a feature. The tournament r
 | `src/engine` | The `Engine` interface the UI talks to, with one implementation per host (`TauriEngine`, `WasmEngine`). |
 | `src/app` | React screens, hooks and utilities (CSV and PDF exports, labels). No tournament rule lives here. |
 | `src/bindings` | TypeScript types generated from the Rust types by [ts-rs](https://github.com/Aleph-Alpha/ts-rs). Never edited by hand. |
-| `src/i18n` | Messages, including one message per error code (`errors.<CODE>`) and warning. |
+| `src/i18n` | Messages in English (`en.ts`) and French (`fr.ts`), including one message per error code (`errors.<CODE>`) and warning; the language of the device (`language.ts`). |
 | `scripts/wasm.mjs` | Builds `crates/mtt-wasm` into `src/wasm/pkg` with wasm-pack (`npm run wasm`). |
 
 The Cargo workspace holds the three crates. `mtt-core` depends only on serde, serde_json,
@@ -341,7 +341,7 @@ notified once per stored revision.
 | IPC | `src-tauri/src/tests.rs` | The real invoke handler, configuration and capabilities on Tauri's mock runtime, with a temporary data directory. |
 | Engines | `src/engine/*.test.ts` | `WasmEngine` on the real WebAssembly build with in-memory storage (cross-tab behavior, full storage); `TauriEngine` with mocked IPC. |
 | Components | `src/app/**/*.test.tsx` | Screens rendered with Testing Library against a real `WasmEngine`. |
-| Messages | `src/i18n/i18n.test.ts` | Every error code in the generated bindings has an English message using only its parameters. |
+| Messages | `src/i18n/*.test.ts` | Every error code in the generated bindings has an English message using only its parameters; the French messages have the same keys and placeholders (also a type check), French typography and plurals. |
 
 Run them with `cargo test --workspace` and `npm test`. A bug fix comes with a regression test.
 
@@ -364,7 +364,7 @@ Run them with `cargo test --workspace` and `npm test`. A bug fix comes with a re
    if it matters end to end.
 7. **Bindings.** Run `cargo test -p mtt-core` and commit the regenerated `src/bindings/`.
 8. **Messages.** Add `errors.<CODE>` for each new error and `actions.<event_kind>` for the undo
-   label in `src/i18n/en.ts`.
+   label in `src/i18n/en.ts`, and their French in `src/i18n/fr.ts`.
 9. **Hosts.** Nothing to do: both hosts dispatch any `Command`. Only a new host operation (not a
    core command) needs a Tauri command in `commands.rs` registered in `lib.rs`, its name in
    `build.rs`, its `allow-...` permission in the right capability file, an IPC test, and a method

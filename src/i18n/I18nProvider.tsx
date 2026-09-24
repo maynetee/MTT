@@ -1,10 +1,21 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { createI18n, i18n as english, type I18n, type Locale } from "./core";
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
+import { getI18n, i18n as english, type I18n } from "./core";
+import { useLanguage, type Locale } from "./language";
 
 const I18nContext = createContext<I18n>(english);
 
-export function I18nProvider({ locale = "en", children }: { locale?: Locale; children: ReactNode }) {
-  const value = useMemo(() => (locale === english.locale ? english : createI18n(locale)), [locale]);
+/**
+ * Translations and formats for the language of this device (see ./language.ts), or for
+ * `locale` when given. Keeps `<html lang>` in step, so assistive technology reads the page
+ * in the right language.
+ */
+export function I18nProvider({ locale, children }: { locale?: Locale; children: ReactNode }) {
+  const language = useLanguage();
+  const active = locale ?? language.locale;
+  const value = useMemo(() => getI18n(active), [active]);
+  useEffect(() => {
+    document.documentElement.lang = active;
+  }, [active]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 

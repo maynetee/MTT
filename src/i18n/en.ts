@@ -818,7 +818,10 @@ export const en = {
     output_auto: "Automatic",
     output_autoHint: "The display window when it is open, this window otherwise.",
     output_control: "This window",
-    output_display: "The display window"
+    output_display: "The display window",
+    language: "Language",
+    /** `{language}` is the language the system asks for, in that language. */
+    languageSystem: "Match system ({language})"
   },
   exports: {
     title: "Exports",

@@ -754,8 +754,9 @@ h1.section-title {
 }
 
 .tabs-divider {
+  flex: none;
   width: 1px;
-  margin: 12px var(--space-3);
+  margin: 12px var(--tabs-divider-gap, var(--space-3));
   background: var(--color-border);
 }
 
@@ -764,7 +765,7 @@ h1.section-title {
   display: inline-flex;
   align-items: center;
   height: 100%;
-  padding: 0 14px;
+  padding: 0 var(--tab-padding, 14px);
   color: var(--color-text-muted);
   font-weight: var(--weight-medium);
   text-decoration: none;
@@ -775,9 +776,9 @@ h1.section-title {
 .tab::after {
   content: "";
   position: absolute;
-  right: 10px;
+  right: calc(var(--tab-padding, 14px) - 4px);
   bottom: 0;
-  left: 10px;
+  left: calc(var(--tab-padding, 14px) - 4px);
   height: 3px;
   border-radius: 3px 3px 0 0;
   background: transparent;

@@ -74,7 +74,8 @@ function PlaceTable({
 
 /** Pool, fees, guarantee and overlay. */
 function PoolSummary({ format }: { format: MoneyFormatter }) {
-  const { t } = useI18n();
+  const i18n = useI18n();
+  const { t } = i18n;
   const { view } = useTournament();
   const money = view.money!;
   return (
@@ -84,7 +85,7 @@ function PoolSummary({ format }: { format: MoneyFormatter }) {
       {money.guarantee !== null && <Stat label={t("payouts.guarantee")} value={format(money.guarantee, { whole: true })} />}
       {money.overlay > 0 && <Stat label={t("payouts.overlay")} value={format(money.overlay, { whole: true })} tone="danger" />}
       <Stat label={t("payouts.fees")} value={format(money.fees, { whole: true })} />
-      <Stat label={t("players.entries")} value={view.counts.entries} />
+      <Stat label={t("players.entries")} value={i18n.number(view.counts.entries)} />
     </StatGroup>
   );
 }

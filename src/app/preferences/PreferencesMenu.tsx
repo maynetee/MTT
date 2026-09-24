@@ -1,18 +1,19 @@
 import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
-import { useI18n } from "../../i18n";
+import { LANGUAGE_NAMES, LANGUAGE_PREFERENCES, setLanguagePreference, useI18n, useLanguage, type LanguagePreference } from "../../i18n";
 import { Button, IconButton } from "../components/Button";
 import { Checkbox, RadioGroup } from "../components/Field";
 import { previewCue } from "../sound/audio";
 import { SOUND_OUTPUTS, setPreferences, usePreferences } from "./preferences";
 
 /**
- * Header control for this device's preferences (level sounds for now): a button that opens a
- * small non-modal panel. Esc, a click outside or tabbing away closes it.
+ * Header control for this device's preferences (level sounds and language): a button that
+ * opens a small non-modal panel. Esc, a click outside or tabbing away closes it.
  */
 export function PreferencesMenu() {
   const i18n = useI18n();
   const { t } = i18n;
   const preferences = usePreferences();
+  const language = useLanguage();
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const titleId = useId();
@@ -107,6 +108,22 @@ export function PreferencesMenu() {
               label: t(`preferences.output_${output}`),
               disabled: !preferences.sound,
               nested: output === "auto" ? <span className="preferences-hint">{t("preferences.output_autoHint")}</span> : undefined
+            }))}
+          />
+          <RadioGroup<LanguagePreference>
+            legend={t("preferences.language")}
+            name={`${panelId}-language`}
+            value={language.preference}
+            onChange={setLanguagePreference}
+            options={LANGUAGE_PREFERENCES.map((preference) => ({
+              value: preference,
+              // Each language in its own name, so a director who cannot read this one finds theirs.
+              label:
+                preference === "system" ? (
+                  t("preferences.languageSystem", { language: LANGUAGE_NAMES[language.system] })
+                ) : (
+                  <span lang={preference}>{LANGUAGE_NAMES[preference]}</span>
+                )
             }))}
           />
         </div>

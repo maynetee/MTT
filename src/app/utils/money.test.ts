@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { currencyExponent, currencySymbol, moneyFormatter, parseMoney, rescale, sanitizeMoneyText, toDecimal, toInputText } from "./money";
+import {
+  currencyExponent,
+  currencySymbol,
+  decimalSeparator,
+  moneyFormatter,
+  parseMoney,
+  rescale,
+  sanitizeMoneyText,
+  toDecimal,
+  toInputText
+} from "./money";
 
 const EUR = { code: "EUR", exponent: 2 };
 const JPY = { code: "JPY", exponent: 0 };
@@ -66,6 +76,16 @@ describe("money text", () => {
     expect(sanitizeMoneyText("-5a0", 2)).toBe("50");
     expect(sanitizeMoneyText("12.5", 0)).toBe("125");
     expect(sanitizeMoneyText("1234567890123456789", 2)).toBe("123456789012345");
+  });
+
+  it("writes the decimal separator of the language in money fields", () => {
+    expect(decimalSeparator("en")).toBe(".");
+    expect(decimalSeparator("fr")).toBe(",");
+    expect(toInputText(1250, 2, ",")).toBe("12,50");
+    expect(toInputText(11_000, 2, ",")).toBe("110");
+    expect(sanitizeMoneyText("7.5", 2, ",")).toBe("7,5");
+    expect(sanitizeMoneyText("7,55", 2, ",")).toBe("7,55");
+    expect(parseMoney(toInputText(1250, 2, ","), 2)).toBe(1250);
   });
 
   it("keeps the amounts typed when the currency changes", () => {

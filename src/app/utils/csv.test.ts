@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RankingRow } from "../../engine/types";
+import { getI18n } from "../../i18n";
 import { buildRankingCsv, escapeCsvField, toCsvRow } from "./csv";
 
 describe("escapeCsvField", () => {
@@ -87,6 +88,24 @@ describe("buildRankingCsv", () => {
       "1,Ann,Winner,750.50",
       "2,Ben,Eliminated,450.00",
       "3,Cat,Eliminated,",
+      ""
+    ]);
+  });
+
+  it("writes the header and the statuses in the language of the export", () => {
+    const rows = [
+      row(1, "Ann", 1, { alive: true, prize: 75_050 }),
+      row(2, "Ben", 2, { placeTo: 3 }),
+      row(3, "Cat", 2, { placeTo: 3, provisional: true }),
+      row(4, "Dan", null, { alive: true })
+    ];
+
+    expect(buildRankingCsv(rows, 1, getI18n("fr"), { code: "EUR", exponent: 2 }).split("\r\n")).toEqual([
+      "\uFEFFPlace,Joueur,État,Gain (EUR)",
+      "1,Ann,Vainqueur,750.50",
+      "2,Ben,Éliminé (ex æquo 2e–3e),",
+      '2,Cat,"Éliminé (ex æquo 2e–3e, provisoire)",',
+      ",Dan,En jeu,",
       ""
     ]);
   });

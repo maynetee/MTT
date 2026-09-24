@@ -16,10 +16,30 @@ export type MessageKeys<T, Prefix extends string = ""> = {
   [K in keyof T & string]: T[K] extends Message ? `${Prefix}${K}` : MessageKeys<T[K], `${Prefix}${K}.`>;
 }[keyof T & string];
 
-/** The same shape with plain strings, for other languages. */
+/**
+ * The same shape, for another language. Any message may take plural forms there, even one that
+ * needs none in English (French writes places as ordinals: `1er`, `2e`).
+ */
 export type Translation<T> = {
-  readonly [K in keyof T]: T[K] extends string ? string : T[K] extends PluralMessage ? PluralMessage : Translation<T[K]>;
+  readonly [K in keyof T]: T[K] extends Message ? Message : Translation<T[K]>;
 };
+
+/** The `{name}` placeholders of a message, every plural form included. */
+type Placeholders<S> = S extends `${string}{${infer Name}}${infer Rest}` ? Name | Placeholders<Rest> : never;
+type MessagePlaceholders<M> = M extends string ? Placeholders<M> : M extends PluralMessage ? Placeholders<M[keyof M]> : never;
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+/**
+ * Dotted keys of `T` whose message in `U` has other placeholders (a missing or extra key fails
+ * `Translation<T>` already). `never` when the translation matches.
+ */
+export type PlaceholderMismatches<T, U, Prefix extends string = ""> = {
+  [K in keyof T & keyof U & string]: T[K] extends Message
+    ? Same<MessagePlaceholders<T[K]>, MessagePlaceholders<U[K]>> extends true
+      ? never
+      : `${Prefix}${K}`
+    : PlaceholderMismatches<T[K], U[K], `${Prefix}${K}.`>;
+}[keyof T & keyof U & string];
 
 export type Params = Readonly<Record<string, string | number | null | undefined>>;
 

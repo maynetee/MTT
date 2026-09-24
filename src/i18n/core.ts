@@ -2,14 +2,16 @@ import type { ActionLabel } from "../bindings/ActionLabel";
 import type { Warning } from "../bindings/Warning";
 import type { EngineError } from "../engine/types";
 import { en } from "./en";
+import { fr } from "./fr";
+import type { Locale } from "./language";
 import { createTranslate, lookup, type MessageKeys, type MessageTree, type Params } from "./translate";
 
 export type { Params } from "./translate";
+export type { Locale } from "./language";
 
-export type Locale = "en";
 export type MessageKey = MessageKeys<typeof en>;
 
-const dictionaries: Record<Locale, MessageTree> = { en };
+const dictionaries: Record<Locale, MessageTree> = { en, fr };
 
 /** Resolves a player id to a name, for messages about players. */
 export type PlayerNames = (player: number) => string | undefined;
@@ -117,6 +119,18 @@ export function createI18n(locale: Locale = "en"): I18n {
   };
 }
 
-/** English strings for code outside React (exports). */
-export const i18n = createI18n("en");
+const instances = new Map<Locale, I18n>();
+
+/** The shared instance for a language (formatters are costly to build). */
+export function getI18n(locale: Locale): I18n {
+  let instance = instances.get(locale);
+  if (!instance) {
+    instance = createI18n(locale);
+    instances.set(locale, instance);
+  }
+  return instance;
+}
+
+/** English strings for code outside React, and the default of the exports. */
+export const i18n = getI18n("en");
 export const t = i18n.t;
