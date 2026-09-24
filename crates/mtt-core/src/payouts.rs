@@ -20,7 +20,7 @@ use crate::event::Event;
 use crate::ids::PlayerId;
 use crate::money::Money;
 use crate::ranking::{self, Placement};
-use crate::state::State;
+use crate::state::{Phase, State};
 
 /// Prize pool totals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -325,7 +325,8 @@ pub fn amount_at(amounts: &[Money], place: u32) -> Money {
 
 /// Prize of every placed player. Players tied over `[p, p + c - 1]` share the amounts of
 /// those places (zero beyond the places paid): each gets the floor of the share and the
-/// leftover minor units go one each by ascending player id.
+/// leftover minor units go one each by ascending player id. A deal sets the prize of its
+/// players (placed or not), the winner adding what was left to play for.
 pub fn prizes(state: &State, amounts: &[Money]) -> BTreeMap<PlayerId, Money> {
     let mut clusters: BTreeMap<Placement, Vec<PlayerId>> = BTreeMap::new();
     // Placements iterate by ascending player id, so each cluster is sorted.
@@ -342,6 +343,20 @@ pub fn prizes(state: &State, amounts: &[Money]) -> BTreeMap<PlayerId, Money> {
         for (i, player) in members.into_iter().enumerate() {
             let extra = i64::from((i as i64) < leftover);
             out.insert(player, Money(each + extra));
+        }
+    }
+    if let Some(deal) = &state.deal {
+        let winner = match state.phase {
+            Phase::Finished { winner } => Some(winner),
+            _ => None,
+        };
+        for share in &deal.amounts {
+            let bonus = if winner == Some(share.player) {
+                deal.play_for
+            } else {
+                Money::ZERO
+            };
+            out.insert(share.player, share.amount.saturating_add(bonus));
         }
     }
     out

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::clock::{Clock, ClockReason};
 use crate::command::MoveReason;
 use crate::config::Config;
+use crate::deal::DealShare;
 use crate::ids::{BustGroup, PlayerId, SeatNo, SeatRef, Seq, TableNo, TournamentId};
 use crate::money::{Chips, Money, Price};
 use crate::structure::Level;
@@ -164,6 +165,12 @@ pub enum Event {
     },
     #[serde(rename = "payouts_unlocked")]
     PayoutsUnlocked {},
+    /// The remaining players share what their places pay; `play_for` goes to the winner.
+    #[serde(rename = "deal_recorded")]
+    DealRecorded {
+        amounts: Vec<DealShare>,
+        play_for: Money,
+    },
     #[serde(rename = "button_set")]
     ButtonSet { table: TableNo, seat: SeatNo },
     #[serde(rename = "table_opened")]
@@ -203,6 +210,7 @@ impl Event {
             Event::ClockChanged { .. } => "clock_changed",
             Event::PayoutsLocked { .. } => "payouts_locked",
             Event::PayoutsUnlocked {} => "payouts_unlocked",
+            Event::DealRecorded { .. } => "deal_recorded",
             Event::ButtonSet { .. } => "button_set",
             Event::TableOpened { .. } => "table_opened",
             Event::TableBroken { .. } => "table_broken",
@@ -233,6 +241,7 @@ impl Event {
             | Event::PlayerRevived { player, .. }
             | Event::PlayerMoved { player, .. } => vec![*player],
             Event::PlayersBusted { busts, .. } => busts.iter().map(|b| b.player).collect(),
+            Event::DealRecorded { amounts, .. } => amounts.iter().map(|s| s.player).collect(),
             Event::TournamentFinished { finish } => vec![finish.winner],
             _ => Vec::new(),
         }

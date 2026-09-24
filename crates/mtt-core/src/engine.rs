@@ -572,6 +572,13 @@ mod tests {
                 pool: crate::money::Money(4),
             },
             Event::PayoutsUnlocked {},
+            Event::DealRecorded {
+                amounts: vec![crate::deal::DealShare {
+                    player: p,
+                    amount: crate::money::Money(5),
+                }],
+                play_for: crate::money::Money(1),
+            },
             Event::ButtonSet {
                 table,
                 seat: SeatNo(1),

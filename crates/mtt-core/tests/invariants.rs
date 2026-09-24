@@ -80,6 +80,8 @@ fn command() -> impl Strategy<Value = Command> {
         1 => player().prop_map(|player| Command::AddOn { player }),
         2 => (player(), seat()).prop_map(|(player, to)| Command::MovePlayer { player, to, reason: None }),
         1 => Just(Command::LockPayouts {}),
+        // Turned into an ICM deal between the players still in by `run_ops`.
+        1 => (0i64..=2_000).prop_map(|play_for| Command::RecordDeal { amounts: Vec::new(), play_for: Some(Money(play_for)) }),
         1 => Just(Command::UnlockPayouts {}),
         1 => Just(Command::CloseRegistration {}),
         1 => Just(Command::ReopenRegistration {}),
@@ -335,6 +337,43 @@ fn check_money(agg: &Aggregate, now: i64) {
     assert_eq!(money.overlay.0, money.effective_pool.0 - prize);
 }
 
+/// A deal between the players still in, as the UI would propose it: ICM on the chips
+/// they bought, over the locked payouts of the remaining places.
+fn icm_deal(state: &State, play_for: Option<Money>) -> Command {
+    let alive: Vec<&mtt_core::state::Player> =
+        state.players.values().filter(|p| p.is_alive()).collect();
+    let empty = Command::RecordDeal {
+        amounts: Vec::new(),
+        play_for,
+    };
+    let Some(locked) = &state.payouts_locked else {
+        return empty;
+    };
+    let prizes: Vec<Money> = (1..=alive.len() as u32)
+        .map(|place| payouts::amount_at(&locked.amounts, place))
+        .collect();
+    let first = prizes.first().copied().unwrap_or(Money::ZERO);
+    let request = mtt_core::DealRequest {
+        stacks: alive.iter().map(|p| p.chips_bought).collect(),
+        prizes,
+        play_for: play_for.map(|p| p.min(first)),
+    };
+    match mtt_core::icm::quote(&request) {
+        Ok(quote) => Command::RecordDeal {
+            amounts: alive
+                .iter()
+                .zip(quote.icm)
+                .map(|(p, amount)| mtt_core::DealShare {
+                    player: p.id,
+                    amount,
+                })
+                .collect(),
+            play_for: Some(quote.play_for),
+        },
+        Err(_) => empty,
+    }
+}
+
 fn run_ops(
     late_reg: Deadline,
     trigger: u8,
@@ -411,6 +450,7 @@ fn run_ops(
                     },
                 }
             }
+            Command::RecordDeal { play_for, .. } => icm_deal(h.agg.state(), play_for),
             // Half the re-entries target a busted player, the rest stay random.
             Command::ReEnter { player, seat } if player.0 % 2 == 0 => {
                 let busted: Vec<PlayerId> = h
@@ -474,6 +514,75 @@ proptest! {
         ops in prop::collection::vec(op(), 1..80),
     ) {
         run_ops(late_reg, trigger, money, payout, players, start, ops);
+    }
+
+    #[test]
+    fn deals_share_the_remaining_payouts(
+        players in 3u32..=12,
+        early_busts in 0usize..=8,
+        payout in payout(),
+        guarantee in prop::option::of(0i64..=200_000),
+        play_for in 0i64..=3_000,
+        seed in any::<u64>(),
+    ) {
+        let money = MoneyConfig {
+            guarantee: guarantee.map(Money),
+            rounding_unit: Money(100),
+            ..MoneyConfig::new("EUR", 2, 10_000, 1_000)
+        };
+        let config = Config {
+            money: Some(money),
+            payout,
+            ..Config::new("Deal", 6, 3, 10_000)
+        };
+        let mut h = Harness::new(config, levels());
+        h.seed = seed;
+        let ids = h.register_many(players);
+        h.start();
+        let busted = early_busts.min(players as usize - 2);
+        for &id in &ids[..busted] {
+            h.bust(&[id]);
+        }
+        h.ok(Command::CloseRegistration {});
+        h.ok(Command::LockPayouts {});
+        let deal = icm_deal(h.agg.state(), Some(Money(play_for)));
+        h.ok(deal);
+        check_invariants(h.agg.state(), &h.view());
+        // Play on to the end.
+        for &id in &ids[busted..ids.len() - 1] {
+            h.bust(&[id]);
+        }
+        let view = h.view();
+        prop_assert!(view.winner.is_some());
+        let money = view.money.as_ref().unwrap();
+        let paid = money.payouts.len().min(players as usize);
+        let expected: i64 = money.payouts[..paid].iter().map(|m| m.0).sum();
+        let won: i64 = view.ranking.iter().filter_map(|r| r.prize).map(|m| m.0).sum();
+        prop_assert_eq!(won, expected);
+        check_invariants(h.agg.state(), &view);
+        let reloaded = Aggregate::from_json(&h.agg.to_json().unwrap()).unwrap();
+        prop_assert_eq!(reloaded, h.agg);
+    }
+
+    #[test]
+    fn icm_sums_exactly_for_any_input(
+        stacks in prop::collection::vec(prop_oneof![Just(0i64), 1i64..=1_000_000_000], 0..=10),
+        prizes in prop::collection::vec(0i64..=1_000_000_000_000, 0..=10),
+        play_for in 0i64..=1_000,
+    ) {
+        let prizes: Vec<Money> = prizes.into_iter().take(stacks.len()).map(Money).collect();
+        let total: i64 = prizes.iter().map(|m| m.0).sum();
+        let top = prizes.iter().map(|m| m.0).max().unwrap_or(0);
+        let stacks: Vec<Chips> = stacks.into_iter().map(Chips).collect();
+        let out = mtt_core::icm(&stacks, &prizes).unwrap();
+        prop_assert_eq!(out.iter().map(|m| m.0).sum::<i64>(), total);
+        prop_assert!(out.iter().all(|m| m.0 >= 0 && m.0 <= top + 1), "{:?}", out);
+        let first = prizes.first().map_or(0, |m| m.0);
+        let request = mtt_core::DealRequest { stacks, prizes, play_for: Some(Money(play_for.min(first))) };
+        let quote = mtt_core::icm::quote(&request).unwrap();
+        let left = total - quote.play_for.0;
+        prop_assert_eq!(quote.icm.iter().map(|m| m.0).sum::<i64>(), left);
+        prop_assert_eq!(quote.chip_chop.iter().map(|m| m.0).sum::<i64>(), left);
     }
 
     #[test]

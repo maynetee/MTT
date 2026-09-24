@@ -27,6 +27,7 @@ let view = agg.view(now_ms);                          // pure, recompute any tim
 let json = agg.to_json()?;                            // SavedLog { format, head, events }
 let agg = Aggregate::from_json(&json)?;               // replay (upcasts old versions)
 let agg = Aggregate::from_log(events, head)?;         // replay from stored rows
+let quote = icm::quote(&DealRequest { stacks, prizes, play_for })?; // deal calculator
 ```
 
 - `dispatch` returns `Outcome::Recorded { envelope, discarded }`, `Undone { seq }` or
@@ -58,7 +59,7 @@ let agg = Aggregate::from_log(events, head)?;         // replay from stored rows
 State { id, phase: Setup | Running | Finished { winner }, config, structure: Vec<Level>,
         clock, reg_override: Option<bool>, players: BTreeMap<PlayerId, Player>,
         tables: BTreeMap<TableNo, Table>, next_player_id, next_bust_group, final_table_formed,
-        payouts_locked: Option<{ amounts, pool }> }
+        payouts_locked: Option<{ amounts, pool }>, deal: Option<Deal { amounts, play_for }> }
 Player { id, name, name_key, status: Seated { seat } | Busted { group, start_stack, last_seat },
          entries, rebuys, addons, chips_bought, prize_paid, fees_paid }
 Table  { no, seats, status: Idle | Open | Closed, occupants: BTreeMap<SeatNo, PlayerId>,
@@ -212,6 +213,36 @@ distribute; `overlay = effective - pool` is paid by the house.
   amounts (places paid = their count, capped by N) and warns
   `PAYOUTS_STALE { lockedPool, pool }` when the pool would now give other amounts.
 
+## Deals and ICM
+
+- `icm::icm(stacks, prizes) -> Result<Vec<Money>, DomainError>` (re-exported as
+  `mtt_core::icm`), a pure query: Malmuth-Harville over the sets of players holding the top
+  places (bitmask DP, `O(n * sum_{k<m} C(n, k))`, memory `2^n` floats), at most 20 players
+  (`ICM_TOO_MANY_PLAYERS`). `prizes[j]` pays place `j + 1`; players without chips finish
+  last and split the lowest places equally. Equities become `Money` by largest remainder
+  (fractions compared at 2^-32 so float noise never decides; ties by index): they add up
+  exactly to the prizes. `INVALID_ICM_INPUT`: negative amount, more prizes than players,
+  total out of range.
+- `icm::chip_chop`: everyone gets the lowest remaining prize, the rest in proportion to the
+  stacks (integers only).
+- `icm::quote(DealRequest { stacks, prizes, playFor? }) -> DealQuote { icm, chipChop,
+  playFor }`: `playFor` is taken from the first prize first. This is the entry point for
+  the hosts (plain function, JSON-friendly types).
+- Floats: the ICM probabilities and the payout curve weights are the only float
+  computations; nothing float is stored, logged or shown.
+- `RecordDeal { amounts: [{ player, amount }], playFor? }` -> `DealRecorded { amounts,
+  playFor }`. Needs money (`MONEY_NOT_CONFIGURED`), running (`NOT_STARTED`), entries closed
+  (`LATE_REG_OPEN`), locked payouts (`PAYOUTS_NOT_LOCKED`), one deal only
+  (`DEAL_ALREADY_RECORDED`), every player still in exactly once (`DUPLICATE_PLAYER`,
+  `PLAYER_NOT_FOUND`, `PLAYER_NOT_ACTIVE`, `DEAL_PLAYER_MISSING { player }`), valid amounts
+  (`INVALID_DEAL_AMOUNT`) and `sum(amounts) + playFor` = what places `1..alive` pay
+  (`DEAL_SUM_MISMATCH { expected, actual }`).
+- The deal sets the prize of its players (shown even while they still play); the
+  tournament goes on (busts still give places) and the winner adds `playFor`. To end at
+  once, bust the others in one hand. While a deal stands, `LockPayouts`, `UnlockPayouts`,
+  `ReopenRegistration` and `RevivePlayer` are `DEAL_ALREADY_RECORDED` (undo the deal
+  first).
+
 ## Busts, ranking, finish
 
 - `BustPlayers { busts: [{ player, start_stack? }] }` is one hand = one bust group.
@@ -292,9 +323,10 @@ first, then by place, with ties, provisional and in-money flags, entries, `rebuy
 `addons?`), tables with seats,
 names, button and next blinds, suggestions (final table, table break, balance plan),
 warnings, and `money?` when money is tracked (currency, pool, fees, guarantee, overlay,
-effective pool, `payouts` per place, `locked`). With money, ranking rows carry `prize?`
-(ties split, provisional like the place) and `itm` `in_money` carries `nextPayout?`, the
-prize of the next player out. `placesPaid` is the count in force (reduced or locked).
+effective pool, `payouts` per place, `locked`, `deal`). With money, ranking rows carry
+`prize?` (ties split, provisional like the place, deal amounts for deal players) and
+`itm` `in_money` carries `nextPayout?`, the prize of the next player out (none after a
+deal). `placesPaid` is the count in force (reduced or locked).
 
 Compatibility: every field added to an existing wire type (config, events, view) is
 optional (`#[serde(default, skip_serializing_if = "Option::is_none")]`, `#[ts(optional)]`)
@@ -321,13 +353,16 @@ no `getrandom`. The host passes a fresh seed per command; outcomes are stored in
   never fewer than unique players, payouts are non-increasing and (unlocked, not custom
   amounts, with players) sum exactly to the effective pool, and once finished the prizes
   add up to the payouts. A pure property checks `payouts::compute` for any pool, places,
-  curve or custom shares, unit and minimum cash.
+  curve or custom shares, unit and minimum cash; another checks that ICM and chip chop add
+  up exactly for any stacks and prizes; a third records an ICM deal (random play-for) and
+  plays to the end: prizes add up to the locked payouts and the log replays.
+- ICM regressions: the two-player closed form `E1 = p2 + (p1 - p2) * s1 / S`, a brute force
+  over every finishing order for up to 6 players (within one minor unit), exact sums.
 - JSON scenarios (`tests/scenarios/*.json`, among them 100 entries with re-entries, a
   guarantee, curve payouts, rounding and a bubble tie) with partial view matching:
   `{ name, seed, tournament, steps: [{ atMs, cmd, expect?, view? }], checks: [{ nowMs, view }] }`.
 
 ## Not implemented yet
 
-ICM, deals, WASM crate,
-Tauri integration. The model keeps room for them (`entries`, `chips_bought`, `payout`,
-`Money`, provisional places).
+WASM crate and Tauri integration (the hosts will expose `icm::quote` next to `dispatch`
+and `view`).

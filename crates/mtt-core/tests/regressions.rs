@@ -868,3 +868,110 @@ fn tie_split_across_paid_boundary() {
             .any(|w| matches!(w, Warning::PayoutsMismatch { .. }))
     );
 }
+
+// ICM.
+
+/// Brute force Malmuth-Harville: every finishing order, each with its probability.
+fn icm_bruteforce(stacks: &[i64], prizes: &[i64]) -> Vec<f64> {
+    fn walk(stacks: &[i64], prizes: &[i64], left: &mut Vec<usize>, p: f64, eq: &mut [f64]) {
+        let rest: i64 = left.iter().map(|&i| stacks[i]).sum();
+        let place = stacks.len() - left.len();
+        for k in 0..left.len() {
+            let i = left[k];
+            let q = p * stacks[i] as f64 / rest as f64;
+            eq[i] += q * prizes.get(place).copied().unwrap_or(0) as f64;
+            let taken = left.remove(k);
+            if !left.is_empty() {
+                walk(stacks, prizes, left, q, eq);
+            }
+            left.insert(k, taken);
+        }
+    }
+    let mut eq = vec![0.0; stacks.len()];
+    walk(
+        stacks,
+        prizes,
+        &mut (0..stacks.len()).collect(),
+        1.0,
+        &mut eq,
+    );
+    eq
+}
+
+fn icm_of(stacks: &[i64], prizes: &[i64]) -> Vec<i64> {
+    let stacks: Vec<Chips> = stacks.iter().copied().map(Chips).collect();
+    let prizes: Vec<Money> = prizes.iter().copied().map(Money).collect();
+    mtt_core::icm(&stacks, &prizes)
+        .unwrap()
+        .iter()
+        .map(|m| m.0)
+        .collect()
+}
+
+#[test]
+fn icm_two_players_closed_form() {
+    // E1 = p2 + (p1 - p2) * s1 / S.
+    for (s1, s2, p1, p2) in [
+        (3_000, 1_000, 700, 300),
+        (1, 1, 10_001, 0),
+        (12_345, 67_890, 1_000_000, 400_000),
+        (1, 999_999, 5_000_000, 1),
+    ] {
+        let out = icm_of(&[s1, s2], &[p1, p2]);
+        let exact = p2 as f64 + (p1 - p2) as f64 * s1 as f64 / (s1 + s2) as f64;
+        assert!((out[0] as f64 - exact).abs() < 1.0, "{out:?} vs {exact}");
+        assert_eq!(out[0] + out[1], p1 + p2);
+    }
+}
+
+#[test]
+fn icm_matches_bruteforce_permutations() {
+    let mut rng = mtt_core::rng::Rng::from_seed(56);
+    for n in 2..=6usize {
+        for _ in 0..40 {
+            let stacks: Vec<i64> = (0..n).map(|_| 1 + i64::from(rng.below(100_000))).collect();
+            let mut prizes: Vec<i64> = (0..1 + rng.index(n))
+                .map(|_| i64::from(rng.below(1_000_000)))
+                .collect();
+            prizes.sort_unstable_by(|a, b| b.cmp(a));
+            let expected = icm_bruteforce(&stacks, &prizes);
+            let out = icm_of(&stacks, &prizes);
+            for (got, want) in out.iter().zip(&expected) {
+                assert!(
+                    (*got as f64 - want).abs() < 1.0 + 1e-9,
+                    "stacks {stacks:?} prizes {prizes:?}: {out:?} vs {expected:?}"
+                );
+            }
+            assert_eq!(out.iter().sum::<i64>(), prizes.iter().sum::<i64>());
+        }
+    }
+}
+
+#[test]
+fn icm_sums_exactly() {
+    let mut rng = mtt_core::rng::Rng::from_seed(20);
+    for _ in 0..300 {
+        let n = 1 + rng.index(12);
+        // Some players without chips, and amounts up to the JavaScript limit.
+        let stacks: Vec<i64> = (0..n)
+            .map(|_| match rng.below(4) {
+                0 => 0,
+                _ => i64::from(rng.next_u32()) << rng.below(21),
+            })
+            .collect();
+        let prizes: Vec<i64> = (0..rng.index(n + 1))
+            .map(|_| (i64::from(rng.next_u32()) << 16) / 64)
+            .collect();
+        let out = icm_of(&stacks, &prizes);
+        assert_eq!(out.iter().sum::<i64>(), prizes.iter().sum::<i64>());
+        assert!(out.iter().all(|&e| e >= 0));
+        let quote = mtt_core::icm::quote(&mtt_core::DealRequest {
+            stacks: stacks.iter().copied().map(Chips).collect(),
+            prizes: prizes.iter().copied().map(Money).collect(),
+            play_for: None,
+        })
+        .unwrap();
+        let chop: i64 = quote.chip_chop.iter().map(|m| m.0).sum();
+        assert_eq!(chop, prizes.iter().sum::<i64>());
+    }
+}

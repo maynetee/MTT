@@ -3,8 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
+use crate::deal::DealShare;
 use crate::ids::{PlayerId, SeatNo, SeatRef, TableNo, TournamentId};
-use crate::money::Chips;
+use crate::money::{Chips, Money};
 use crate::structure::Level;
 
 /// Host-supplied context. The core never reads a clock or an entropy source.
@@ -114,6 +115,15 @@ pub enum Command {
     /// Payouts follow the pool again.
     #[serde(rename = "unlock_payouts")]
     UnlockPayouts {},
+    /// Records a deal between every remaining player (see `deal`).
+    #[serde(rename = "record_deal")]
+    RecordDeal {
+        amounts: Vec<DealShare>,
+        /// Kept aside for the winner.
+        #[serde(default)]
+        #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+        play_for: Option<Money>,
+    },
     #[serde(rename = "close_registration")]
     CloseRegistration {},
     #[serde(rename = "reopen_registration")]

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::clock::{self, Boundary};
 use crate::config::{Config, Currency, Deadline, PURCHASE_KINDS, PurchaseKind};
+use crate::deal::Deal;
 use crate::ids::{PlayerId, SeatNo, SeatRef, Seq, TableNo, TournamentId};
 use crate::money::{Chips, Money};
 use crate::payouts;
@@ -177,6 +178,8 @@ pub struct MoneyView {
     pub payouts: Vec<Money>,
     /// The payouts are frozen by `LockPayouts`.
     pub locked: bool,
+    /// Deal between the remaining players, once recorded.
+    pub deal: Option<Deal>,
 }
 
 /// In-the-money status.
@@ -345,6 +348,7 @@ fn money_view(state: &State, payouts: payouts::InForce) -> Option<MoneyView> {
         effective_pool: pool.effective,
         payouts: payouts.amounts,
         locked: payouts.locked,
+        deal: state.deal.clone(),
     })
 }
 
@@ -352,8 +356,9 @@ fn money_view(state: &State, payouts: payouts::InForce) -> Option<MoneyView> {
 fn itm_with_payout(state: &State, alive: u32, payouts: &payouts::InForce) -> Itm {
     match itm(state.phase, alive, payouts.places_paid) {
         Itm::InMoney { .. } => Itm::InMoney {
-            next_payout: Some(payouts::amount_at(&payouts.amounts, alive))
-                .filter(|amount| amount.0 > 0 && state.phase == Phase::Running),
+            next_payout: Some(payouts::amount_at(&payouts.amounts, alive)).filter(|amount| {
+                amount.0 > 0 && state.phase == Phase::Running && state.deal.is_none()
+            }),
         },
         other => other,
     }

@@ -6,7 +6,7 @@ use crate::error::DomainError;
 use crate::event::Event;
 use crate::rng::Rng;
 use crate::state::{Phase, State};
-use crate::{clock, config, payouts, players, purchase, registration, seating, structure};
+use crate::{clock, config, deal, payouts, players, purchase, registration, seating, structure};
 
 /// Longest accepted tournament id.
 pub const MAX_TOURNAMENT_ID: usize = 64;
@@ -36,6 +36,17 @@ pub fn decide(state: &State, cmd: &Command, ctx: &Ctx) -> Result<Event, DomainEr
     }
     let now = ctx.now_ms;
     let mut rng = Rng::from_seed(ctx.seed);
+    // A deal shares locked payouts between the players still in: nothing may change them.
+    let frozen_by_deal = matches!(
+        cmd,
+        Command::LockPayouts {}
+            | Command::UnlockPayouts {}
+            | Command::ReopenRegistration {}
+            | Command::RevivePlayer { .. }
+    );
+    if frozen_by_deal && state.deal.is_some() {
+        return Err(DomainError::DealAlreadyRecorded);
+    }
     match cmd {
         Command::UpdateConfig { config } => config::decide_update(state, config),
         Command::UpdateStructure { levels } => structure::decide_update(state, levels, now),
@@ -55,6 +66,9 @@ pub fn decide(state: &State, cmd: &Command, ctx: &Ctx) -> Result<Event, DomainEr
         }
         Command::LockPayouts {} => payouts::decide_lock(state),
         Command::UnlockPayouts {} => payouts::decide_unlock(state),
+        Command::RecordDeal { amounts, play_for } => {
+            deal::decide_deal(state, amounts, *play_for, now)
+        }
         Command::CloseRegistration {} => registration::decide_close(state, now),
         Command::ReopenRegistration {} => registration::decide_reopen(state),
         Command::FinishTournament {} => players::decide_finish(state, now),

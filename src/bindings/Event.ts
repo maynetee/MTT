@@ -5,6 +5,7 @@ import type { Chips } from "./Chips";
 import type { Clock } from "./Clock";
 import type { ClockReason } from "./ClockReason";
 import type { Config } from "./Config";
+import type { DealShare } from "./DealShare";
 import type { Finish } from "./Finish";
 import type { Level } from "./Level";
 import type { Money } from "./Money";
@@ -52,4 +53,4 @@ amounts: Array<Money>,
 /**
  * Effective prize pool at that moment.
  */
-pool: Money, } | { "type": "payouts_unlocked", } | { "type": "button_set", table: TableNo, seat: SeatNo, } | { "type": "table_opened", table: TableNo, } | { "type": "table_broken", table: TableNo, moves: Array<SeatMove>, } | { "type": "final_table_formed", table: TableNo, moves: Array<SeatMove>, closed: Array<TableNo>, };
+pool: Money, } | { "type": "payouts_unlocked", } | { "type": "deal_recorded", amounts: Array<DealShare>, playFor: Money, } | { "type": "button_set", table: TableNo, seat: SeatNo, } | { "type": "table_opened", table: TableNo, } | { "type": "table_broken", table: TableNo, moves: Array<SeatMove>, } | { "type": "final_table_formed", table: TableNo, moves: Array<SeatMove>, closed: Array<TableNo>, };

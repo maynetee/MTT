@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::clock::Clock;
 use crate::config::Config;
+use crate::deal::Deal;
 use crate::event::{Event, Finish, SeatMove};
 use crate::ids::{BustGroup, PlayerId, SeatNo, SeatRef, TableNo, TournamentId};
 use crate::money::{Chips, Money, Price};
@@ -176,6 +177,8 @@ pub struct State {
     pub final_table_formed: bool,
     #[serde(default)]
     pub payouts_locked: Option<LockedPayouts>,
+    #[serde(default)]
+    pub deal: Option<Deal>,
 }
 
 /// An event that does not fit the state it is applied to (corrupted or foreign log).
@@ -198,6 +201,7 @@ impl State {
             next_bust_group: 1,
             final_table_formed: false,
             payouts_locked: None,
+            deal: None,
         };
         state.sync_tables();
         state
@@ -482,6 +486,18 @@ pub fn apply(state: &mut State, event: &Event) -> Result<(), ApplyError> {
             });
         }
         Event::PayoutsUnlocked {} => state.payouts_locked = None,
+        Event::DealRecorded { amounts, play_for } => {
+            if amounts
+                .iter()
+                .any(|s| state.player(s.player).is_none_or(|p| !p.is_alive()))
+            {
+                return Err(ApplyError("deal with a player not in play"));
+            }
+            state.deal = Some(Deal {
+                amounts: amounts.clone(),
+                play_for: *play_for,
+            });
+        }
         Event::ButtonSet { table, seat } => state.table_mut(*table)?.button = Some(*seat),
         Event::TableOpened { table } => state.table_mut(*table)?.status = TableStatus::Open,
         Event::TableBroken { table, moves } => {

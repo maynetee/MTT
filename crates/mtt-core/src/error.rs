@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::PurchaseKind;
 use crate::ids::{PlayerId, SeatNo, TableNo};
+use crate::money::Money;
 
 /// Why a command was rejected. A rejected command never changes state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -239,6 +240,25 @@ pub enum DomainError {
     /// Unlock the payouts before changing how they are computed.
     PayoutsLocked,
     PayoutsNotLocked,
+
+    // Deals.
+    IcmTooManyPlayers {
+        max: u8,
+    },
+    /// Negative amount, more prizes than players, amounts out of range, or more to play
+    /// for than the first prize.
+    InvalidIcmInput,
+    DealAlreadyRecorded,
+    /// Every remaining player must be part of the deal.
+    DealPlayerMissing {
+        player: PlayerId,
+    },
+    InvalidDealAmount,
+    /// The deal must share exactly what the remaining places pay.
+    DealSumMismatch {
+        expected: Money,
+        actual: Money,
+    },
 
     // History.
     NothingToUndo,
