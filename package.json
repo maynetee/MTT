@@ -14,11 +14,17 @@
     "node": ">=22.12"
   },
   "scripts": {
+    "wasm": "node scripts/wasm.mjs",
+    "predev": "node scripts/wasm.mjs --if-stale",
     "dev": "vite",
+    "prebuild": "node scripts/wasm.mjs --if-stale",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "pretypecheck": "node scripts/wasm.mjs --if-stale",
     "typecheck": "tsc --noEmit",
+    "pretest": "node scripts/wasm.mjs --if-stale",
     "test": "vitest run",
+    "pretest:watch": "node scripts/wasm.mjs --if-stale",
     "test:watch": "vitest",
     "tauri": "tauri"
   },

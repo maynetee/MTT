@@ -1,0 +1,30 @@
+[package]
+name = "mtt-wasm"
+description = "WebAssembly host of mtt-core for the browser build of MTT Tournament Director"
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+mtt-core = { path = "../mtt-core" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+wasm-bindgen = "0.2"
+
+# Rust enables these WebAssembly features by default (bulk memory since 1.87); the wasm-opt
+# that wasm-pack downloads predates that and rejects the module unless they are listed.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+    "-Oz",
+    "--enable-bulk-memory",
+    "--enable-nontrapping-float-to-int",
+    "--enable-sign-ext",
+    "--enable-mutable-globals",
+    "--enable-reference-types",
+    "--enable-multivalue",
+]

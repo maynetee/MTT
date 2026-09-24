@@ -22,7 +22,23 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
       - run: npm ci
+      - name: No getrandom in the WASM engine
+        run: |
+          tree="$(cargo tree -p mtt-wasm -e normal --target wasm32-unknown-unknown)"
+          if grep -q getrandom <<<"$tree"; then
+            echo "::error::mtt-wasm must not depend on getrandom"
+            exit 1
+          fi
+      - name: WASM engine
+        run: npm run wasm
       - name: Type check
         run: npm run typecheck
       - name: Unit tests
