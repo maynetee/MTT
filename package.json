@@ -61,5 +61,10 @@
     "typescript": "^5.3.3",
     "vite": "^8.3.0",
     "vitest": "^5.0.1"
+  },
+  "overrides": {
+    "@puppeteer/browsers": "^3.2.3",
+    "deepmerge-ts": "^8.0.2",
+    "serialize-javascript": "^7.1.2"
   }
 }
