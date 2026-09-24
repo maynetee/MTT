@@ -129,7 +129,22 @@ export const en = {
     tableSeatShort: "T{table} S{seat}",
     selectPlayer: "Select player",
     selectSeat: "Select seat",
-    none: "—"
+    none: "—",
+    close: "Close"
+  },
+  theme: {
+    label: "Theme: {theme}",
+    menu: "Theme",
+    system: "Match system",
+    light: "Light",
+    dark: "Dark"
+  },
+  confirm: {
+    typeToConfirm: "Type “{text}” to confirm"
+  },
+  toast: {
+    region: "Notifications",
+    dismiss: "Dismiss notification"
   },
   app: {
     brand: "MTT",

@@ -102,6 +102,8 @@
   --color-surface-selected: #e8edf5;
   --color-sunken: #f6f8fb;
   --color-field: #ffffff;
+  --color-control: #ffffff;
+  --color-control-hover: #eef2f8;
   --color-border: #d3dae6;
   --color-border-strong: #aeb9cc;
   --color-divider: #e3e8f0;
@@ -157,6 +159,8 @@
   --color-surface-selected: #1d2d50;
   --color-sunken: #0a1328;
   --color-field: #0b1530;
+  --color-control: #19284a;
+  --color-control-hover: #213359;
   --color-border: #23345a;
   --color-border-strong: #34497a;
   --color-divider: #1b2a4a;

@@ -1,5 +1,6 @@
 @import "./styles/tokens.css";
 @import "./styles/base.css";
+@import "./styles/components.css";
 
 .app-shell {
   min-height: 100vh;
