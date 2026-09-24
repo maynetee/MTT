@@ -309,7 +309,9 @@ notified once per stored revision.
   director) may call every command and toggle its own full screen (the `F` shortcut). The
   `display` window may only list tournaments, read a view, listen to events, close itself and
   toggle fullscreen: it cannot change anything. An IPC test checks that every other command is
-  refused from the display window.
+  refused from the display window. Both windows may emit events: the level sounds'
+  `level_sound_channel` tells them which one plays (an event only reaches listeners; the
+  display's worst case is a spurious refetch).
 - **Content Security Policy** (`src-tauri/tauri.conf.json`): scripts only from the app itself,
   connections only to the app and the IPC channel, images and fonts from the app or inline data,
   no objects, no `<base>`, no form submission. Fonts are bundled: nothing is loaded from the

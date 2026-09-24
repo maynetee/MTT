@@ -1,11 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Director window: runs every command, listens to tournament changes and toggles its own full screen.",
+  "description": "Director window: runs every command, listens to tournament changes, toggles its own full screen and agrees with the display on which window plays the level sounds.",
   "windows": ["main"],
   "permissions": [
     "core:event:allow-listen",
     "core:event:allow-unlisten",
+    "core:event:allow-emit",
     "allow-list-tournaments",
     "allow-create-tournament",
     "allow-delete-tournament",

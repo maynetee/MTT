@@ -1,11 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "display",
-  "description": "Public display window: reads tournaments and can close itself, nothing else.",
+  "description": "Public display window: reads tournaments, can close itself and tells the director's window whether it plays the level sounds, nothing else.",
   "windows": ["display"],
   "permissions": [
     "core:event:allow-listen",
     "core:event:allow-unlisten",
+    "core:event:allow-emit",
     "allow-get-view",
     "allow-list-tournaments",
     "core:window:allow-close",

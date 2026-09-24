@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Level } from "../../engine/types";
 import type { WasmEngine } from "../../engine/wasmEngine";
@@ -302,6 +303,32 @@ describe("level sounds with a display window open", () => {
       display.unmount();
       audio.restore();
       vi.setSystemTime(T0);
+    }
+  });
+
+  it("agrees over Tauri events in the desktop app, and resumes in the director's window when the display closes", async () => {
+    audio = installFakeAudio();
+    channels.restore();
+    vi.stubGlobal("isTauri", true);
+    mockIPC(() => null, { shouldMockEvents: true });
+    try {
+      const { engine, id } = await started();
+      open(engine, id, "control");
+      const display = open(engine, id, "display");
+      await settle();
+      expect(screen.getByText("control silent")).toBeInTheDocument();
+      expect(screen.getByText("display plays")).toBeInTheDocument();
+      await advance(19 * MIN);
+      expect(audio.voices()).toEqual(["oneMinute"]);
+
+      display.unmount();
+      await settle();
+      expect(screen.getByText("control plays")).toBeInTheDocument();
+      await advance(MIN);
+      expect(audio.voices()).toEqual(["oneMinute", "levelChange"]);
+    } finally {
+      cleanup();
+      clearMocks();
     }
   });
 

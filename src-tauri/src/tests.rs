@@ -378,6 +378,37 @@ fn the_display_window_can_read_tournaments_but_not_change_them() {
     assert_eq!(stored_events(data_dir.path(), &id), 1);
 }
 
+/// The level sounds' event (src/app/sound/channel.ts): the windows agree on which one plays.
+const SOUND_EVENT: &str = "level_sound_channel";
+
+#[test]
+fn both_windows_may_emit_the_level_sound_event() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let app = mock_app(data_dir.path());
+    let heard = Arc::new(Mutex::new(Vec::new()));
+    let seen = Arc::clone(&heard);
+    app.listen_any(SOUND_EVENT, move |event| {
+        let payload: Value = serde_json::from_str(event.payload()).unwrap();
+        seen.lock().unwrap().push(payload["sender"].clone());
+    });
+
+    for label in ["main", DISPLAY_WINDOW] {
+        let emitted = invoke(
+            &window(&app, label),
+            "plugin:event|emit",
+            json!({
+                "event": SOUND_EVENT,
+                "payload": {"sender": label, "message": {"type": "query"}}
+            }),
+        );
+        assert!(emitted.is_ok(), "{label} may not emit: {emitted:?}");
+    }
+    assert_eq!(
+        *heard.lock().unwrap(),
+        vec![json!("main"), json!("display")]
+    );
+}
+
 #[test]
 fn the_director_window_can_toggle_its_own_full_screen() {
     let data_dir = tempfile::tempdir().unwrap();
