@@ -7,12 +7,17 @@ Thanks for helping improve MTT Tournament Director.
 - Node.js 24 LTS (see `.nvmrc`) and npm
 - Rust stable with `rustfmt` and `clippy`
 - The [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your platform
+- For the browser build of the core: `rustup target add wasm32-unknown-unknown` and
+  `cargo install wasm-pack --locked`
 
 ```bash
 npm ci
 npm run tauri dev   # desktop app
 npm run dev         # browser demo only
 ```
+
+`npm run wasm` builds `crates/mtt-wasm` into `src/wasm/pkg`; `dev`, `build`, `typecheck` and
+`test` rebuild it first when it is missing or older than the Rust sources.
 
 Set `MTT_DATA_DIR` to a throwaway directory (`MTT_DATA_DIR=/tmp/mtt-dev npm run tauri dev`) to keep development data apart from your real tournaments.
 
