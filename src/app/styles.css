@@ -1,5 +1,5 @@
 :root {
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family: "Inter Variable", "Inter", system-ui, sans-serif;
   color: #0b1220;
   background: #eef2f7;
 }
@@ -158,6 +158,7 @@ body {
 button,
 .btn {
   border: none;
+  font-family: inherit;
   border-radius: 12px;
   padding: 9px 16px;
   font-weight: 600;
@@ -189,6 +190,7 @@ button,
 input,
 select {
   padding: 9px 12px;
+  font-family: inherit;
   border-radius: 12px;
   border: 1px solid #cbd5e1;
   font-size: 14px;
@@ -284,6 +286,7 @@ label {
 .stat-value {
   font-size: 28px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-label {
@@ -301,6 +304,7 @@ label {
 .clock-time {
   font-size: 48px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .clock-level {
@@ -333,6 +337,10 @@ label {
   grid-template-columns: 160px 80px 70px 70px 70px 90px 40px;
   gap: 8px;
   align-items: center;
+}
+
+.level-row input {
+  font-variant-numeric: tabular-nums;
 }
 
 .level-label {
@@ -440,12 +448,14 @@ label {
   font-size: 64px;
   font-weight: 700;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .display-next {
   font-size: 32px;
   text-align: center;
   opacity: 0.7;
+  font-variant-numeric: tabular-nums;
 }
 
 .display-card:has(.display-time) {
