@@ -379,6 +379,24 @@ fn the_display_window_can_read_tournaments_but_not_change_them() {
 }
 
 #[test]
+fn the_director_window_can_toggle_its_own_full_screen() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let app = mock_app(data_dir.path());
+    let main = main_window(&app);
+
+    for (cmd, args) in [
+        ("plugin:window|is_fullscreen", json!({"label": "main"})),
+        (
+            "plugin:window|set_fullscreen",
+            json!({"label": "main", "value": true}),
+        ),
+    ] {
+        let result = invoke(&main, cmd, args);
+        assert!(result.is_ok(), "{cmd} was refused: {result:?}");
+    }
+}
+
+#[test]
 fn a_deal_quote_adds_up_exactly_to_the_prizes() {
     let data_dir = tempfile::tempdir().unwrap();
     let app = mock_app(data_dir.path());

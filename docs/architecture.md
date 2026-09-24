@@ -305,9 +305,10 @@ notified once per stored revision.
 
 - **Capabilities per window** (`src-tauri/capabilities/`). `build.rs` declares the app's commands
   so that each one needs an explicit `allow-<command>` permission. The `main` window (the
-  director) may call every command. The `display` window may only list tournaments, read a view,
-  listen to events, close itself and toggle fullscreen: it cannot change anything. An IPC test
-  checks that every other command is refused from the display window.
+  director) may call every command and toggle its own full screen (the `F` shortcut). The
+  `display` window may only list tournaments, read a view, listen to events, close itself and
+  toggle fullscreen: it cannot change anything. An IPC test checks that every other command is
+  refused from the display window.
 - **Content Security Policy** (`src-tauri/tauri.conf.json`): scripts only from the app itself,
   connections only to the app and the IPC channel, images and fonts from the app or inline data,
   no objects, no `<base>`, no form submission. Fonts are bundled: nothing is loaded from the

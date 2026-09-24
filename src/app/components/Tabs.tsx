@@ -4,6 +4,10 @@ import { NavLink } from "react-router-dom";
 export interface TabItem {
   to: string;
   label: string;
+  /** A tooltip, e.g. the tab's keyboard shortcut. */
+  title?: string;
+  /** `aria-keyshortcuts` of the tab. */
+  keyShortcuts?: string;
 }
 
 /**
@@ -19,7 +23,12 @@ export function Tabs({ label, groups }: { label: string; groups: readonly (reado
           <ul className="tabs-group">
             {group.map((item) => (
               <li key={item.to}>
-                <NavLink to={item.to} className={({ isActive }) => (isActive ? "tab is-active" : "tab")}>
+                <NavLink
+                  to={item.to}
+                  className={({ isActive }) => (isActive ? "tab is-active" : "tab")}
+                  title={item.title}
+                  aria-keyshortcuts={item.keyShortcuts}
+                >
                   {item.label}
                 </NavLink>
               </li>

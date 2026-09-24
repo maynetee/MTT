@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Outlet, useParams } from "react-router-dom";
-import { toEngineError, type Command, type EngineError, type View } from "../../engine/types";
+import { toEngineError, type EngineError, type View } from "../../engine/types";
 import { useI18n } from "../../i18n";
 import { AppShell, PageTitle } from "../components/AppShell";
 import { ButtonLink, Button, IconButton } from "../components/Button";
@@ -11,8 +11,8 @@ import { Pill } from "../components/Pill";
 import { Tabs } from "../components/Tabs";
 import { useToast } from "../components/Toast";
 import { useTournamentView } from "../hooks/useTournamentView";
+import { TAB_KEYS, useDirectorShortcuts, useShortcutText } from "../keyboard";
 import { TournamentContext, type TournamentContextValue } from "../TournamentContext";
-import { isEditableTarget, isMac } from "../utils/keyboard";
 import { playerNames } from "../utils/view";
 
 /** Live work first, then the setup and output screens. */
@@ -86,25 +86,12 @@ export default function DirectorShell({ id }: { id: string }) {
     [run, toast, t]
   );
 
-  // Undo/redo shortcuts, except while typing in a field (native text undo wins there) or
-  // while a dialog asks for a decision.
-  const runRef = useRef(run);
-  runRef.current = run;
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (isEditableTarget(event.target) || isEditableTarget(document.activeElement)) return;
-      if (document.querySelector('[aria-modal="true"]')) return;
-      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
-      const key = event.key.toLowerCase();
-      const command: Command | null =
-        key === "z" ? (event.shiftKey ? { type: "redo" } : { type: "undo" }) : key === "y" && event.ctrlKey ? { type: "redo" } : null;
-      if (!command) return;
-      event.preventDefault();
-      void runRef.current(command);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+  const base = `/t/${encodeURIComponent(id)}`;
+  const tabGroups = TAB_GROUPS.map((group) => group.map((tab) => ({ to: `${base}/${tab}`, label: t(`tabs.${tab}`) })));
+  // 1 to 9 open the tabs in the order they are shown.
+  const tabs = tabGroups.flat();
+  const shortcuts = useDirectorShortcuts({ id, view, run, report, tabs });
+  const keys = useShortcutText();
 
   const context = useMemo<TournamentContextValue | null>(
     () => (view ? { id, view, offsetMs, run, undoIfLast, report, playerName: names } : null),
@@ -132,14 +119,12 @@ export default function DirectorShell({ id }: { id: string }) {
   }
 
   const { history } = view;
-  const mac = isMac();
   const undoLabel = history.undo ? t("header.undoAction", { action: i18n.action(history.undo) }) : t("header.undo");
   const redoLabel = history.redo ? t("header.redoAction", { action: i18n.action(history.redo) }) : t("header.redo");
-  const undoHint = [mac ? t("header.undoKeysMac") : t("header.undoKeys"), history.undo?.kind === "clock_changed" ? t("header.clockUndoHint") : null]
+  const undoHint = [keys.text("undo"), history.undo?.kind === "clock_changed" ? t("header.clockUndoHint") : null]
     .filter(Boolean)
     .join("\n");
   const finishPending = view.warnings.some((warning) => warning.code === "FINISH_PENDING");
-  const base = `/t/${encodeURIComponent(id)}`;
 
   return (
     <AppShell
@@ -148,19 +133,45 @@ export default function DirectorShell({ id }: { id: string }) {
       actions={
         <>
           <span className="history-buttons">
-            <IconButton icon="undo" label={undoLabel} hint={undoHint} onClick={() => void run({ type: "undo" })} disabled={!history.undo} />
+            <IconButton
+              icon="undo"
+              label={undoLabel}
+              hint={undoHint}
+              aria-keyshortcuts={keys.aria("undo")}
+              onClick={() => void run({ type: "undo" })}
+              disabled={!history.undo}
+            />
             <IconButton
               icon="redo"
               label={redoLabel}
-              hint={mac ? t("header.redoKeysMac") : t("header.redoKeys")}
+              hint={keys.text("redo")}
+              aria-keyshortcuts={keys.aria("redo")}
               onClick={() => void run({ type: "redo" })}
               disabled={!history.redo}
             />
           </span>
           <StatusPill view={view} />
+          <IconButton
+            icon="keyboard"
+            label={t("shortcuts.title")}
+            hint={keys.text("showShortcuts")}
+            aria-keyshortcuts={keys.aria("showShortcuts")}
+            tooltipAlign="end"
+            onClick={shortcuts.openOverlay}
+          />
         </>
       }
-      nav={<Tabs label={t("app.sections")} groups={TAB_GROUPS.map((group) => group.map((tab) => ({ to: `${base}/${tab}`, label: t(`tabs.${tab}`) })))} />}
+      nav={
+        <Tabs
+          label={t("app.sections")}
+          groups={tabGroups.map((group) =>
+            group.map((tab) => {
+              const key = TAB_KEYS[tabs.indexOf(tab)];
+              return key ? { ...tab, title: t("shortcuts.tabHint", { key }), keyShortcuts: key } : tab;
+            })
+          )}
+        />
+      }
     >
       {finishPending && (
         <Callout
@@ -178,6 +189,7 @@ export default function DirectorShell({ id }: { id: string }) {
       <TournamentContext.Provider value={context}>
         <Outlet />
       </TournamentContext.Provider>
+      {shortcuts.overlay}
     </AppShell>
   );
 }

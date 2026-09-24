@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Director window: runs every command and listens to tournament changes.",
+  "description": "Director window: runs every command, listens to tournament changes and toggles its own full screen.",
   "windows": ["main"],
   "permissions": [
     "core:event:allow-listen",
@@ -15,6 +15,8 @@
     "allow-open-display-window",
     "allow-save-export",
     "allow-legacy-import-status",
-    "allow-import-legacy"
+    "allow-import-legacy",
+    "core:window:allow-is-fullscreen",
+    "core:window:allow-set-fullscreen"
   ]
 }

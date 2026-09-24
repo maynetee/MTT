@@ -179,10 +179,6 @@ export const en = {
     redo: "Redo",
     undoAction: "Undo {action}",
     redoAction: "Redo {action}",
-    undoKeysMac: "⌘Z",
-    undoKeys: "Ctrl+Z",
-    redoKeysMac: "⇧⌘Z",
-    redoKeys: "Ctrl+Shift+Z",
     clockUndoHint: "Undoing a clock change puts back the clock as it was recorded, as if the change never happened.",
     clock: "Tournament clock",
     notStarted: "Not started",
@@ -563,6 +559,39 @@ export const en = {
     tie: "tie {from}–{to}",
     provisional: "provisional",
     failed: "{format} export failed: {reason}"
+  },
+  shortcuts: {
+    title: "Keyboard shortcuts",
+    note: "Shortcuts do nothing while you type in a field or while a dialog is open.",
+    tooltip: "Shortcut",
+    or: "or",
+    tabHint: "Shortcut: {key}",
+    keys: {
+      space: "Space",
+      escape: "Esc",
+      ctrl: "Ctrl",
+      shift: "Shift"
+    },
+    groups: {
+      clock: "Clock",
+      history: "Undo and redo",
+      window: "Tabs and windows"
+    },
+    actions: {
+      toggleClock: "Start or pause the clock",
+      nextLevel: "Next level",
+      previousLevel: "Previous level",
+      addMinute: "Add one minute",
+      subtractMinute: "Take one minute off",
+      nextBreak: "Jump to the next break",
+      undo: "Undo the last action",
+      redo: "Redo",
+      switchTab: "Go to a tab",
+      openDisplay: "Open the display window",
+      toggleFullscreen: "Full screen on or off",
+      escape: "Leave full screen, close a dialog",
+      showShortcuts: "Show these shortcuts"
+    }
   },
   errors,
   warnings

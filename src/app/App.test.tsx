@@ -62,6 +62,7 @@ describe("App", () => {
   });
 
   it("ignores the undo shortcut while typing in a field", async () => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
     const user = userEvent.setup();
     const { engine, id } = await withTournament();
     renderApp(engine, `/t/${id}/registration`);

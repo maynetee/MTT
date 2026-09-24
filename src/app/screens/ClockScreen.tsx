@@ -6,6 +6,7 @@ import { Callout } from "../components/Callout";
 import { Pill } from "../components/Pill";
 import { Table } from "../components/Table";
 import { useClock } from "../hooks/useClock";
+import { ShortcutTooltip } from "../keyboard/ShortcutKeys";
 import { useTournament } from "../TournamentContext";
 import { anteLabel, blindsLabel } from "../utils/labels";
 
@@ -77,30 +78,42 @@ export default function ClockScreen() {
 
         {!finished && (
           <div className="clock-controls">
-            {clock.running ? (
-              <Button size="lg" icon="pause" onClick={() => void run({ type: "pause_clock" })}>
-                {t("header.pause")}
-              </Button>
-            ) : (
-              <Button size="lg" variant="primary" icon="play" onClick={() => void run({ type: "start_clock" })}>
-                {t("header.start")}
-              </Button>
-            )}
+            <ShortcutTooltip id="toggleClock">
+              {clock.running ? (
+                <Button size="lg" icon="pause" onClick={() => void run({ type: "pause_clock" })}>
+                  {t("header.pause")}
+                </Button>
+              ) : (
+                <Button size="lg" variant="primary" icon="play" onClick={() => void run({ type: "start_clock" })}>
+                  {t("header.start")}
+                </Button>
+              )}
+            </ShortcutTooltip>
             <span className="clock-controls-group">
-              <Button icon="skipBack" onClick={() => void run({ type: "prev_level" })}>
-                {t("clock.previous")}
-              </Button>
-              <Button icon="skipForward" onClick={() => void run({ type: "next_level" })}>
-                {t("clock.nextLevel")}
-              </Button>
+              <ShortcutTooltip id="previousLevel">
+                <Button icon="skipBack" onClick={() => void run({ type: "prev_level" })}>
+                  {t("clock.previous")}
+                </Button>
+              </ShortcutTooltip>
+              <ShortcutTooltip id="nextLevel">
+                <Button icon="skipForward" onClick={() => void run({ type: "next_level" })}>
+                  {t("clock.nextLevel")}
+                </Button>
+              </ShortcutTooltip>
             </span>
             <span className="clock-controls-group">
-              <Button onClick={() => void run({ type: "adjust_time", deltaMs: -MINUTE_MS })}>{t("clock.minusMinute")}</Button>
-              <Button onClick={() => void run({ type: "adjust_time", deltaMs: MINUTE_MS })}>{t("clock.plusMinute")}</Button>
+              <ShortcutTooltip id="subtractMinute">
+                <Button onClick={() => void run({ type: "adjust_time", deltaMs: -MINUTE_MS })}>{t("clock.minusMinute")}</Button>
+              </ShortcutTooltip>
+              <ShortcutTooltip id="addMinute">
+                <Button onClick={() => void run({ type: "adjust_time", deltaMs: MINUTE_MS })}>{t("clock.plusMinute")}</Button>
+              </ShortcutTooltip>
             </span>
-            <Button icon="coffee" onClick={() => void run({ type: "jump_to_next_break" })}>
-              {t("clock.nextBreak")}
-            </Button>
+            <ShortcutTooltip id="nextBreak">
+              <Button icon="coffee" onClick={() => void run({ type: "jump_to_next_break" })}>
+                {t("clock.nextBreak")}
+              </Button>
+            </ShortcutTooltip>
           </div>
         )}
 

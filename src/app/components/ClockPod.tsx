@@ -1,6 +1,7 @@
 import type { View } from "../../engine/types";
 import { useI18n } from "../../i18n";
 import { useClock } from "../hooks/useClock";
+import { ShortcutTooltip } from "../keyboard/ShortcutKeys";
 import { anteLabel, blindsLabel } from "../utils/labels";
 import { Button } from "./Button";
 
@@ -81,15 +82,17 @@ export function ClockPod({ view, offsetMs, onStart, onPause }: { view: View; off
       {!finished && (
         <>
           <span className="clock-pod-time">{i18n.duration(local.remainingMs)}</span>
-          {clock.running ? (
-            <Button icon="pause" onClick={onPause} className="clock-pod-toggle">
-              {t("header.pause")}
-            </Button>
-          ) : (
-            <Button icon="play" variant="primary" onClick={onStart} className="clock-pod-toggle">
-              {t("header.start")}
-            </Button>
-          )}
+          <ShortcutTooltip id="toggleClock">
+            {clock.running ? (
+              <Button icon="pause" onClick={onPause} className="clock-pod-toggle">
+                {t("header.pause")}
+              </Button>
+            ) : (
+              <Button icon="play" variant="primary" onClick={onStart} className="clock-pod-toggle">
+                {t("header.start")}
+              </Button>
+            )}
+          </ShortcutTooltip>
         </>
       )}
     </div>

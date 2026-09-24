@@ -1,0 +1,94 @@
+/* Keyboard shortcuts: key caps, the hints in tooltips and the shortcuts overlay. */
+
+.shortcut-keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.shortcut-keys kbd {
+  display: inline-block;
+  min-width: 1.9em;
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.shortcut-or {
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}
+
+/* In a tooltip (inverted colors), the caps follow the tooltip's text color. */
+.tooltip-shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tooltip-shortcut .shortcut-keys kbd {
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+  color: inherit;
+}
+
+.tooltip-shortcut .shortcut-or {
+  color: inherit;
+  opacity: 0.78;
+}
+
+.shortcut-groups {
+  columns: 2 260px;
+  column-gap: var(--space-8);
+}
+
+.shortcut-group {
+  break-inside: avoid;
+  margin-bottom: var(--space-5);
+}
+
+.shortcut-group:last-child {
+  margin-bottom: 0;
+}
+
+.shortcut-group-title {
+  margin-bottom: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-muted);
+}
+
+.shortcut-list {
+  display: grid;
+  margin: 0;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.shortcut-row:last-child {
+  border-bottom: 0;
+}
+
+.shortcut-row dt {
+  display: grid;
+  gap: 2px;
+  line-height: var(--leading-snug);
+}
+
+.shortcut-row dd {
+  flex: none;
+  margin: 0;
+}
+
+.shortcut-tabs {
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}
