@@ -251,6 +251,11 @@ export const en = {
     noMatch: "No tournament matches “{search}”.",
     noneInFilter: "No tournament in this list."
   },
+  sample: {
+    try: "Try a sample tournament",
+    hint: "A tournament in progress with fictional players, to look around every screen.",
+    name: "Sample — Friday Deepstack"
+  },
   config: {
     section: "Tournament",
     sectionHint: "Seats per table and the starting stack are fixed once the clock starts.",

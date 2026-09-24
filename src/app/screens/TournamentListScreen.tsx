@@ -16,6 +16,7 @@ import { Table } from "../components/Table";
 import { useToast } from "../components/Toast";
 import { useEngine } from "../EngineContext";
 import { useTournamentList } from "../hooks/useTournamentList";
+import { createSampleTournament } from "../sample/sampleTournament";
 import { relativeTime } from "../utils/relativeTime";
 import { byLastChange, copyName, duplicateTournament, filterTournaments, type PhaseFilter } from "../utils/tournamentList";
 
@@ -58,6 +59,7 @@ export default function TournamentListScreen() {
   const [confirming, setConfirming] = useState<TournamentSummary | null>(null);
   const [legacyAvailable, setLegacyAvailable] = useState(false);
   const [duplicating, setDuplicating] = useState<string | null>(null);
+  const [creatingSample, setCreatingSample] = useState(false);
   const [search, setSearch] = useState("");
   const [phase, setPhase] = useState<PhaseFilter>("all");
   const now = useNow(RELATIVE_TIME_REFRESH_MS);
@@ -110,6 +112,17 @@ export default function TournamentListScreen() {
     }
   };
 
+  const handleSample = async () => {
+    setCreatingSample(true);
+    try {
+      const id = await createSampleTournament(engine, t("sample.name"));
+      navigate(`/t/${encodeURIComponent(id)}`);
+    } catch (thrown) {
+      setError(toEngineError(thrown));
+      setCreatingSample(false);
+    }
+  };
+
   const handleImport = async () => {
     try {
       const id = await engine.importLegacy();
@@ -131,6 +144,11 @@ export default function TournamentListScreen() {
       {t("list.create")}
     </ButtonLink>
   );
+  const sample = (
+    <Button icon="sparkles" onClick={() => void handleSample()} loading={creatingSample} title={t("sample.hint")}>
+      {t("sample.try")}
+    </Button>
+  );
 
   return (
     <AppShell>
@@ -140,7 +158,10 @@ export default function TournamentListScreen() {
         flush={Boolean(sorted?.length)}
         actions={
           sorted?.length ? (
-            create
+            <>
+              {sample}
+              {create}
+            </>
           ) : offerImport ? (
             <Button onClick={() => void handleImport()} title={t("list.importLegacyHint")}>
               {t("list.importLegacy")}
@@ -151,7 +172,17 @@ export default function TournamentListScreen() {
         {sorted === null || visible === null ? (
           <p className="page-loading">{t("common.loading")}</p>
         ) : sorted.length === 0 ? (
-          <EmptyState art={<BrandMark size={56} />} title={t("list.emptyTitle")} description={t("list.emptyDescription")} action={create} />
+          <EmptyState
+            art={<BrandMark size={56} />}
+            title={t("list.emptyTitle")}
+            description={t("list.emptyDescription")}
+            action={
+              <span className="empty-state-buttons">
+                {create}
+                {sample}
+              </span>
+            }
+          />
         ) : (
           <>
             {filtering && (

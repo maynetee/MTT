@@ -1,6 +1,6 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import App from "../App";
 import { Providers, register, renderApp } from "../../test/app";
@@ -130,5 +130,44 @@ describe("the display window", () => {
     act(() => go(`/display/${saturday}`));
     expect(await screen.findByRole("heading", { name: "Saturday" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Friday" })).not.toBeInTheDocument();
+  });
+});
+
+describe("the sample tournament button", () => {
+  it("is on the empty list and opens the sample once it is ready", async () => {
+    const user = userEvent.setup();
+    const engine = createTestEngine();
+    renderApp(engine, "/");
+
+    await user.click(await screen.findByRole("button", { name: "Try a sample tournament" }));
+    expect(await screen.findByRole("heading", { name: "Sample — Friday Deepstack", level: 1 })).toBeInTheDocument();
+    expect(await engine.listTournaments()).toEqual([
+      expect.objectContaining({ name: "Sample — Friday Deepstack", phase: "running", players: 36, alive: 31 })
+    ]);
+  });
+
+  it("is next to New tournament on a list", async () => {
+    const user = userEvent.setup();
+    const engine = createTestEngine();
+    await engine.createTournament(tournamentInput({ name: "Friday" }));
+    renderApp(engine, "/");
+
+    await user.click(await screen.findByRole("button", { name: "Try a sample tournament" }));
+    expect(await screen.findByRole("heading", { name: "Sample — Friday Deepstack", level: 1 })).toBeInTheDocument();
+    expect((await engine.listTournaments()).map((summary) => summary.name)).toEqual(["Sample — Friday Deepstack", "Friday"]);
+  });
+
+  it("reports a failure and leaves nothing half-built", async () => {
+    const user = userEvent.setup();
+    const engine = createTestEngine();
+    vi.spyOn(engine, "dispatch").mockRejectedValue({ code: "HOST_ERROR", params: { message: "storage full" } });
+    renderApp(engine, "/");
+
+    const button = await screen.findByRole("button", { name: "Try a sample tournament" });
+    await user.click(button);
+    const notifications = screen.getByRole("region", { name: "Notifications" });
+    expect(await within(notifications).findByRole("alert")).toHaveTextContent("Something went wrong: storage full");
+    expect(button).toBeEnabled();
+    expect(await engine.listTournaments()).toEqual([]);
   });
 });
