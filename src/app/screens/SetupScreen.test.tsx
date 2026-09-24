@@ -63,6 +63,76 @@ describe("SetupScreen", () => {
     expect(view.levels.at(-1)!.level).toEqual({ type: "break", durationMs: 10 * 60_000, colorUp: null });
   });
 
+  it("leaves money tracking off by default", async () => {
+    const user = userEvent.setup();
+    const engine = createTestEngine();
+    renderApp(engine, "/new");
+
+    expect(await screen.findByRole("checkbox", { name: /Track buy-ins and the prize pool/ })).not.toBeChecked();
+    expect(screen.queryByLabelText("Buy-in")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Create tournament" }));
+
+    await screen.findByRole("heading", { name: "Register player" });
+    const [summary] = await engine.listTournaments();
+    const view = await engine.getView(summary.id);
+    expect(view.config.money).toBeUndefined();
+    expect(view.money).toBeUndefined();
+  });
+
+  it("creates a tournament with a buy-in typed in major units, converted exactly", async () => {
+    const user = userEvent.setup();
+    const engine = createTestEngine();
+    renderApp(engine, "/new");
+
+    await user.click(await screen.findByRole("checkbox", { name: /Track buy-ins and the prize pool/ }));
+    await user.selectOptions(screen.getByLabelText("Currency"), "USD");
+    const buyIn = screen.getByLabelText("Buy-in");
+    await user.clear(buyIn);
+    await user.type(buyIn, "19.99");
+    await user.type(screen.getByLabelText("Fee"), "2,01");
+    expect(screen.getByText("Player pays").nextSibling).toHaveTextContent("$22");
+    await user.type(screen.getByLabelText("Guaranteed prize pool"), "1000.10");
+    const unit = screen.getByLabelText("Round payouts to");
+    await user.clear(unit);
+    await user.type(unit, "5");
+    await user.click(screen.getByRole("button", { name: "Create tournament" }));
+
+    await screen.findByRole("heading", { name: "Register player" });
+    const [summary] = await engine.listTournaments();
+    const view = await engine.getView(summary.id);
+    expect(view.config.money).toEqual({
+      currency: { code: "USD", exponent: 2 },
+      buyIn: { prize: 1999, fee: 201 },
+      guarantee: 100_010,
+      roundingUnit: 500
+    });
+    expect(view.money).toMatchObject({ pool: 0, guarantee: 100_010, effectivePool: 100_010, overlay: 100_010 });
+  });
+
+  it("keeps the amounts typed when switching to a currency without decimals", async () => {
+    const user = userEvent.setup();
+    const engine = createTestEngine();
+    renderApp(engine, "/new");
+
+    await user.click(await screen.findByRole("checkbox", { name: /Track buy-ins and the prize pool/ }));
+    expect(screen.getByLabelText("Buy-in")).toHaveValue("100");
+    await user.selectOptions(screen.getByLabelText("Currency"), "JPY");
+    expect(screen.getByLabelText("Buy-in")).toHaveValue("100");
+    // Yen have no decimals: the separator is ignored.
+    await user.clear(screen.getByLabelText("Fee"));
+    await user.type(screen.getByLabelText("Fee"), "1.5");
+    expect(screen.getByLabelText("Fee")).toHaveValue("15");
+    await user.click(screen.getByRole("button", { name: "Create tournament" }));
+
+    await screen.findByRole("heading", { name: "Register player" });
+    const [summary] = await engine.listTournaments();
+    expect((await engine.getView(summary.id)).config.money).toEqual({
+      currency: { code: "JPY", exponent: 0 },
+      buyIn: { prize: 100, fee: 15 },
+      roundingUnit: 1
+    });
+  });
+
   it("reports the core's configuration errors", async () => {
     const user = userEvent.setup();
     const engine = createTestEngine();

@@ -74,8 +74,10 @@ export function createI18n(locale: Locale = "en"): I18n {
     if (typeof raw.level === "number") params.row = raw.level + 1;
     if (typeof raw.level === "number" && typeof raw.max === "number") params.rows = raw.max + 1;
     if (typeof raw.player === "number") params.player = names?.(raw.player) ?? `#${raw.player}`;
-    if (typeof raw.field === "string" && lookup(tree, `config.${raw.field}`)) {
-      params.field = translate(`config.${raw.field}`);
+    if (typeof raw.field === "string") {
+      // `config.<field>`, or `config.<field>.label` for a field with sub-fields (`money`).
+      const key = [`config.${raw.field}`, `config.${raw.field}.label`].find((candidate) => lookup(tree, candidate));
+      if (key) params.field = translate(key);
     }
     if (typeof raw.levelsLeft === "number") params.count = raw.levelsLeft;
     return params;

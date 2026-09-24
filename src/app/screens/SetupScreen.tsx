@@ -6,6 +6,7 @@ import { AppShell, PageTitle } from "../components/AppShell";
 import { Button } from "../components/Button";
 import { Section } from "../components/Card";
 import { ConfigFields, LateRegFields, sanitizeConfig } from "../components/ConfigForm";
+import { MoneyFields } from "../components/MoneyFields";
 import { StructureEditor } from "../components/StructureEditor";
 import { useToast } from "../components/Toast";
 import { useEngine } from "../EngineContext";
@@ -76,12 +77,19 @@ export default function SetupScreen() {
   return (
     <AppShell title={<PageTitle name={t("setup.title")} />}>
       <div className="setup-grid">
-        <Section title={t("config.section")} description={t("config.sectionHint")}>
-          <ConfigFields config={config} onChange={setConfig} />
-        </Section>
-        <Section title={t("config.lateReg.title")} description={t("config.lateReg.hint")}>
-          <LateRegFields config={config} onChange={setConfig} />
-        </Section>
+        <div className="stack">
+          <Section title={t("config.section")} description={t("config.sectionHint")}>
+            <ConfigFields config={config} onChange={setConfig} />
+          </Section>
+          <Section title={t("money.section")} description={t("money.sectionHint")}>
+            <MoneyFields config={config} onChange={setConfig} />
+          </Section>
+        </div>
+        <div className="stack">
+          <Section title={t("config.lateReg.title")} description={t("config.lateReg.hint")}>
+            <LateRegFields config={config} onChange={setConfig} />
+          </Section>
+        </div>
       </div>
 
       <Section title={t("structure.title")} flush>

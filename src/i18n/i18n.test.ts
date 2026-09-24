@@ -82,7 +82,13 @@ describe("error messages", () => {
       "The clock can move by at most 24 hr at once."
     );
     expect(i18n.error({ code: "CONFIG_LOCKED", params: { field: "seatsPerTable" } })).toBe(
-      "Seats per table cannot change once the tournament has started."
+      "Seats per table can no longer change at this stage of the tournament."
+    );
+    expect(i18n.error({ code: "CONFIG_LOCKED", params: { field: "money.currency" } })).toBe(
+      "The currency can no longer change at this stage of the tournament."
+    );
+    expect(i18n.error({ code: "CONFIG_LOCKED", params: { field: "money" } })).toBe(
+      "Money tracking can no longer change at this stage of the tournament."
     );
     expect(i18n.error({ code: "LEVEL_OUT_OF_RANGE", params: { level: 9, max: 3 } })).toBe(
       "Row 10 does not exist: the structure has 4 rows."

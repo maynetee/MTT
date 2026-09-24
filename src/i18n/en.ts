@@ -16,7 +16,7 @@ const errors = {
   INVALID_PLACES_PAID: "Places paid must be at least {min}.",
   INVALID_LATE_REG_LEVEL: "Late registration cannot end at play level {n}: the structure has {max} play levels.",
   INVALID_LATE_REG_ELAPSED: "Late registration must close within {max} of play.",
-  CONFIG_LOCKED: "{field} cannot change once the tournament has started.",
+  CONFIG_LOCKED: "{field} can no longer change at this stage of the tournament.",
   TABLE_IN_USE: "Table {table} is in use, so the number of tables cannot go below {table}.",
   SEAT_IN_USE: "Seat {seat} at table {table} is taken, so tables cannot get smaller than {seat} seats.",
   NO_CHANGE: "Nothing changed.",
@@ -71,7 +71,7 @@ const errors = {
   NOTHING_TO_UNDO: "Nothing to undo.",
   NOTHING_TO_REDO: "Nothing to redo.",
   INVALID_CURRENCY: "Use a 3-letter currency code with at most {maxExponent} decimals.",
-  INVALID_BUY_IN: "The buy-in and the fee cannot be negative, and the buy-in must be more than 0.",
+  INVALID_BUY_IN: "The buy-in and the fee cannot be negative.",
   INVALID_GUARANTEE: "The guaranteed prize pool cannot be negative.",
   INVALID_ROUNDING_UNIT: "The rounding unit must be more than 0.",
   INVALID_MIN_CASH: "The minimum cash cannot be negative.",
@@ -87,7 +87,7 @@ const errors = {
   INVALID_FIRST_SHARE: "The first place share must be between {min} and {max} basis points.",
   INVALID_PAYOUT_SHARES: "Payout percentages must add up to 100% and never increase (currently {total} basis points).",
   INVALID_PAYOUT_AMOUNTS: "Payout amounts must be positive and never increase from one place to the next.",
-  MONEY_NOT_CONFIGURED: "Set a buy-in first.",
+  MONEY_NOT_CONFIGURED: "Turn on money tracking in Settings first.",
   NO_ENTRIES: "There are no entries yet.",
   PAYOUTS_LOCKED: "Payouts are locked: unlock them first.",
   PAYOUTS_NOT_LOCKED: "Lock the payouts first.",
@@ -271,6 +271,12 @@ export const en = {
     capacity: "Capacity",
     capacitySeats: { one: "{count} seat", other: "{count} seats" },
     lockedHint: "Seats per table and the starting stack are locked once the tournament has started.",
+    /** Field names in CONFIG_LOCKED errors (`money`, `money.currency`, `money.buyIn`). */
+    money: {
+      label: "Money tracking",
+      currency: "The currency",
+      buyIn: "The buy-in"
+    },
     lateReg: {
       title: "Late registration",
       hint: "When registration closes on its own. You can also close or reopen it by hand while the clock runs.",
@@ -280,6 +286,30 @@ export const en = {
       minutes: "minutes",
       manual: "Until I close it"
     }
+  },
+  money: {
+    section: "Money",
+    sectionHint: "Optional: leave it off for a free or home game.",
+    track: "Track buy-ins and the prize pool",
+    trackHint: "Every entry records what it paid; payouts come from the prize pool.",
+    trackLocked: "Fixed once a player has registered.",
+    currency: "Currency",
+    currencyOption: "{code} — {name}",
+    currencyLocked: "Fixed once a player has registered.",
+    buyIn: "Buy-in",
+    buyInHint: "Goes to the prize pool.",
+    buyInLocked: "Fixed once the tournament has started: entries keep what they paid.",
+    fee: "Fee",
+    feeHint: "Kept by the house.",
+    playerPays: "Player pays",
+    guarantee: "Guaranteed prize pool",
+    guaranteeHint: "Optional: the house pays any shortfall.",
+    roundingUnit: "Round payouts to",
+    roundingUnitHint: "Payouts are multiples of this amount; the rest goes to first place.",
+    minCash: "Minimum cash",
+    minCashHint: "Optional: fewer places are paid so that every payout reaches it.",
+    payoutsLockedHint: "Payouts are locked: unlock them to change this.",
+    none: "None"
   },
   setup: {
     title: "New tournament",

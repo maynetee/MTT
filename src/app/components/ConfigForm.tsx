@@ -1,6 +1,8 @@
 import type { Config, Deadline } from "../../engine/types";
+import type { MoneyConfig } from "../../bindings/MoneyConfig";
 import { useI18n } from "../../i18n";
 import { Checkbox, Field, RadioGroup, TextInput } from "./Field";
+import { NO_LOCKS, type ConfigLocks } from "./MoneyFields";
 import { NumberInput } from "./NumberInput";
 
 const MINUTE_MS = 60_000;
@@ -11,6 +13,24 @@ const integer = (value: number | null) => (value === null ? Number.NaN : Math.tr
 /** Fits a number entered in a form into the core's integer type, so the core validates it. */
 function fit(value: number, max: number): number {
   return Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value), 0), max) : 0;
+}
+
+const MAX_AMOUNT = Number.MAX_SAFE_INTEGER;
+
+/** An optional amount: empty (NaN) means none. */
+function optional(value: number | undefined): number | undefined {
+  return value === undefined || Number.isNaN(value) ? undefined : fit(value, MAX_AMOUNT);
+}
+
+function sanitizeMoney(money: MoneyConfig | undefined): MoneyConfig | undefined {
+  if (!money) return undefined;
+  return {
+    currency: money.currency,
+    buyIn: { prize: fit(money.buyIn.prize, MAX_AMOUNT), fee: fit(money.buyIn.fee, MAX_AMOUNT) },
+    guarantee: optional(money.guarantee),
+    roundingUnit: fit(money.roundingUnit, MAX_AMOUNT),
+    minCash: optional(money.minCash)
+  };
 }
 
 /** The config as sent to the core: empty or out-of-range numbers become values it rejects with a clear error. */
@@ -31,23 +51,26 @@ export function sanitizeConfig(config: Config): Config {
     balanceTrigger: fit(config.balanceTrigger, U8),
     startingStack: fit(config.startingStack, Number.MAX_SAFE_INTEGER),
     placesPaid: fit(config.placesPaid, U16),
-    lateReg
+    lateReg,
+    money: sanitizeMoney(config.money)
   };
 }
 
 interface Props {
   config: Config;
   onChange(config: Config): void;
-  /** Once started, seats per table and the starting stack cannot change. */
-  started?: boolean;
+  /** What can no longer change (seats per table and the starting stack once started...). */
+  locks?: ConfigLocks;
 }
 
 /** Name, tables and seats, places paid, starting stack and balancing settings. */
-export function ConfigFields({ config, onChange, started = false }: Props) {
+export function ConfigFields({ config, onChange, locks = NO_LOCKS }: Props) {
   const { t } = useI18n();
   const set = (changes: Partial<Config>) => onChange({ ...config, ...changes });
   const capacity = (config.seatsPerTable || 0) * (config.maxTables || 0);
+  const started = locks.started;
   const locked = started ? t("config.lockedHint") : undefined;
+  const placesHint = locks.payoutsLocked ? t("money.payoutsLockedHint") : undefined;
 
   return (
     <div className="form-grid">
@@ -64,8 +87,13 @@ export function ConfigFields({ config, onChange, started = false }: Props) {
           title={locked}
         />
       </Field>
-      <Field label={t("config.placesPaid")}>
-        <NumberInput min={1} value={config.placesPaid} onChange={(value) => set({ placesPaid: integer(value) })} />
+      <Field label={t("config.placesPaid")} hint={placesHint}>
+        <NumberInput
+          min={1}
+          value={config.placesPaid}
+          onChange={(value) => set({ placesPaid: integer(value) })}
+          disabled={locks.payoutsLocked}
+        />
       </Field>
       <Field label={t("config.maxTables")}>
         <NumberInput min={1} value={config.maxTables} onChange={(value) => set({ maxTables: integer(value) })} />

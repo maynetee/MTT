@@ -1,0 +1,48 @@
+/* Money: amount fields, prize pool, payouts, deals, purchases and structure presets. */
+
+/* An amount with its currency symbol inside the field. */
+.money-input {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.money-input--sized {
+  width: calc((var(--digits) + var(--symbol-chars)) * 1ch + 2 * var(--space-3) + var(--space-2) + 2px + 0.5ch);
+  flex: none;
+}
+
+.money-input-control {
+  font-variant-numeric: tabular-nums;
+}
+
+.money-input--before .money-input-control {
+  padding-left: calc(var(--space-3) + var(--symbol-chars) * 1ch + var(--space-2));
+}
+
+.money-input--after .money-input-control {
+  padding-right: calc(var(--space-3) + var(--symbol-chars) * 1ch + var(--space-2));
+  text-align: right;
+}
+
+.money-input-symbol {
+  position: absolute;
+  top: 50%;
+  color: var(--color-text-subtle);
+  font-size: var(--text-md);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.money-input--before .money-input-symbol {
+  left: var(--space-3);
+}
+
+.money-input--after .money-input-symbol {
+  right: var(--space-3);
+}
+
+.money-input-control:disabled + .money-input-symbol {
+  opacity: 0.6;
+}

@@ -4,6 +4,7 @@ import { useI18n } from "../../i18n";
 import { Button } from "../components/Button";
 import { Section } from "../components/Card";
 import { ConfigFields, LateRegFields, sanitizeConfig } from "../components/ConfigForm";
+import { MoneyFields, type ConfigLocks } from "../components/MoneyFields";
 import { useToast } from "../components/Toast";
 import { useTournament } from "../TournamentContext";
 
@@ -16,6 +17,7 @@ export default function SettingsScreen() {
   const toast = useToast();
   const started = view.phase !== "setup";
   const finished = view.phase === "finished";
+  const locks: ConfigLocks = { started, registered: view.counts.unique > 0, payoutsLocked: view.money?.locked ?? false };
 
   // Follow the saved settings until the director starts editing.
   useEffect(() => {
@@ -37,12 +39,19 @@ export default function SettingsScreen() {
   return (
     <>
       <div className="setup-grid">
-        <Section title={t("settings.title")} description={started ? t("config.lockedHint") : t("settings.hint")}>
-          <ConfigFields config={config} onChange={edit} started={started} />
-        </Section>
-        <Section title={t("config.lateReg.title")} description={t("config.lateReg.hint")}>
-          <LateRegFields config={config} onChange={edit} />
-        </Section>
+        <div className="stack">
+          <Section title={t("settings.title")} description={started ? t("config.lockedHint") : t("settings.hint")}>
+            <ConfigFields config={config} onChange={edit} locks={locks} />
+          </Section>
+          <Section title={t("money.section")} description={t("money.sectionHint")}>
+            <MoneyFields config={config} onChange={edit} locks={locks} />
+          </Section>
+        </div>
+        <div className="stack">
+          <Section title={t("config.lateReg.title")} description={t("config.lateReg.hint")}>
+            <LateRegFields config={config} onChange={edit} />
+          </Section>
+        </div>
       </div>
       {dirty && !finished && (
         <div className="action-bar">
