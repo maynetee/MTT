@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ClockState, Level, Player, StateSnapshot } from "../types";
-import DisplayScreen from "./DisplayScreen";
+import DisplayScreen, { EXIT_CONTROL_HIDE_DELAY_MS } from "./DisplayScreen";
 
 function level(index: number, smallBlind: number, bigBlind: number, ante: number, isBreak = false): Level {
   return {
@@ -88,5 +88,57 @@ describe("DisplayScreen", () => {
   it("announces the bubble when one elimination is left before the money", () => {
     render(<DisplayScreen state={snapshot(1, "running", 4)} />);
     expect(screen.getByText("Bubble!")).toBeInTheDocument();
+  });
+});
+
+describe("DisplayScreen exit control (browser)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const exitButton = () => screen.queryByRole("button", { name: /exit display/i });
+
+  it("appears when the mouse moves, hides a few seconds later and closes the display", () => {
+    vi.useFakeTimers();
+    const close = vi.spyOn(window, "close").mockImplementation(() => {});
+    render(<DisplayScreen state={snapshot(1, "running")} />);
+    expect(exitButton()).not.toBeInTheDocument();
+
+    fireEvent.mouseMove(window, { clientX: 10, clientY: 10 });
+    expect(exitButton()).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(EXIT_CONTROL_HIDE_DELAY_MS - 1));
+    expect(exitButton()).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1));
+    expect(exitButton()).not.toBeInTheDocument();
+
+    // A mousemove without movement (content scrolling under the cursor) does not bring it back.
+    fireEvent.mouseMove(window, { clientX: 10, clientY: 10 });
+    expect(exitButton()).not.toBeInTheDocument();
+
+    fireEvent.mouseMove(window, { clientX: 20, clientY: 10 });
+    fireEvent.click(exitButton()!);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes the display on Escape", () => {
+    const close = vi.spyOn(window, "close").mockImplementation(() => {});
+    render(<DisplayScreen state={snapshot(1, "running")} />);
+
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(close).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("is not part of the preview", () => {
+    const close = vi.spyOn(window, "close").mockImplementation(() => {});
+    render(<DisplayScreen state={snapshot(1, "running")} preview />);
+
+    fireEvent.mouseMove(window, { clientX: 10, clientY: 10 });
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(exitButton()).not.toBeInTheDocument();
+    expect(close).not.toHaveBeenCalled();
   });
 });

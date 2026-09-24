@@ -203,4 +203,23 @@ mod tests {
             Err(json!("The export content must be sent as raw bytes"))
         );
     }
+
+    // Only the path where the display is already open: the mock runtime has no monitors.
+    #[test]
+    fn open_display_window_brings_back_the_open_display() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let app = mock_app(data_dir.path());
+        let main = main_window(&app);
+        window(&app, "display");
+
+        let result = invoke(
+            &main,
+            "open_display_window",
+            InvokeBody::default(),
+            HeaderMap::default(),
+        );
+
+        assert_eq!(result, Ok(Value::Null));
+        assert_eq!(app.webview_windows().len(), 2);
+    }
 }

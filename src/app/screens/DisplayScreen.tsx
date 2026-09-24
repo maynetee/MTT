@@ -1,7 +1,10 @@
-import { useEffect, useRef } from "react";
-import { openDisplayWindow } from "../api";
+import { useEffect, useRef, useState } from "react";
+import { closeDisplayWindow, openDisplayWindow } from "../api";
 import type { Player, StateSnapshot } from "../types";
 import { formatTime, moneyStatus, playLevelNumber } from "../utils/tournament";
+
+/** How long the exit control stays visible after the mouse stops moving. */
+export const EXIT_CONTROL_HIDE_DELAY_MS = 3000;
 
 function sortEliminated(players: Player[]) {
   return [...players]
@@ -9,8 +12,51 @@ function sortEliminated(players: Player[]) {
     .sort((a, b) => (b.eliminatedAt ?? 0) - (a.eliminatedAt ?? 0));
 }
 
+function closeDisplay() {
+  closeDisplayWindow().catch((error) => console.error("Could not close the display", error));
+}
+
+/**
+ * The fullscreen display has no window controls: Esc closes it, and moving the mouse shows
+ * an exit button for a few seconds. Returns whether that button is visible.
+ */
+function useExitControl(enabled: boolean) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let hideTimer: ReturnType<typeof setTimeout> | undefined;
+    let lastPosition: { x: number; y: number } | null = null;
+
+    const onMouseMove = (event: MouseEvent) => {
+      // Browsers also fire mousemove when content scrolls under a still cursor.
+      if (lastPosition?.x === event.clientX && lastPosition.y === event.clientY) return;
+      lastPosition = { x: event.clientX, y: event.clientY };
+      setVisible(true);
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => setVisible(false), EXIT_CONTROL_HIDE_DELAY_MS);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeDisplay();
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      clearTimeout(hideTimer);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [enabled]);
+
+  return visible;
+}
+
 export default function DisplayScreen({ state, preview }: { state: StateSnapshot; preview?: boolean }) {
   const listRef = useRef<HTMLDivElement | null>(null);
+  const exitVisible = useExitControl(!preview);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -36,6 +82,11 @@ export default function DisplayScreen({ state, preview }: { state: StateSnapshot
 
   const content = (
     <div className={preview ? "display-preview" : "display"}>
+      {exitVisible && (
+        <button type="button" className="display-exit" onClick={closeDisplay}>
+          Exit display <kbd>Esc</kbd>
+        </button>
+      )}
       <div className="display-left">
         <div className="display-card">
           <h2>Clock</h2>

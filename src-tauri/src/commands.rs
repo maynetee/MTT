@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::http::HeaderMap;
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{
-    AppHandle, Emitter, Manager, Runtime, State, WebviewUrl, WebviewWindowBuilder, Window,
+    AppHandle, Emitter, Manager, Monitor, Runtime, State, WebviewUrl, WebviewWindowBuilder, Window,
 };
 use tauri_plugin_dialog::DialogExt;
 
@@ -1618,22 +1618,53 @@ pub fn undo_last_event<R: Runtime>(
     Ok(())
 }
 
+const DISPLAY_WINDOW: &str = "display";
+
+/// Opens the public display fullscreen, on a secondary monitor when there is one, or brings
+/// it back to the front if it is already open.
+///
 /// Async because creating a window from a synchronous command deadlocks on Windows.
 #[tauri::command]
 pub async fn open_display_window<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
-    if app.get_webview_window("display").is_some() {
-        return Ok(());
+    if let Some(window) = app.get_webview_window(DISPLAY_WINDOW) {
+        window.show().map_err(|err| err.to_string())?;
+        return window.set_focus().map_err(|err| err.to_string());
     }
-    WebviewWindowBuilder::new(
+
+    let mut builder = WebviewWindowBuilder::new(
         &app,
-        "display",
+        DISPLAY_WINDOW,
         WebviewUrl::App("index.html#/display".into()),
     )
     .title("MTT Display")
-    .fullscreen(true)
-    .build()
-    .map_err(|err| err.to_string())?;
-    Ok(())
+    .visible(false);
+    if let Some(monitor) = secondary_monitor(&app)? {
+        // The builder takes logical coordinates, the monitor reports physical ones.
+        let scale_factor = monitor.scale_factor();
+        let position = monitor.position().to_logical::<f64>(scale_factor);
+        let size = monitor.size().to_logical::<f64>(scale_factor);
+        builder = builder
+            .position(position.x, position.y)
+            .inner_size(size.width, size.height);
+    }
+    let window = builder.build().map_err(|err| err.to_string())?;
+    // On macOS, simple fullscreen covers the monitor the window is on without moving it to a
+    // new Space; other platforms fall back to regular fullscreen.
+    window
+        .set_simple_fullscreen(true)
+        .map_err(|err| err.to_string())?;
+    window.show().map_err(|err| err.to_string())
+}
+
+/// A monitor other than the primary one, if there is one.
+fn secondary_monitor<R: Runtime>(app: &AppHandle<R>) -> Result<Option<Monitor>, String> {
+    let Some(primary) = app.primary_monitor().map_err(|err| err.to_string())? else {
+        return Ok(None);
+    };
+    let monitors = app.available_monitors().map_err(|err| err.to_string())?;
+    Ok(monitors
+        .into_iter()
+        .find(|monitor| monitor.position() != primary.position()))
 }
 
 /// Request header carrying the suggested file name of an export. URL-encoded, because

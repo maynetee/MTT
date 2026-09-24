@@ -1,4 +1,5 @@
 import { invoke, isTauri, type InvokeArgs, type InvokeOptions } from "@tauri-apps/api/core";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { LevelDraft, MoveSuggestion, Seat, StateSnapshot, TournamentConfig } from "./types";
 import {
   adjustClockLocal,
@@ -161,6 +162,15 @@ export async function undoLastEvent(): Promise<void> {
 export async function openDisplayWindow(): Promise<void> {
   if (!isTauriAvailable()) return runDemo(() => openDisplayWindowLocal());
   return invokeTauri("open_display_window");
+}
+
+/** Closes the display: its own window on the desktop, the window the demo opened in a browser. */
+export async function closeDisplayWindow(): Promise<void> {
+  if (!isTauriAvailable()) {
+    window.close();
+    return;
+  }
+  await getCurrentWebviewWindow().close();
 }
 
 export function tickClockIfDemo() {
