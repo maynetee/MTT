@@ -1,0 +1,259 @@
+{
+    "format": 1,
+    "head": 12,
+    "events": [
+        {
+            "seq": 1,
+            "v": 1,
+            "atMs": 1700000000000,
+            "event": {
+                "type": "tournament_created",
+                "id": "t-1",
+                "config": {
+                    "name": "Test event",
+                    "seatsPerTable": 6,
+                    "maxTables": 2,
+                    "finalTableSize": null,
+                    "balanceTrigger": 2,
+                    "breakOrder": [],
+                    "startingStack": 10000,
+                    "placesPaid": 3,
+                    "lateReg": {
+                        "type": "manual"
+                    },
+                    "payout": {}
+                },
+                "structure": [
+                    {
+                        "type": "play",
+                        "sb": 25,
+                        "bb": 50,
+                        "ante": {
+                            "type": "none"
+                        },
+                        "durationMs": 1200000
+                    },
+                    {
+                        "type": "play",
+                        "sb": 50,
+                        "bb": 100,
+                        "ante": {
+                            "type": "none"
+                        },
+                        "durationMs": 1200000
+                    },
+                    {
+                        "type": "break",
+                        "durationMs": 600000,
+                        "colorUp": null
+                    },
+                    {
+                        "type": "play",
+                        "sb": 75,
+                        "bb": 150,
+                        "ante": {
+                            "type": "none"
+                        },
+                        "durationMs": 1200000
+                    },
+                    {
+                        "type": "play",
+                        "sb": 100,
+                        "bb": 200,
+                        "ante": {
+                            "type": "none"
+                        },
+                        "durationMs": 1200000
+                    }
+                ]
+            }
+        },
+        {
+            "seq": 2,
+            "v": 1,
+            "atMs": 1700000000000,
+            "event": {
+                "type": "player_registered",
+                "player": 1,
+                "name": "Alice",
+                "seat": {
+                    "table": 1,
+                    "seat": 1
+                },
+                "stack": 10000,
+                "openedTable": 1
+            }
+        },
+        {
+            "seq": 3,
+            "v": 1,
+            "atMs": 1700000000000,
+            "event": {
+                "type": "player_registered",
+                "player": 2,
+                "name": "Bob",
+                "seat": {
+                    "table": 1,
+                    "seat": 5
+                },
+                "stack": 10000,
+                "openedTable": null
+            }
+        },
+        {
+            "seq": 4,
+            "v": 1,
+            "atMs": 1700000000000,
+            "event": {
+                "type": "player_registered",
+                "player": 3,
+                "name": "Carol",
+                "seat": {
+                    "table": 2,
+                    "seat": 3
+                },
+                "stack": 10000,
+                "openedTable": 2
+            }
+        },
+        {
+            "seq": 5,
+            "v": 1,
+            "atMs": 1700000000000,
+            "event": {
+                "type": "player_registered",
+                "player": 4,
+                "name": "Dave",
+                "seat": {
+                    "table": 2,
+                    "seat": 5
+                },
+                "stack": 10000,
+                "openedTable": null
+            }
+        },
+        {
+            "seq": 6,
+            "v": 1,
+            "atMs": 1700000000000,
+            "event": {
+                "type": "player_unregistered",
+                "player": 3
+            }
+        },
+        {
+            "seq": 7,
+            "v": 1,
+            "atMs": 1700000000000,
+            "event": {
+                "type": "player_registered",
+                "player": 5,
+                "name": "Eve",
+                "seat": {
+                    "table": 2,
+                    "seat": 4
+                },
+                "stack": 10000,
+                "openedTable": null
+            }
+        },
+        {
+            "seq": 8,
+            "v": 1,
+            "atMs": 1700000060000,
+            "event": {
+                "type": "clock_changed",
+                "reason": "start",
+                "clock": {
+                    "type": "running",
+                    "level": 0,
+                    "endsAtMs": 1700001260000
+                },
+                "startsTournament": true
+            }
+        },
+        {
+            "seq": 9,
+            "v": 1,
+            "atMs": 1700000360000,
+            "event": {
+                "type": "players_busted",
+                "group": 1,
+                "busts": [
+                    {
+                        "player": 1,
+                        "startStack": null,
+                        "seat": {
+                            "table": 1,
+                            "seat": 1
+                        }
+                    }
+                ],
+                "finish": null
+            }
+        },
+        {
+            "seq": 10,
+            "v": 1,
+            "atMs": 1700000420000,
+            "event": {
+                "type": "player_moved",
+                "player": 5,
+                "from": {
+                    "table": 2,
+                    "seat": 4
+                },
+                "to": {
+                    "table": 1,
+                    "seat": 1
+                },
+                "reason": "manual"
+            }
+        },
+        {
+            "seq": 11,
+            "v": 1,
+            "atMs": 1700000420000,
+            "event": {
+                "type": "registration_overridden",
+                "open": false,
+                "finish": null
+            }
+        },
+        {
+            "seq": 12,
+            "v": 1,
+            "atMs": 1700000420000,
+            "event": {
+                "type": "players_busted",
+                "group": 2,
+                "busts": [
+                    {
+                        "player": 4,
+                        "startStack": null,
+                        "seat": {
+                            "table": 2,
+                            "seat": 5
+                        }
+                    }
+                ],
+                "finish": null
+            }
+        },
+        {
+            "seq": 13,
+            "v": 1,
+            "atMs": 1700000420000,
+            "event": {
+                "type": "clock_changed",
+                "reason": "pause",
+                "clock": {
+                    "type": "paused",
+                    "level": 0,
+                    "remainingMs": 840000
+                },
+                "startsTournament": false
+            }
+        }
+    ]
+}

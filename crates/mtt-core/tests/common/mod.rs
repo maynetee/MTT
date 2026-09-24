@@ -6,8 +6,8 @@ use std::collections::BTreeSet;
 use mtt_core::rng::mix_seed;
 use mtt_core::state::TableStatus;
 use mtt_core::{
-    Aggregate, Ante, BustInput, Chips, Command, Config, Ctx, DomainError, Level, NewTournament,
-    Outcome, Phase, PlayerId, SeatRef, State, TournamentId, View,
+    Aggregate, Ante, BustInput, Chips, Command, Config, Ctx, DomainError, Level, Money,
+    MoneyConfig, NewTournament, Outcome, Phase, PlayerId, SeatRef, State, TournamentId, View,
 };
 
 pub const T0: i64 = 1_700_000_000_000;
@@ -44,6 +44,22 @@ pub fn config(seats: u8, tables: u16) -> Config {
     Config {
         places_paid: 3,
         ..Config::new("Test event", seats, tables, 10_000)
+    }
+}
+
+/// EUR 100 + 10 buy-ins, payouts rounded to whole euros.
+pub fn money() -> MoneyConfig {
+    MoneyConfig {
+        rounding_unit: Money(100),
+        ..MoneyConfig::new("EUR", 2, 10_000, 1_000)
+    }
+}
+
+/// `config(seats, tables)` with money tracked.
+pub fn money_config(seats: u8, tables: u16) -> Config {
+    Config {
+        money: Some(money()),
+        ..config(seats, tables)
     }
 }
 
@@ -131,7 +147,14 @@ impl Harness {
 
     /// Registers `n` players named P1..Pn.
     pub fn register_many(&mut self, n: u32) -> Vec<PlayerId> {
-        (1..=n).map(|i| self.register(&format!("P{i}"))).collect()
+        self.register_many_from(1, n)
+    }
+
+    /// Registers players named P`from`..P`to`.
+    pub fn register_many_from(&mut self, from: u32, to: u32) -> Vec<PlayerId> {
+        (from..=to)
+            .map(|i| self.register(&format!("P{i}")))
+            .collect()
     }
 
     #[track_caller]

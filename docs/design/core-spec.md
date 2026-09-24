@@ -57,7 +57,7 @@ State { id, phase: Setup | Running | Finished { winner }, config, structure: Vec
         clock, reg_override: Option<bool>, players: BTreeMap<PlayerId, Player>,
         tables: BTreeMap<TableNo, Table>, next_player_id, next_bust_group, final_table_formed }
 Player { id, name, name_key, status: Seated { seat } | Busted { group, start_stack, last_seat },
-         entries, chips_bought }
+         entries, chips_bought, prize_paid, fees_paid }
 Table  { no, seats, status: Idle | Open | Closed, occupants: BTreeMap<SeatNo, PlayerId>,
          button: Option<SeatNo> }
 ```
@@ -69,7 +69,13 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
 
 - `Config { name, seats_per_table (2..=12), max_tables (1..=1000), final_table_size
   (default seats_per_table), balance_trigger (default 2), break_order, starting_stack,
-  places_paid (>= 1, fixed number for now), late_reg: Deadline, payout (reserved) }`.
+  places_paid (>= 1, fixed number for now), late_reg: Deadline, payout (reserved),
+  money?: MoneyConfig }`.
+- `MoneyConfig { currency: { code, exponent }, buyIn: { prize, fee }, guarantee?,
+  roundingUnit, minCash? }`, absent for a tournament without money tracking. Amounts are
+  `Money` in minor units (`exponent` digits, 0..=4; code: three uppercase letters). Errors:
+  `INVALID_CURRENCY`, `INVALID_BUY_IN`, `INVALID_GUARANTEE`, `INVALID_ROUNDING_UNIT` (must be
+  positive), `INVALID_MIN_CASH`.
 - `Deadline`: `EndOfPlayLevel { n, through_break }` (n is a 1-based play-level number and
   must exist), `Elapsed { ms }`, `Manual` (default).
 - `Level::Play { sb, bb, ante: None | Classic { amount } | BigBlind { amount }, duration_ms }`
@@ -77,9 +83,10 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
   `sb <= 0`, `bb < sb`, negative ante, duration outside `(0, 24h]`. Warnings: ante above big
   blind, big blind lower than the previous play level.
 - Play-level numbers skip breaks (`[P, P, B, P]` is 1, 2, -, 3).
-- `UpdateConfig`: seats per table and starting stack are locked once started
-  (`CONFIG_LOCKED`); `max_tables` cannot drop below a table in use; identical config is
-  `NO_CHANGE`.
+- `UpdateConfig`: seats per table, starting stack and `money.buyIn` are locked once started;
+  enabling/disabling money tracking and the currency are locked as soon as a player is
+  registered (`CONFIG_LOCKED { field }`, e.g. `money.currency`); `max_tables` cannot drop
+  below a table in use; identical config is `NO_CHANGE`.
 - `UpdateStructure`: once started, levels before the current one are frozen
   (`PAST_LEVEL_MODIFIED`), the current level cannot be removed; changing the current
   level's duration keeps the elapsed time (`remaining += new - old`, clamped at 0).
@@ -96,6 +103,9 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
     seat must exist and be empty. Same late-registration check as any registration.
 - Registration is always open in setup; once running, the director's override
   (`CloseRegistration` / `ReopenRegistration`) wins, else the deadline decides (see Clock).
+- Money: every entry records the price it actually paid (`PlayerRegistered.price`,
+  present when money is tracked), so config edits never rewrite history: a new buy-in
+  only applies to later entries. `Unregister` records the refund (`refund`).
 - `Unregister` only in setup. `MovePlayer { player, to, reason? }` to any empty seat of a
   non-closed table.
 
@@ -129,6 +139,12 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
 - `FormFinalTable { table }`: every remaining player is redrawn to a random seat at
   `table` (not closed; an idle table opens), every other open table closes, the button is
   cleared for the director to set after the draw (`TOO_MANY_FOR_FINAL_TABLE`).
+
+## Prize pool
+
+`payouts::pool`: `pool` = sum of the prize parts recorded by the active events (refunds
+removed), `fees` likewise; `effective = max(pool, guarantee)` is what the payouts
+distribute; `overlay = effective - pool` is paid by the house.
 
 ## Busts, ranking, finish
 
@@ -203,7 +219,13 @@ the next play level during a break), places paid (capped by N), ITM status
 (`not_yet { to_money }` / `bubble` when alive == paid + 1 / `in_money`), ranking rows (alive
 first, then by place, with ties, provisional and in-money flags), tables with seats,
 names, button and next blinds, suggestions (final table, table break, balance plan),
-warnings.
+warnings, and `money?` when money is tracked (currency, pool, fees, guarantee, overlay,
+effective pool).
+
+Compatibility: every field added to an existing wire type (config, events, view) is
+optional (`#[serde(default, skip_serializing_if = "Option::is_none")]`, `#[ts(optional)]`)
+so logs written before it replay unchanged (`tests/golden/v1_log.json`) and existing
+TypeScript code keeps type-checking.
 
 ## Determinism
 
@@ -219,12 +241,14 @@ no `getrandom`. The host passes a fresh seed per command; outcomes are stored in
   undo/redo are inverses, the JSON log replays to the same aggregate, the effective level
   never decreases with time, schedules are strictly increasing, pause/resume keeps the
   remaining time, and once every button is known the full balance plan applies cleanly,
-  moves nobody twice and leaves the open tables within `balance_trigger - 1` players.
+  moves nobody twice and leaves the open tables within `balance_trigger - 1` players; the
+  prize pool equals the prices recorded by the active events and
+  `effective = max(pool, guarantee)`.
 - JSON scenarios (`tests/scenarios/*.json`) with partial view matching:
   `{ name, seed, tournament, steps: [{ atMs, cmd, expect?, view? }], checks: [{ nowMs, view }] }`.
 
 ## Not implemented yet
 
-Buy-ins, fees, prize pool, payouts curve, re-entry/rebuy/add-on, ICM, deals, WASM crate,
+Payouts curve, re-entry/rebuy/add-on, ICM, deals, WASM crate,
 Tauri integration. The model keeps room for them (`entries`, `chips_bought`, `payout`,
 `Money`, provisional places).

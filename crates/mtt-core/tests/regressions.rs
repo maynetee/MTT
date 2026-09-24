@@ -7,8 +7,8 @@ use mtt_core::seating::BalanceStep;
 use mtt_core::state::TableStatus;
 use mtt_core::view::Itm;
 use mtt_core::{
-    Clock, Command, Config, Deadline, DomainError, MoveReason, Phase, PlayerId, SeatNo, SeatRef,
-    TableNo, Warning,
+    Aggregate, Clock, Command, Config, Deadline, DomainError, Money, MoveReason, Phase, PlayerId,
+    SeatNo, SeatRef, TableNo, Warning,
 };
 
 #[test]
@@ -508,4 +508,64 @@ fn final_table_redraw_closes_other_tables() {
     h.ok(Command::Undo {});
     assert!(!h.agg.state().final_table_formed);
     assert_eq!(h.view().suggestions.final_table, Some(TableNo(1)));
+}
+
+// Money.
+
+#[test]
+fn guarantee_overlay() {
+    let config = Config {
+        money: Some(mtt_core::MoneyConfig {
+            guarantee: Some(Money(100_000)),
+            ..money()
+        }),
+        ..config(9, 2)
+    };
+    let mut h = Harness::new(config, levels());
+    let ids = h.register_many(6);
+    let money = h.view().money.expect("money is tracked");
+    assert_eq!(
+        (money.pool, money.fees, money.overlay, money.effective_pool),
+        (Money(60_000), Money(6_000), Money(40_000), Money(100_000))
+    );
+    // Unregistering before the start refunds the entry.
+    h.ok(Command::Unregister { player: ids[0] });
+    let money = h.view().money.unwrap();
+    assert_eq!((money.pool, money.overlay), (Money(50_000), Money(50_000)));
+    // Beyond the guarantee there is no overlay.
+    h.register_many_from(7, 12);
+    let money = h.view().money.unwrap();
+    assert_eq!(
+        (money.pool, money.overlay, money.effective_pool),
+        (Money(110_000), Money(0), Money(110_000))
+    );
+    assert_eq!(money.guarantee, Some(Money(100_000)));
+}
+
+/// A log written before money tracking existed replays unchanged: no prices, no money
+/// section, the same view as before.
+#[test]
+fn v1_log_without_money_replays() {
+    let json = include_str!("golden/v1_log.json");
+    let agg = Aggregate::from_json(json).expect("old log replays");
+    assert_eq!(agg.head(), 12);
+    assert_eq!(agg.events().len(), 13);
+    let view = agg.view(T0 + 60 * MIN);
+    assert_eq!(view.money, None);
+    assert_eq!(view.places_paid, 3);
+    assert_eq!(
+        (view.counts.unique, view.counts.entries, view.counts.alive),
+        (4, 4, 2)
+    );
+    assert_eq!(h_names(&view), vec!["Eve", "Bob", "Dave", "Alice"]);
+    // Rewriting the log changes nothing either.
+    let again = Aggregate::from_json(&agg.to_json().unwrap()).unwrap();
+    assert_eq!(again, agg);
+    let original: serde_json::Value = serde_json::from_str(json).unwrap();
+    let rewritten: serde_json::Value = serde_json::from_str(&agg.to_json().unwrap()).unwrap();
+    assert_eq!(rewritten, original);
+}
+
+fn h_names(view: &mtt_core::View) -> Vec<&str> {
+    view.ranking.iter().map(|r| r.name.as_str()).collect()
 }

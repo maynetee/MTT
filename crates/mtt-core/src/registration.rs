@@ -5,6 +5,7 @@ use crate::config::Deadline;
 use crate::error::DomainError;
 use crate::event::{Event, Finish};
 use crate::ids::{PlayerId, SeatRef, TableNo};
+use crate::money::Price;
 use crate::name::{self, MAX_NAME_CHARS};
 use crate::rng::Rng;
 use crate::state::{Phase, State, TableStatus};
@@ -158,18 +159,23 @@ pub(crate) fn decide_register(
         seat,
         stack: state.config.starting_stack,
         opened_table,
+        price: state.config.money.as_ref().map(|m| m.buy_in),
     })
 }
 
-/// `Unregister`: only before the start.
+/// `Unregister`: only before the start; what the player paid is refunded.
 pub(crate) fn decide_unregister(state: &State, player: PlayerId) -> Result<Event, DomainError> {
     if state.phase != Phase::Setup {
         return Err(DomainError::AlreadyStarted);
     }
-    if state.player(player).is_none() {
-        return Err(DomainError::PlayerNotFound { player });
-    }
-    Ok(Event::PlayerUnregistered { player })
+    let found = state
+        .player(player)
+        .ok_or(DomainError::PlayerNotFound { player })?;
+    let refund = state.config.money.as_ref().map(|_| Price {
+        prize: found.prize_paid,
+        fee: found.fees_paid,
+    });
+    Ok(Event::PlayerUnregistered { player, refund })
 }
 
 /// `CloseRegistration`: finishes the tournament when a single player is left.

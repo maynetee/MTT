@@ -59,9 +59,27 @@ amount!(
     Chips
 );
 amount!(
-    /// A money amount in minor currency units (reserved for the prize pool).
+    /// A money amount in minor currency units (cents for EUR, yen for JPY).
     Money
 );
+
+/// What an entry or a purchase costs, split between the prize pool and the house.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
+pub struct Price {
+    /// Part added to the prize pool.
+    pub prize: Money,
+    /// Part kept by the house (not in the prize pool).
+    pub fee: Money,
+}
+
+impl Price {
+    /// True when both parts are valid amounts and their sum is too.
+    pub fn is_valid(self) -> bool {
+        self.prize.is_valid() && self.fee.is_valid() && self.prize.checked_add(self.fee).is_some()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -77,5 +95,17 @@ mod tests {
         assert!(!Chips(-1).is_valid());
         assert!(!Chips(0).is_positive());
         assert!(Money(0).is_valid());
+    }
+
+    #[test]
+    fn price_parts_must_fit_together() {
+        let price = |prize, fee| Price {
+            prize: Money(prize),
+            fee: Money(fee),
+        };
+        assert!(price(1_000, 100).is_valid());
+        assert!(price(0, 0).is_valid());
+        assert!(!price(-1, 0).is_valid());
+        assert!(!price(MAX_SAFE_INT, 1).is_valid());
     }
 }

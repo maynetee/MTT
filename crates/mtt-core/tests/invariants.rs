@@ -8,8 +8,8 @@ use common::*;
 use mtt_core::clock::{Clock, effective, schedule};
 use mtt_core::seating::balance_plan;
 use mtt_core::{
-    Aggregate, BustInput, Chips, Command, Config, Ctx, Deadline, Level, MoveReason, Phase,
-    PlayerId, SeatNo, SeatRef, State, TableNo,
+    Aggregate, BustInput, Chips, Command, Config, Ctx, Deadline, Event, Level, Money, MoneyConfig,
+    MoveReason, Phase, PlayerId, SeatNo, SeatRef, State, TableNo,
 };
 use proptest::prelude::*;
 
@@ -183,11 +183,61 @@ fn check_balance_plan(agg: &Aggregate, now: i64) {
     }
 }
 
-fn run_ops(late_reg: Deadline, trigger: u8, players: u32, start: bool, ops: Vec<Op>) {
+fn money() -> impl Strategy<Value = Option<MoneyConfig>> {
+    prop::option::of((0i64..=5_000, 0i64..=500, prop::option::of(0i64..=80_000))).prop_map(|m| {
+        m.map(|(prize, fee, guarantee)| MoneyConfig {
+            guarantee: guarantee.map(Money),
+            ..MoneyConfig::new("EUR", 2, prize, fee)
+        })
+    })
+}
+
+/// The pool is the sum of the prices recorded in the active events, whatever the
+/// configuration says now; the guarantee only tops it up.
+fn check_money(agg: &Aggregate, now: i64) {
+    let view = agg.view(now);
+    let Some(money) = view.money else {
+        assert!(agg.state().config.money.is_none());
+        return;
+    };
+    let (mut prize, mut fees) = (0i64, 0i64);
+    for env in &agg.events()[..agg.head()] {
+        match &env.event {
+            Event::PlayerRegistered {
+                price: Some(price), ..
+            } => {
+                prize += price.prize.0;
+                fees += price.fee.0;
+            }
+            Event::PlayerUnregistered {
+                refund: Some(refund),
+                ..
+            } => {
+                prize -= refund.prize.0;
+                fees -= refund.fee.0;
+            }
+            _ => {}
+        }
+    }
+    assert_eq!((money.pool.0, money.fees.0), (prize, fees));
+    let guarantee = money.guarantee.map_or(0, |g| g.0);
+    assert_eq!(money.effective_pool.0, prize.max(guarantee));
+    assert_eq!(money.overlay.0, money.effective_pool.0 - prize);
+}
+
+fn run_ops(
+    late_reg: Deadline,
+    trigger: u8,
+    money: Option<MoneyConfig>,
+    players: u32,
+    start: bool,
+    ops: Vec<Op>,
+) {
     let config = Config {
         places_paid: 2,
         late_reg,
         balance_trigger: trigger,
+        money,
         ..Config::new("Prop", SEATS, TABLES, 10_000)
     };
     let mut h = Harness::new(config, levels());
@@ -204,6 +254,16 @@ fn run_ops(late_reg: Deadline, trigger: u8, players: u32, start: bool, ops: Vec<
                 continue;
             }
             Op::Cmd(cmd) => cmd,
+        };
+        // Keep the money settings: switching them is rejected once someone paid.
+        let cmd = match cmd {
+            Command::UpdateConfig { config } => Command::UpdateConfig {
+                config: Config {
+                    money: h.agg.state().config.money.clone(),
+                    ..config
+                },
+            },
+            other => other,
         };
         let before = h.agg.clone();
         let result = h.run(cmd.clone());
@@ -229,6 +289,7 @@ fn run_ops(late_reg: Deadline, trigger: u8, players: u32, start: bool, ops: Vec<
         check_invariants(h.agg.state(), &h.view());
         check_clock(h.agg.state(), h.now);
         check_balance_plan(&h.agg, h.now);
+        check_money(&h.agg, h.now);
     }
     let json = h.agg.to_json().expect("serializable log");
     let reloaded = Aggregate::from_json(&json).expect("replayable log");
@@ -241,11 +302,12 @@ proptest! {
     fn random_sequences_keep_invariants(
         late_reg in deadline(),
         trigger in 2u8..=SEATS,
+        money in money(),
         players in 2u32..=12,
         start in any::<bool>(),
         ops in prop::collection::vec(op(), 1..80),
     ) {
-        run_ops(late_reg, trigger, players, start, ops);
+        run_ops(late_reg, trigger, money, players, start, ops);
     }
 
     #[test]

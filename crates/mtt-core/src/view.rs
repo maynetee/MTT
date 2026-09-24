@@ -3,9 +3,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::clock::{self, Boundary};
-use crate::config::{Config, Deadline};
+use crate::config::{Config, Currency, Deadline};
 use crate::ids::{PlayerId, SeatNo, SeatRef, Seq, TableNo, TournamentId};
-use crate::money::Chips;
+use crate::money::{Chips, Money};
+use crate::payouts;
 use crate::ranking;
 use crate::registration;
 use crate::seating::{self, Suggestions};
@@ -131,6 +132,23 @@ pub struct ChipsView {
     pub avg_stack_bb_x100: Option<i64>,
 }
 
+/// Prize pool, present when money is tracked. Amounts are in minor units of `currency`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
+pub struct MoneyView {
+    pub currency: Currency,
+    /// Sum of the prize parts paid by every entry and purchase.
+    pub pool: Money,
+    /// Fees collected (kept by the house, not in the pool).
+    pub fees: Money,
+    pub guarantee: Option<Money>,
+    /// Paid by the house when the pool is below the guarantee.
+    pub overlay: Money,
+    /// Distributed to the players: the larger of `pool` and `guarantee`.
+    pub effective_pool: Money,
+}
+
 /// In-the-money status.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all_fields = "camelCase")]
@@ -212,6 +230,10 @@ pub struct View {
     pub tables: Vec<TableView>,
     pub suggestions: Suggestions,
     pub warnings: Vec<Warning>,
+    /// Prize pool; absent when money is not tracked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub money: Option<MoneyView>,
 }
 
 /// Builds the view of `state` at `now_ms`. History is left empty; see `Aggregate::view`.
@@ -251,7 +273,21 @@ pub fn view(state: &State, now_ms: i64) -> View {
         tables: tables(state),
         suggestions: seating::suggestions(state),
         counts,
+        money: money_view(state),
     }
+}
+
+fn money_view(state: &State) -> Option<MoneyView> {
+    let money = state.config.money.as_ref()?;
+    let pool = payouts::pool(state);
+    Some(MoneyView {
+        currency: money.currency.clone(),
+        pool: pool.prize,
+        fees: pool.fees,
+        guarantee: pool.guarantee,
+        overlay: pool.overlay,
+        effective_pool: pool.effective,
+    })
 }
 
 fn level_row(levels: &[Level], index: usize) -> Option<LevelRow> {

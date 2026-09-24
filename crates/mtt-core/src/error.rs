@@ -56,6 +56,14 @@ pub enum DomainError {
     InvalidLateRegElapsed {
         max_ms: i64,
     },
+    /// Currency code not three uppercase letters, or exponent too large.
+    InvalidCurrency {
+        max_exponent: u8,
+    },
+    InvalidBuyIn,
+    InvalidGuarantee,
+    InvalidRoundingUnit,
+    InvalidMinCash,
     ConfigLocked {
         field: String,
     },

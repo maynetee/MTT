@@ -8,7 +8,7 @@ use crate::clock::Clock;
 use crate::config::Config;
 use crate::event::{Event, Finish, SeatMove};
 use crate::ids::{BustGroup, PlayerId, SeatNo, SeatRef, TableNo, TournamentId};
-use crate::money::Chips;
+use crate::money::{Chips, Money, Price};
 use crate::name;
 use crate::structure::Level;
 
@@ -108,6 +108,21 @@ pub struct Player {
     pub entries: u8,
     /// Chips received from all entries.
     pub chips_bought: Chips,
+    /// Prize-pool parts paid, as recorded in the events.
+    #[serde(default)]
+    pub prize_paid: Money,
+    /// Fees paid, as recorded in the events.
+    #[serde(default)]
+    pub fees_paid: Money,
+}
+
+impl Player {
+    fn pay(&mut self, price: Option<Price>) {
+        if let Some(price) = price {
+            self.prize_paid = self.prize_paid.saturating_add(price.prize);
+            self.fees_paid = self.fees_paid.saturating_add(price.fee);
+        }
+    }
 }
 
 impl Player {
@@ -313,26 +328,28 @@ pub fn apply(state: &mut State, event: &Event) -> Result<(), ApplyError> {
             name,
             seat,
             stack,
+            price,
             ..
         } => {
             if state.players.contains_key(player) {
                 return Err(ApplyError("player id already used"));
             }
             state.seat_player(*player, *seat)?;
-            state.players.insert(
-                *player,
-                Player {
-                    id: *player,
-                    name: name.clone(),
-                    name_key: name::key(name),
-                    status: PlayerStatus::Seated { seat: *seat },
-                    entries: 1,
-                    chips_bought: *stack,
-                },
-            );
+            let mut registered = Player {
+                id: *player,
+                name: name.clone(),
+                name_key: name::key(name),
+                status: PlayerStatus::Seated { seat: *seat },
+                entries: 1,
+                chips_bought: *stack,
+                prize_paid: Money::ZERO,
+                fees_paid: Money::ZERO,
+            };
+            registered.pay(*price);
+            state.players.insert(*player, registered);
             state.next_player_id = state.next_player_id.max(player.0.saturating_add(1));
         }
-        Event::PlayerUnregistered { player } => {
+        Event::PlayerUnregistered { player, .. } => {
             let seat = state
                 .player(*player)
                 .and_then(Player::seat)

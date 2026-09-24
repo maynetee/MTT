@@ -6,6 +6,7 @@ import type { Counts } from "./Counts";
 import type { History } from "./History";
 import type { Itm } from "./Itm";
 import type { LevelRow } from "./LevelRow";
+import type { MoneyView } from "./MoneyView";
 import type { PhaseName } from "./PhaseName";
 import type { PlayerId } from "./PlayerId";
 import type { RankingRow } from "./RankingRow";
@@ -22,4 +23,8 @@ export type View = { generatedAtMs: number, id: TournamentId, phase: PhaseName, 
 /**
  * Places paid, capped by the number of players.
  */
-placesPaid: number, itm: Itm, ranking: Array<RankingRow>, tables: Array<TableView>, suggestions: Suggestions, warnings: Array<Warning>, };
+placesPaid: number, itm: Itm, ranking: Array<RankingRow>, tables: Array<TableView>, suggestions: Suggestions, warnings: Array<Warning>, 
+/**
+ * Prize pool; absent when money is not tracked.
+ */
+money?: MoneyView, };

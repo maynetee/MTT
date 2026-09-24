@@ -7,7 +7,7 @@ use crate::clock::{Clock, ClockReason};
 use crate::command::MoveReason;
 use crate::config::Config;
 use crate::ids::{BustGroup, PlayerId, SeatNo, SeatRef, Seq, TableNo, TournamentId};
-use crate::money::Chips;
+use crate::money::{Chips, Price};
 use crate::structure::Level;
 
 /// Current event schema version, stored in every envelope.
@@ -78,9 +78,19 @@ pub enum Event {
         /// Table opened to seat this player, if any.
         #[serde(default)]
         opened_table: Option<TableNo>,
+        /// Buy-in paid, when money is tracked. Later config edits never change it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+        price: Option<Price>,
     },
     #[serde(rename = "player_unregistered")]
-    PlayerUnregistered { player: PlayerId },
+    PlayerUnregistered {
+        player: PlayerId,
+        /// Amounts given back, when money is tracked.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+        refund: Option<Price>,
+    },
     #[serde(rename = "players_busted")]
     PlayersBusted {
         group: BustGroup,
@@ -170,7 +180,7 @@ impl Event {
     pub fn players(&self) -> Vec<PlayerId> {
         match self {
             Event::PlayerRegistered { player, .. }
-            | Event::PlayerUnregistered { player }
+            | Event::PlayerUnregistered { player, .. }
             | Event::PlayerRevived { player, .. }
             | Event::PlayerMoved { player, .. } => vec![*player],
             Event::PlayersBusted { busts, .. } => busts.iter().map(|b| b.player).collect(),
@@ -207,6 +217,7 @@ mod tests {
                 seat: SeatRef::new(1, 3),
                 stack: Chips(20_000),
                 opened_table: Some(TableNo(1)),
+                price: None,
             },
         };
         let golden = json!({
@@ -221,6 +232,25 @@ mod tests {
             serde_json::from_value::<Envelope>(golden).unwrap(),
             envelope
         );
+        // With money tracked, the price actually paid is part of the fact.
+        let paid = Event::PlayerRegistered {
+            player: PlayerId(2),
+            name: "Bob".into(),
+            seat: SeatRef::new(1, 4),
+            stack: Chips(20_000),
+            opened_table: None,
+            price: Some(Price {
+                prize: crate::money::Money(9_000),
+                fee: crate::money::Money(1_000),
+            }),
+        };
+        let golden = json!({
+            "type": "player_registered", "player": 2, "name": "Bob",
+            "seat": {"table": 1, "seat": 4}, "stack": 20000, "openedTable": null,
+            "price": {"prize": 9000, "fee": 1000}
+        });
+        assert_eq!(serde_json::to_value(&paid).unwrap(), golden);
+        assert_eq!(serde_json::from_value::<Event>(golden).unwrap(), paid);
         let clock = Event::ClockChanged {
             reason: ClockReason::Start,
             clock: Clock::Running {

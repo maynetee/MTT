@@ -25,6 +25,8 @@ pub struct Aggregate {
 }
 
 /// What a successful dispatch changed, for the host to persist.
+// Returned once per command: boxing the envelope would only complicate host code.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all_fields = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
@@ -519,8 +521,12 @@ mod tests {
                 seat,
                 stack: crate::money::Chips(1),
                 opened_table: None,
+                price: None,
             },
-            Event::PlayerUnregistered { player: p },
+            Event::PlayerUnregistered {
+                player: p,
+                refund: None,
+            },
             Event::PlayersBusted {
                 group: crate::ids::BustGroup(1),
                 busts: Vec::new(),
