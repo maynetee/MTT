@@ -23,6 +23,7 @@ export default defineConfig({
   reporter: CI ? [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]] : [["list"]],
   use: {
     baseURL: BASE_URL,
+    // The app speaks the browser's language and the tests read English, whatever the machine's.
     locale: "en-US",
     timezoneId: "Europe/Paris",
     viewport: { width: 1400, height: 900 },

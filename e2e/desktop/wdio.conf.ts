@@ -1,7 +1,7 @@
 import { rmSync } from "node:fs";
 import { browser } from "@wdio/globals";
 import type { TauriCapabilities, TauriServiceOptions } from "@wdio/tauri-service";
-import { APP_BINARY, OUTPUT_DIR, WEBDRIVER_PORT, appEnv, dataDir, stopRelaunchedApp } from "./app";
+import { APP_ARGS, APP_BINARY, OUTPUT_DIR, WEBDRIVER_PORT, appEnv, dataDir, stopRelaunchedApp } from "./app";
 
 const capabilities: TauriCapabilities[] = [{ browserName: "tauri", "tauri:options": { application: APP_BINARY } }];
 
@@ -9,6 +9,7 @@ const tauri: TauriServiceOptions = {
   driverProvider: "embedded",
   embeddedPort: WEBDRIVER_PORT,
   env: appEnv(),
+  appArgs: APP_ARGS,
   startTimeout: 60_000
 };
 

@@ -27,12 +27,21 @@ export function dataDir(): string {
 }
 
 /**
- * The app's environment: the throwaway data directory, and a previous-version database that
- * does not exist, so the real one (from the app's previous identifier) is never read.
+ * The app speaks the system's language and the tests read English: English whatever the
+ * machine's language. macOS takes the preferred languages from launch arguments (the
+ * NSUserDefaults argument domain, read by WKWebView); WebKitGTK from `LANGUAGE`. Nothing is
+ * stored, unlike the language setting, which would stay in the web view storage that
+ * `npm run tauri dev` shares with this build.
+ */
+export const APP_ARGS = process.platform === "darwin" ? ["-AppleLanguages", "(en)"] : [];
+
+/**
+ * The app's environment: the throwaway data directory, a previous-version database that does
+ * not exist, so the real one (from the app's previous identifier) is never read, and English.
  */
 export function appEnv(): Record<string, string> {
   const dir = dataDir();
-  return { MTT_DATA_DIR: dir, MTT_LEGACY_DB: join(dir, "no-previous-version.sqlite") };
+  return { MTT_DATA_DIR: dir, MTT_LEGACY_DB: join(dir, "no-previous-version.sqlite"), LANGUAGE: "en" };
 }
 
 async function webDriverReady(): Promise<boolean> {
@@ -59,7 +68,7 @@ let relaunched: ChildProcess | null = null;
 /** Waits until the app has quit, then starts it again on the same data directory. */
 export async function relaunchApp(): Promise<void> {
   await waitFor(async () => !(await webDriverReady()), 15_000, "the app has quit");
-  relaunched = spawn(APP_BINARY, [], {
+  relaunched = spawn(APP_BINARY, APP_ARGS, {
     env: { ...process.env, ...appEnv(), TAURI_WEBDRIVER_PORT: String(WEBDRIVER_PORT) },
     stdio: "ignore"
   });
