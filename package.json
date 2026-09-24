@@ -23,11 +23,12 @@
     "build:pages": "tsc --noEmit && vite build --mode pages",
     "preview": "vite preview",
     "pretypecheck": "node scripts/wasm.mjs --if-stale",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e/web",
     "pretest": "node scripts/wasm.mjs --if-stale",
     "test": "vitest run",
     "pretest:watch": "node scripts/wasm.mjs --if-stale",
     "test:watch": "vitest",
+    "e2e": "npm run build && playwright test",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -40,6 +41,7 @@
     "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tauri-apps/cli": "^2.11.5",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
