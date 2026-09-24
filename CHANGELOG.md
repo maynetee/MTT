@@ -7,6 +7,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Tournaments without payouts, for a freeroll for points, a league night or a practice event:
+  untick “This tournament pays prizes” in the new-tournament form or in Settings. Nobody is
+  then in the money: no places paid, no bubble, no Payouts or Deal tab, no money line or payout
+  ladder on the TV display and no prize column in the exports. Buy-ins and the prize pool can
+  still be tracked, and prizes can be turned back on at any time unless the payouts are locked
+  (#86).
+
+### Changed
+
+- The currency can be changed after the first entry, to fix a wrong choice or the sample
+  tournament's: amounts keep their value (100.00 EUR becomes 100.00 USD), nothing is converted,
+  and they keep the decimals they were recorded with, even in a currency that usually has
+  fewer (#87).
+
 ## [1.0.0] - 2026-09-24
 
 The first public release. The prototype imported at the start of the project becomes a

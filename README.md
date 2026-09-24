@@ -93,18 +93,23 @@ Seating follows the practice of the [TDA rules](https://www.pokertda.com/):
   chips finishes higher, and equal stacks tie and share the place.
 - After an elimination, a notification offers to undo it.
 - Live ranking with ties, provisional places while players can still come in, places paid,
-  bubble and in-the-money status.
+  bubble and in-the-money status (none of these for a tournament that pays no prizes).
 - A wrong elimination that can no longer be undone can be corrected.
 - The tournament ends by itself when one player is left and no one else can enter.
 
 ### Money, payouts and deals
 
-Money tracking is optional: leave it off for a free or home game.
+Money tracking is optional: leave it off for a free or home game. A tournament can also pay no
+prizes at all (a freeroll for points, a league night, a practice event): untick “This
+tournament pays prizes” and there are no places paid, no bubble and no Payouts or Deal tab,
+while the buy-ins can still be tracked. Prizes can be turned back on during the tournament.
 
 - Buy-in split into prize and fee, in one of 36 currencies, with an optional guarantee: the
   prize pool, the fees, the guarantee and any overlay are always in view. Every entry records
   the price it paid, so changing the buy-in never rewrites history, and amounts are exact to the
   smallest unit of the currency.
+- The currency can be changed at any time: amounts keep their value (nothing is converted) and
+  the decimals they were recorded with.
 - Re-entries, rebuys and add-ons, each with its price, chips, limit per player and window
   (while registration is open, until a level or a playing time, or during the break after a
   given level). The players screen offers them when they are open.
@@ -128,9 +133,9 @@ Money tracking is optional: leave it off for a free or home game.
   to any screen: the time left in large digits that never shift, blinds and ante, next level,
   time to the break, late registration, players and entries, average stack in chips and big
   blinds, and chips in play. With money tracking, the prize pool and a payout ladder that
-  points at the next payout or the minimum cash.
-- Bubble and in-the-money status; paused, break (with the color-up), last level, overtime and
-  the winner each have a look of their own.
+  points at the next payout or the minimum cash; without prizes, the levels coming up instead.
+- Bubble and in-the-money status when the tournament pays prizes; paused, break (with the
+  color-up), last level, overtime and the winner each have a look of their own.
 - On the desktop it opens fullscreen on the second screen when there is one, and comes back to
   the front if it is already open; in the browser it opens in a tab of its own. Moving the mouse
   shows an exit button, and Esc closes it. It follows every change made in the director window.
@@ -147,8 +152,8 @@ during play ask for confirmation first.
 ### Exports
 
 - The ranking as CSV (UTF-8, opens correctly in Excel) or PDF, with a prize column when money is
-  tracked. The PDF embeds the Inter font, so names with accented Latin, Greek or Cyrillic
-  letters print as typed.
+  tracked and the tournament pays prizes. The PDF embeds the Inter font, so names with accented
+  Latin, Greek or Cyrillic letters print as typed.
 - The desktop app asks where to save the file; the browser downloads it.
 
 ### Tournaments and data

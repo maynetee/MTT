@@ -301,9 +301,9 @@ language and the sound preferences reach every open window through `storage` eve
   if the result differs from what is committed, so the TypeScript code always type-checks against
   the real shapes.
 - **Shared scenarios.** The JSON scenarios in `crates/mtt-core/tests/scenarios/` (balancing, clock,
-  freeze-out, a hundred entries with re-entries and a bubble tie) run natively through
-  `cargo test` (`tests/scenarios.rs`) and through the WebAssembly build in Vitest
-  (`src/engine/scenarios.test.ts`), with the same per-step seeds (`mix_seed`), the same partial
+  freeze-out, a freeze-out without payouts, a hundred entries with re-entries and a bubble tie)
+  run natively through `cargo test` (`tests/scenarios.rs`) and through the WebAssembly build in
+  Vitest (`src/engine/scenarios.test.ts`), with the same per-step seeds (`mix_seed`), the same partial
   view matching and a replay check. The same seeded seat draws are also asserted on both sides
   (`crates/mtt-wasm/src/lib.rs` and `src/engine/wasmEngine.test.ts`).
 - **No OS entropy in the browser build.** CI fails if `mtt-core` or `mtt-wasm` depends on
