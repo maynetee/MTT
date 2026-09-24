@@ -3,12 +3,12 @@
 /**
  * Start of an upcoming level.
  */
-export type Boundary = { level_index: number, 
+export type Boundary = { levelIndex: number, 
 /**
  * Clock time until this level starts.
  */
-starts_in_ms: number, 
+startsInMs: number, 
 /**
  * Wall-clock start while running.
  */
-starts_at_ms: number | null, };
+startsAtMs: number | null, };

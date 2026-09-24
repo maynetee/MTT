@@ -18,8 +18,8 @@ import type { Warning } from "./Warning";
 /**
  * Everything the UI renders.
  */
-export type View = { generated_at_ms: number, id: TournamentId, phase: PhaseName, winner: PlayerId | null, history: History, config: Config, levels: Array<LevelRow>, clock: ClockView, registration: RegistrationView, counts: Counts, chips: ChipsView, 
+export type View = { generatedAtMs: number, id: TournamentId, phase: PhaseName, winner: PlayerId | null, history: History, config: Config, levels: Array<LevelRow>, clock: ClockView, registration: RegistrationView, counts: Counts, chips: ChipsView, 
 /**
  * Places paid, capped by the number of players.
  */
-places_paid: number, itm: Itm, ranking: Array<RankingRow>, tables: Array<TableView>, suggestions: Suggestions, warnings: Array<Warning>, };
+placesPaid: number, itm: Itm, ranking: Array<RankingRow>, tables: Array<TableView>, suggestions: Suggestions, warnings: Array<Warning>, };

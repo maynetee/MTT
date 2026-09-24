@@ -5,119 +5,119 @@
     "id": "clock",
     "config": {
       "name": "Clock drill",
-      "seats_per_table": 9,
-      "max_tables": 1,
-      "starting_stack": 5000,
-      "places_paid": 2,
-      "late_reg": { "type": "end_of_play_level", "n": 2, "through_break": false }
+      "seatsPerTable": 9,
+      "maxTables": 1,
+      "startingStack": 5000,
+      "placesPaid": 2,
+      "lateReg": { "type": "end_of_play_level", "n": 2, "throughBreak": false }
     },
     "structure": [
-      { "type": "play", "sb": 25, "bb": 50, "duration_ms": 600000 },
-      { "type": "play", "sb": 50, "bb": 100, "duration_ms": 600000 },
-      { "type": "break", "duration_ms": 300000 },
-      { "type": "play", "sb": 100, "bb": 200, "duration_ms": 600000 }
+      { "type": "play", "sb": 25, "bb": 50, "durationMs": 600000 },
+      { "type": "play", "sb": 50, "bb": 100, "durationMs": 600000 },
+      { "type": "break", "durationMs": 300000 },
+      { "type": "play", "sb": 100, "bb": 200, "durationMs": 600000 }
     ]
   },
   "steps": [
-    { "at_ms": 1000, "cmd": { "type": "register", "name": "Ann" } },
-    { "at_ms": 2000, "cmd": { "type": "register", "name": "Ben" } },
-    { "at_ms": 3000, "cmd": { "type": "register", "name": "Cat" } },
+    { "atMs": 1000, "cmd": { "type": "register", "name": "Ann" } },
+    { "atMs": 2000, "cmd": { "type": "register", "name": "Ben" } },
+    { "atMs": 3000, "cmd": { "type": "register", "name": "Cat" } },
     {
-      "at_ms": 60000,
+      "atMs": 60000,
       "cmd": { "type": "start_clock" },
       "view": {
         "clock": {
-          "level_index": 0, "running": true, "remaining_ms": 600000, "ends_at_ms": 660000,
-          "next_break_in_ms": 1200000, "structure_ends_in_ms": 2100000, "recompute_at_ms": 660000,
-          "next": { "index": 1, "play_level": 2 },
+          "levelIndex": 0, "running": true, "remainingMs": 600000, "endsAtMs": 660000,
+          "nextBreakInMs": 1200000, "structureEndsInMs": 2100000, "recomputeAtMs": 660000,
+          "next": { "index": 1, "playLevel": 2 },
           "schedule": [
-            { "level_index": 1, "starts_in_ms": 600000, "starts_at_ms": 660000 },
-            { "level_index": 2, "starts_in_ms": 1200000, "starts_at_ms": 1260000 },
-            { "level_index": 3, "starts_in_ms": 1500000, "starts_at_ms": 1560000 }
+            { "levelIndex": 1, "startsInMs": 600000, "startsAtMs": 660000 },
+            { "levelIndex": 2, "startsInMs": 1200000, "startsAtMs": 1260000 },
+            { "levelIndex": 3, "startsInMs": 1500000, "startsAtMs": 1560000 }
           ]
         },
-        "registration": { "open": true, "closes_in_ms": 1200000, "closes_at_ms": 1260000 }
+        "registration": { "open": true, "closesInMs": 1200000, "closesAtMs": 1260000 }
       }
     },
     {
-      "at_ms": 720000,
+      "atMs": 720000,
       "cmd": { "type": "pause_clock" },
       "view": {
-        "clock": { "level_index": 1, "play_level": 2, "running": false, "remaining_ms": 540000, "ends_at_ms": null, "recompute_at_ms": null },
-        "registration": { "open": true, "closes_in_ms": 540000, "closes_at_ms": null }
+        "clock": { "levelIndex": 1, "playLevel": 2, "running": false, "remainingMs": 540000, "endsAtMs": null, "recomputeAtMs": null },
+        "registration": { "open": true, "closesInMs": 540000, "closesAtMs": null }
       }
     },
     {
-      "at_ms": 900000,
+      "atMs": 900000,
       "cmd": { "type": "undo" },
       "view": {
-        "clock": { "level_index": 1, "running": true, "remaining_ms": 360000, "ends_at_ms": 1260000 },
+        "clock": { "levelIndex": 1, "running": true, "remainingMs": 360000, "endsAtMs": 1260000 },
         "history": { "redo": { "kind": "clock_changed" } }
       }
     },
     {
-      "at_ms": 960000,
+      "atMs": 960000,
       "cmd": { "type": "next_level" },
       "view": {
-        "clock": { "level_index": 2, "is_break": true, "play_level": null, "remaining_ms": 300000, "sb": null },
+        "clock": { "levelIndex": 2, "isBreak": true, "playLevel": null, "remainingMs": 300000, "sb": null },
         "registration": { "open": false }
       }
     },
-    { "at_ms": 1000000, "cmd": { "type": "register", "name": "Dan" }, "expect": { "error": "LATE_REG_CLOSED" } },
+    { "atMs": 1000000, "cmd": { "type": "register", "name": "Dan" }, "expect": { "error": "LATE_REG_CLOSED" } },
     {
-      "at_ms": 1020000,
+      "atMs": 1020000,
       "cmd": { "type": "undo" },
-      "view": { "clock": { "level_index": 1, "remaining_ms": 240000 }, "registration": { "open": true } }
+      "view": { "clock": { "levelIndex": 1, "remainingMs": 240000 }, "registration": { "open": true } }
     },
-    { "at_ms": 1030000, "cmd": { "type": "register", "name": "Dan" }, "view": { "counts": { "alive": 4 } } },
+    { "atMs": 1030000, "cmd": { "type": "register", "name": "Dan" }, "view": { "counts": { "alive": 4 } } },
     {
-      "at_ms": 1100000,
-      "cmd": { "type": "adjust_time", "delta_ms": -200000 },
+      "atMs": 1100000,
+      "cmd": { "type": "adjust_time", "deltaMs": -200000 },
       "view": {
-        "clock": { "level_index": 2, "remaining_ms": 300000, "ends_at_ms": 1400000 },
+        "clock": { "levelIndex": 2, "remainingMs": 300000, "endsAtMs": 1400000 },
         "registration": { "open": false }
       }
     },
-    { "at_ms": 2200000, "cmd": { "type": "next_level" }, "expect": { "error": "NO_NEXT_LEVEL" } },
+    { "atMs": 2200000, "cmd": { "type": "next_level" }, "expect": { "error": "NO_NEXT_LEVEL" } },
     {
-      "at_ms": 2210000,
+      "atMs": 2210000,
       "cmd": { "type": "pause_clock" },
-      "view": { "clock": { "level_index": 3, "remaining_ms": 0, "overtime_ms": 0, "running": false } }
+      "view": { "clock": { "levelIndex": 3, "remainingMs": 0, "overtimeMs": 0, "running": false } }
     },
-    { "at_ms": 2220000, "cmd": { "type": "start_clock" } },
+    { "atMs": 2220000, "cmd": { "type": "start_clock" } },
     {
-      "at_ms": 2230000,
+      "atMs": 2230000,
       "cmd": {
         "type": "update_structure",
         "levels": [
-          { "type": "play", "sb": 25, "bb": 50, "duration_ms": 600000 },
-          { "type": "play", "sb": 50, "bb": 100, "duration_ms": 600000 },
-          { "type": "break", "duration_ms": 300000 },
-          { "type": "play", "sb": 100, "bb": 200, "duration_ms": 600000 },
-          { "type": "play", "sb": 200, "bb": 400, "duration_ms": 600000 }
+          { "type": "play", "sb": 25, "bb": 50, "durationMs": 600000 },
+          { "type": "play", "sb": 50, "bb": 100, "durationMs": 600000 },
+          { "type": "break", "durationMs": 300000 },
+          { "type": "play", "sb": 100, "bb": 200, "durationMs": 600000 },
+          { "type": "play", "sb": 200, "bb": 400, "durationMs": 600000 }
         ]
       },
       "view": {
-        "clock": { "level_index": 4, "play_level": 4, "remaining_ms": 600000, "overtime_ms": 0, "bb": 400 },
-        "warnings": [{ "code": "STRUCTURE_ENDING", "params": { "levels_left": 0 } }]
+        "clock": { "levelIndex": 4, "playLevel": 4, "remainingMs": 600000, "overtimeMs": 0, "bb": 400 },
+        "warnings": [{ "code": "STRUCTURE_ENDING", "params": { "levelsLeft": 0 } }]
       }
     },
     {
-      "at_ms": 2240000,
+      "atMs": 2240000,
       "cmd": { "type": "undo" },
       "view": {
-        "clock": { "level_index": 3, "remaining_ms": 0, "overtime_ms": 20000 },
+        "clock": { "levelIndex": 3, "remainingMs": 0, "overtimeMs": 20000 },
         "warnings": [{ "code": "STRUCTURE_EXHAUSTED" }]
       }
     }
   ],
   "checks": [
     {
-      "now_ms": 2300000,
+      "nowMs": 2300000,
       "view": {
-        "clock": { "level_index": 3, "running": true, "remaining_ms": 0, "overtime_ms": 80000, "recompute_at_ms": null, "schedule": [] },
+        "clock": { "levelIndex": 3, "running": true, "remainingMs": 0, "overtimeMs": 80000, "recomputeAtMs": null, "schedule": [] },
         "counts": { "alive": 4 },
-        "chips": { "in_play": 20000, "avg_stack": 5000, "avg_stack_bb_x100": 2500 }
+        "chips": { "inPlay": 20000, "avgStack": 5000, "avgStackBbX100": 2500 }
       }
     }
   ]

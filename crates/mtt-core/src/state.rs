@@ -14,7 +14,7 @@ use crate::structure::Level;
 
 /// Tournament lifecycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
 pub enum Phase {
     /// Registration and seating before the first clock start.
     #[serde(rename = "setup")]
@@ -42,6 +42,7 @@ pub enum TableStatus {
 
 /// A physical table.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Table {
     pub no: TableNo,
     pub seats: u8,
@@ -83,7 +84,7 @@ impl Table {
 
 /// Where a player is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
 pub enum PlayerStatus {
     #[serde(rename = "seated")]
     Seated { seat: SeatRef },
@@ -98,6 +99,7 @@ pub enum PlayerStatus {
 
 /// A registered player (one per person; re-entries will add entries, not players).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Player {
     pub id: PlayerId,
     pub name: String,
@@ -125,6 +127,7 @@ impl Player {
 
 /// Full tournament state, rebuilt by folding events.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct State {
     pub id: TournamentId,
     pub phase: Phase,

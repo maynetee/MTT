@@ -5,7 +5,7 @@ import type { TableNo } from "./TableNo";
 /**
  * An undoable or redoable action, for "Undo: bust Alice" style labels.
  */
-export type ActionLabel = { seq: Seq, at_ms: number, 
+export type ActionLabel = { seq: Seq, atMs: number, 
 /**
  * Event type, e.g. `players_busted`.
  */

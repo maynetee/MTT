@@ -11,7 +11,12 @@ use crate::ids::{PlayerId, SeatNo, TableNo};
 
 /// Why a command was rejected. A rejected command never changes state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "code", content = "params", rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(
+    tag = "code",
+    content = "params",
+    rename_all = "SCREAMING_SNAKE_CASE",
+    rename_all_fields = "camelCase"
+)]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub enum DomainError {
     // Configuration.
@@ -236,5 +241,14 @@ mod tests {
         );
         let back: DomainError = serde_json::from_value(json).unwrap();
         assert_eq!(back, err);
+        // Param names are camelCase like every other field; unit variants have no params.
+        assert_eq!(
+            serde_json::to_value(DomainError::InvalidRemaining { max_ms: 5 }).unwrap(),
+            serde_json::json!({"code": "INVALID_REMAINING", "params": {"maxMs": 5}})
+        );
+        assert_eq!(
+            serde_json::to_value(DomainError::NothingToUndo).unwrap(),
+            serde_json::json!({"code": "NOTHING_TO_UNDO"})
+        );
     }
 }

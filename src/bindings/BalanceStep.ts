@@ -6,20 +6,20 @@ import type { TableNo } from "./TableNo";
 /**
  * One move of a balancing plan: the donor's next big blind to the receiver's worst seat.
  */
-export type BalanceStep = { from_table: TableNo, to_table: TableNo, 
+export type BalanceStep = { fromTable: TableNo, toTable: TableNo, 
 /**
  * `None` until the donor's button is known.
  */
-player: PlayerId | null, from_seat: SeatNo | null, 
+player: PlayerId | null, fromSeat: SeatNo | null, 
 /**
  * `None` until the receiver's button is known.
  */
-to_seat: SeatNo | null, 
+toSeat: SeatNo | null, 
 /**
  * The seat is between the button and the small blind: wait for the big blind.
  */
-waits_for_bb: boolean, 
+waitsForBb: boolean, 
 /**
  * Tables whose button must be set to complete this step.
  */
-needs_button: Array<TableNo>, };
+needsButton: Array<TableNo>, };

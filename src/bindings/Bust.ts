@@ -6,4 +6,4 @@ import type { SeatRef } from "./SeatRef";
 /**
  * One elimination as recorded.
  */
-export type Bust = { player: PlayerId, start_stack: Chips | null, seat: SeatRef, };
+export type Bust = { player: PlayerId, startStack: Chips | null, seat: SeatRef, };

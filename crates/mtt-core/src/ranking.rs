@@ -15,6 +15,7 @@ use crate::state::{Phase, PlayerStatus, State};
 
 /// A finishing place. `place_to > place` for ties (e.g. 3..4 shared).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Placement {
     pub place: u32,
     pub place_to: u32,

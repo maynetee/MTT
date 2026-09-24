@@ -3,4 +3,4 @@
 /**
  * When late registration closes (registration is always open during setup).
  */
-export type Deadline = { "type": "end_of_play_level", n: number, through_break: boolean, } | { "type": "elapsed", ms: number, } | { "type": "manual" };
+export type Deadline = { "type": "end_of_play_level", n: number, throughBreak: boolean, } | { "type": "elapsed", ms: number, } | { "type": "manual" };

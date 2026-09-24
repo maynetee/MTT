@@ -15,7 +15,7 @@ use crate::structure::{self, Level, MAX_LEVEL_MS};
 
 /// Clock state as stored in events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub enum Clock {
     #[serde(rename = "paused")]
@@ -138,6 +138,7 @@ pub fn normalize(clock: &Clock, levels: &[Level], now_ms: i64) -> Clock {
 
 /// Start of an upcoming level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct Boundary {
     pub level_index: u16,

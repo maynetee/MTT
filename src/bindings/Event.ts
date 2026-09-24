@@ -22,8 +22,8 @@ export type Event = { "type": "tournament_created", id: TournamentId, config: Co
 /**
  * Table opened to seat this player, if any.
  */
-opened_table: TableNo | null, } | { "type": "player_unregistered", player: PlayerId, } | { "type": "players_busted", group: BustGroup, busts: Array<Bust>, finish: Finish | null, } | { "type": "player_revived", player: PlayerId, seat: SeatRef, } | { "type": "player_moved", player: PlayerId, from: SeatRef, to: SeatRef, reason: MoveReason, } | { "type": "registration_overridden", open: boolean, finish: Finish | null, } | { "type": "tournament_finished", finish: Finish, } | { "type": "clock_changed", reason: ClockReason, clock: Clock, 
+openedTable: TableNo | null, } | { "type": "player_unregistered", player: PlayerId, } | { "type": "players_busted", group: BustGroup, busts: Array<Bust>, finish: Finish | null, } | { "type": "player_revived", player: PlayerId, seat: SeatRef, } | { "type": "player_moved", player: PlayerId, from: SeatRef, to: SeatRef, reason: MoveReason, } | { "type": "registration_overridden", open: boolean, finish: Finish | null, } | { "type": "tournament_finished", finish: Finish, } | { "type": "clock_changed", reason: ClockReason, clock: Clock, 
 /**
  * True for the first start, which moves the tournament out of setup.
  */
-starts_tournament: boolean, } | { "type": "button_set", table: TableNo, seat: SeatNo, } | { "type": "table_opened", table: TableNo, } | { "type": "table_broken", table: TableNo, moves: Array<SeatMove>, } | { "type": "final_table_formed", table: TableNo, moves: Array<SeatMove>, closed: Array<TableNo>, };
+startsTournament: boolean, } | { "type": "button_set", table: TableNo, seat: SeatNo, } | { "type": "table_opened", table: TableNo, } | { "type": "table_broken", table: TableNo, moves: Array<SeatMove>, } | { "type": "final_table_formed", table: TableNo, moves: Array<SeatMove>, closed: Array<TableNo>, };

@@ -86,6 +86,7 @@ fn worst_seat(
 
 /// One move of a balancing plan: the donor's next big blind to the receiver's worst seat.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct BalanceStep {
     pub from_table: TableNo,
@@ -232,6 +233,7 @@ pub fn break_sequence(state: &State) -> Vec<TableNo> {
 
 /// What the director should do next, highest priority first; at most one kind is set.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct Suggestions {
     /// Redraw everyone at this table for the final table.

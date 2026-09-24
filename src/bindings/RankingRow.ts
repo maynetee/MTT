@@ -9,8 +9,8 @@ export type RankingRow = { player: PlayerId, name: string, alive: boolean, seat:
 /**
  * Last place of a tie (`place..=place_to`).
  */
-place_to: number | null, 
+placeTo: number | null, 
 /**
  * The place may still change (late registration open).
  */
-provisional: boolean, in_money: boolean, entries: number, };
+provisional: boolean, inMoney: boolean, entries: number, };

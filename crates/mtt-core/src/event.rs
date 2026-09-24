@@ -15,6 +15,7 @@ pub const EVENT_VERSION: u16 = 1;
 
 /// A logged event with its position and wall-clock time.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct Envelope {
     pub seq: Seq,
@@ -25,6 +26,7 @@ pub struct Envelope {
 
 /// End of the tournament, recorded with the event that caused it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct Finish {
     pub winner: PlayerId,
@@ -34,6 +36,7 @@ pub struct Finish {
 
 /// One elimination as recorded.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct Bust {
     pub player: PlayerId,
@@ -43,6 +46,7 @@ pub struct Bust {
 
 /// A player's seat change inside a table break or final table draw.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct SeatMove {
     pub player: PlayerId,
@@ -52,7 +56,7 @@ pub struct SeatMove {
 
 /// Domain events.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub enum Event {
     #[serde(rename = "tournament_created")]
@@ -183,4 +187,65 @@ pub fn upcast(mut envelope: serde_json::Value, from_version: u16) -> serde_json:
         envelope["v"] = serde_json::Value::from(EVENT_VERSION);
     }
     envelope
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// Frozen v1 wire format: camelCase fields, snake_case `type` tags.
+    #[test]
+    fn envelope_json_is_camel_case() {
+        let envelope = Envelope {
+            seq: Seq(2),
+            v: EVENT_VERSION,
+            at_ms: 1_000,
+            event: Event::PlayerRegistered {
+                player: PlayerId(1),
+                name: "Alice".into(),
+                seat: SeatRef::new(1, 3),
+                stack: Chips(20_000),
+                opened_table: Some(TableNo(1)),
+            },
+        };
+        let golden = json!({
+            "seq": 2, "v": 1, "atMs": 1000,
+            "event": {
+                "type": "player_registered", "player": 1, "name": "Alice",
+                "seat": {"table": 1, "seat": 3}, "stack": 20000, "openedTable": 1
+            }
+        });
+        assert_eq!(serde_json::to_value(&envelope).unwrap(), golden);
+        assert_eq!(
+            serde_json::from_value::<Envelope>(golden).unwrap(),
+            envelope
+        );
+        let clock = Event::ClockChanged {
+            reason: ClockReason::Start,
+            clock: Clock::Running {
+                level: 0,
+                ends_at_ms: 5,
+            },
+            starts_tournament: true,
+        };
+        assert_eq!(
+            serde_json::to_value(&clock).unwrap(),
+            json!({
+                "type": "clock_changed", "reason": "start",
+                "clock": {"type": "running", "level": 0, "endsAtMs": 5},
+                "startsTournament": true
+            })
+        );
+    }
+
+    #[test]
+    fn upcast_brings_old_envelopes_to_the_current_version() {
+        let old =
+            json!({"seq": 1, "v": 0, "atMs": 0, "event": {"type": "table_opened", "table": 2}});
+        let up = upcast(old, 0);
+        assert_eq!(up["v"], EVENT_VERSION);
+        let env: Envelope = serde_json::from_value(up).unwrap();
+        assert_eq!(env.event, Event::TableOpened { table: TableNo(2) });
+    }
 }

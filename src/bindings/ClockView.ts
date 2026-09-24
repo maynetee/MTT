@@ -8,19 +8,19 @@ import type { LevelRow } from "./LevelRow";
  * Clock at the time of the view. While running, the UI counts down to `ends_at_ms` on
  * its own and asks for a fresh view at `recompute_at_ms`; nothing is written per tick.
  */
-export type ClockView = { level_index: number, play_level: number | null, is_break: boolean, running: boolean, sb: Chips | null, bb: Chips | null, ante: Ante, duration_ms: number, remaining_ms: number, 
+export type ClockView = { levelIndex: number, playLevel: number | null, isBreak: boolean, running: boolean, sb: Chips | null, bb: Chips | null, ante: Ante, durationMs: number, remainingMs: number, 
 /**
  * Wall-clock end of the current level while running.
  */
-ends_at_ms: number | null, 
+endsAtMs: number | null, 
 /**
  * Time spent past the end of the last level.
  */
-overtime_ms: number, next: LevelRow | null, 
+overtimeMs: number, next: LevelRow | null, 
 /**
  * Clock time until the next break starts.
  */
-next_break_in_ms: number | null, 
+nextBreakInMs: number | null, 
 /**
  * Upcoming level starts.
  */
@@ -28,8 +28,8 @@ schedule: Array<Boundary>,
 /**
  * Clock time until the last level ends.
  */
-structure_ends_in_ms: number, 
+structureEndsInMs: number, 
 /**
  * When this view goes stale while running (level change or registration close).
  */
-recompute_at_ms: number | null, };
+recomputeAtMs: number | null, };

@@ -5,8 +5,8 @@ import type { Chips } from "./Chips";
 /**
  * One level of the structure.
  */
-export type Level = { "type": "play", sb: Chips, bb: Chips, ante: Ante, duration_ms: number, } | { "type": "break", duration_ms: number, 
+export type Level = { "type": "play", sb: Chips, bb: Chips, ante: Ante, durationMs: number, } | { "type": "break", durationMs: number, 
 /**
  * Smallest chip kept after a color-up during this break, if any.
  */
-color_up: Chips | null, };
+colorUp: Chips | null, };

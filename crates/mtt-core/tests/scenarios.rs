@@ -1,7 +1,8 @@
 //! Runs the JSON scenarios in `tests/scenarios/`.
 //!
-//! Format: `{name, seed, tournament: {id, config, structure}, steps: [{at_ms, cmd, expect?, view?}],
-//! checks: [{now_ms, view}]}`. The tournament is created at `at_ms = 0`. `expect` is `"ok"`
+//! Format: `{name, seed, tournament: {id, config, structure}, steps: [{atMs, cmd, expect?, view?}],
+//! checks: [{nowMs, view}]}` (camelCase, like every JSON the core reads or writes). The
+//! tournament is created at `atMs = 0`. `expect` is `"ok"`
 //! (default) or `{"error": "CODE"}`. `view` is a partial match: objects match on the listed
 //! keys, arrays element by element with the same length.
 
@@ -17,6 +18,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Scenario {
     name: String,
     seed: u64,
@@ -27,6 +29,7 @@ struct Scenario {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Step {
     at_ms: i64,
     cmd: Command,
@@ -44,6 +47,7 @@ enum Expect {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Check {
     now_ms: i64,
     view: Value,

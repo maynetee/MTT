@@ -9,11 +9,11 @@ export type Suggestions = {
 /**
  * Redraw everyone at this table for the final table.
  */
-final_table: TableNo | null, 
+finalTable: TableNo | null, 
 /**
  * Break this table: the others can seat everybody.
  */
-break_table: TableNo | null, 
+breakTable: TableNo | null, 
 /**
  * Balancing moves, in order.
  */

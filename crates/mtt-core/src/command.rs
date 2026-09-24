@@ -25,6 +25,7 @@ impl Ctx {
 
 /// Parameters of a new tournament.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct NewTournament {
     pub id: TournamentId,
@@ -34,6 +35,7 @@ pub struct NewTournament {
 
 /// One elimination inside a `BustPlayers` command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct BustInput {
     pub player: PlayerId,
@@ -57,7 +59,7 @@ pub enum MoveReason {
 
 /// Everything the director can do.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub enum Command {
     #[serde(rename = "update_config")]

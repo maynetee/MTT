@@ -24,6 +24,7 @@ pub struct SeatNo(pub u8);
 
 /// A seat at a given table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct SeatRef {
     pub table: TableNo,

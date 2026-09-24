@@ -7,16 +7,16 @@ import type { TableNo } from "./TableNo";
 /**
  * Tournament settings editable by the director.
  */
-export type Config = { name: string, seats_per_table: number, max_tables: number, 
+export type Config = { name: string, seatsPerTable: number, maxTables: number, 
 /**
  * Players at the final table; defaults to `seats_per_table`.
  */
-final_table_size: number | null, 
+finalTableSize: number | null, 
 /**
  * Rebalance when the largest and smallest tables differ by at least this much.
  */
-balance_trigger: number, 
+balanceTrigger: number, 
 /**
  * Tables to break first, in order; other tables follow from the highest number down.
  */
-break_order: Array<TableNo>, starting_stack: Chips, places_paid: number, late_reg: Deadline, payout: PayoutConfig, };
+breakOrder: Array<TableNo>, startingStack: Chips, placesPaid: number, lateReg: Deadline, payout: PayoutConfig, };

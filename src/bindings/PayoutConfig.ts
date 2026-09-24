@@ -3,4 +3,4 @@
 /**
  * Payout settings. Reserved: places paid is a fixed number for now.
  */
-export type PayoutConfig = Record<symbol, never>;
+export type PayoutConfig = Record<string, never>;

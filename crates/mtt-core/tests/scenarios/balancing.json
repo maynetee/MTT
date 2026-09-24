@@ -5,86 +5,86 @@
     "id": "balancing",
     "config": {
       "name": "Three tables",
-      "seats_per_table": 6,
-      "max_tables": 3,
-      "starting_stack": 10000,
-      "places_paid": 3
+      "seatsPerTable": 6,
+      "maxTables": 3,
+      "startingStack": 10000,
+      "placesPaid": 3
     },
     "structure": [
-      { "type": "play", "sb": 50, "bb": 100, "duration_ms": 3600000 },
-      { "type": "play", "sb": 100, "bb": 200, "duration_ms": 3600000 }
+      { "type": "play", "sb": 50, "bb": 100, "durationMs": 3600000 },
+      { "type": "play", "sb": 100, "bb": 200, "durationMs": 3600000 }
     ]
   },
   "steps": [
-    { "at_ms": 1000, "cmd": { "type": "register", "name": "P1", "seat": { "table": 1, "seat": 1 } } },
-    { "at_ms": 1000, "cmd": { "type": "register", "name": "P2", "seat": { "table": 1, "seat": 2 } } },
-    { "at_ms": 1000, "cmd": { "type": "register", "name": "P3", "seat": { "table": 1, "seat": 3 } } },
-    { "at_ms": 1000, "cmd": { "type": "register", "name": "P4", "seat": { "table": 1, "seat": 4 } } },
-    { "at_ms": 1000, "cmd": { "type": "register", "name": "P5", "seat": { "table": 1, "seat": 5 } } },
-    { "at_ms": 1000, "cmd": { "type": "register", "name": "P6", "seat": { "table": 1, "seat": 6 } } },
-    { "at_ms": 2000, "cmd": { "type": "register", "name": "P7", "seat": { "table": 2, "seat": 1 } } },
-    { "at_ms": 2000, "cmd": { "type": "register", "name": "P8", "seat": { "table": 2, "seat": 2 } } },
-    { "at_ms": 2000, "cmd": { "type": "register", "name": "P9", "seat": { "table": 2, "seat": 3 } } },
-    { "at_ms": 2000, "cmd": { "type": "register", "name": "P10", "seat": { "table": 2, "seat": 4 } } },
-    { "at_ms": 2000, "cmd": { "type": "register", "name": "P11", "seat": { "table": 2, "seat": 5 } } },
-    { "at_ms": 2000, "cmd": { "type": "register", "name": "P12", "seat": { "table": 2, "seat": 6 } } },
-    { "at_ms": 3000, "cmd": { "type": "register", "name": "P13", "seat": { "table": 3, "seat": 1 } } },
-    { "at_ms": 3000, "cmd": { "type": "register", "name": "P14", "seat": { "table": 3, "seat": 4 } } },
+    { "atMs": 1000, "cmd": { "type": "register", "name": "P1", "seat": { "table": 1, "seat": 1 } } },
+    { "atMs": 1000, "cmd": { "type": "register", "name": "P2", "seat": { "table": 1, "seat": 2 } } },
+    { "atMs": 1000, "cmd": { "type": "register", "name": "P3", "seat": { "table": 1, "seat": 3 } } },
+    { "atMs": 1000, "cmd": { "type": "register", "name": "P4", "seat": { "table": 1, "seat": 4 } } },
+    { "atMs": 1000, "cmd": { "type": "register", "name": "P5", "seat": { "table": 1, "seat": 5 } } },
+    { "atMs": 1000, "cmd": { "type": "register", "name": "P6", "seat": { "table": 1, "seat": 6 } } },
+    { "atMs": 2000, "cmd": { "type": "register", "name": "P7", "seat": { "table": 2, "seat": 1 } } },
+    { "atMs": 2000, "cmd": { "type": "register", "name": "P8", "seat": { "table": 2, "seat": 2 } } },
+    { "atMs": 2000, "cmd": { "type": "register", "name": "P9", "seat": { "table": 2, "seat": 3 } } },
+    { "atMs": 2000, "cmd": { "type": "register", "name": "P10", "seat": { "table": 2, "seat": 4 } } },
+    { "atMs": 2000, "cmd": { "type": "register", "name": "P11", "seat": { "table": 2, "seat": 5 } } },
+    { "atMs": 2000, "cmd": { "type": "register", "name": "P12", "seat": { "table": 2, "seat": 6 } } },
+    { "atMs": 3000, "cmd": { "type": "register", "name": "P13", "seat": { "table": 3, "seat": 1 } } },
+    { "atMs": 3000, "cmd": { "type": "register", "name": "P14", "seat": { "table": 3, "seat": 4 } } },
     {
-      "at_ms": 60000,
+      "atMs": 60000,
       "cmd": { "type": "start_clock" },
       "view": {
         "suggestions": {
-          "final_table": null,
-          "break_table": null,
+          "finalTable": null,
+          "breakTable": null,
           "balance": [
-            { "from_table": 1, "to_table": 3, "player": null, "to_seat": null, "needs_button": [1, 3] },
-            { "from_table": 2, "to_table": 3, "player": null, "to_seat": null, "needs_button": [2, 3] }
+            { "fromTable": 1, "toTable": 3, "player": null, "toSeat": null, "needsButton": [1, 3] },
+            { "fromTable": 2, "toTable": 3, "player": null, "toSeat": null, "needsButton": [2, 3] }
           ]
         }
       }
     },
-    { "at_ms": 120000, "cmd": { "type": "set_button", "table": 1, "seat": 1 } },
-    { "at_ms": 121000, "cmd": { "type": "set_button", "table": 2, "seat": 6 } },
-    { "at_ms": 121500, "cmd": { "type": "set_button", "table": 2, "seat": 9 }, "expect": { "error": "SEAT_NOT_FOUND" } },
+    { "atMs": 120000, "cmd": { "type": "set_button", "table": 1, "seat": 1 } },
+    { "atMs": 121000, "cmd": { "type": "set_button", "table": 2, "seat": 6 } },
+    { "atMs": 121500, "cmd": { "type": "set_button", "table": 2, "seat": 9 }, "expect": { "error": "SEAT_NOT_FOUND" } },
     {
-      "at_ms": 122000,
+      "atMs": 122000,
       "cmd": { "type": "set_button", "table": 3, "seat": 1 },
       "view": {
         "tables": [
-          { "table": 1, "button": 1, "next_sb": 2, "next_bb": 3 },
-          { "table": 2, "button": 6, "next_sb": 1, "next_bb": 2 },
-          { "table": 3, "button": 1, "next_sb": 1, "next_bb": 4 }
+          { "table": 1, "button": 1, "nextSb": 2, "nextBb": 3 },
+          { "table": 2, "button": 6, "nextSb": 1, "nextBb": 2 },
+          { "table": 3, "button": 1, "nextSb": 1, "nextBb": 4 }
         ],
         "suggestions": {
           "balance": [
-            { "from_table": 1, "to_table": 3, "player": 3, "from_seat": 3, "to_seat": 5, "waits_for_bb": false, "needs_button": [] },
-            { "from_table": 2, "to_table": 3, "player": 8, "from_seat": 2, "to_seat": 6, "waits_for_bb": false, "needs_button": [] }
+            { "fromTable": 1, "toTable": 3, "player": 3, "fromSeat": 3, "toSeat": 5, "waitsForBb": false, "needsButton": [] },
+            { "fromTable": 2, "toTable": 3, "player": 8, "fromSeat": 2, "toSeat": 6, "waitsForBb": false, "needsButton": [] }
           ]
         }
       }
     },
     {
-      "at_ms": 130000,
+      "atMs": 130000,
       "cmd": { "type": "move_player", "player": 3, "to": { "table": 3, "seat": 5 }, "reason": "balance" },
-      "view": { "suggestions": { "balance": [{ "player": 8, "to_seat": 6 }] } }
+      "view": { "suggestions": { "balance": [{ "player": 8, "toSeat": 6 }] } }
     },
     {
-      "at_ms": 131000,
+      "atMs": 131000,
       "cmd": { "type": "move_player", "player": 8, "to": { "table": 3, "seat": 6 }, "reason": "balance" },
       "view": {
-        "suggestions": { "final_table": null, "break_table": null, "balance": [] },
+        "suggestions": { "finalTable": null, "breakTable": null, "balance": [] },
         "tables": [{ "players": 5 }, { "players": 5 }, { "players": 4 }]
       }
     },
-    { "at_ms": 200000, "cmd": { "type": "bust_players", "busts": [{ "player": 1 }] } },
+    { "atMs": 200000, "cmd": { "type": "bust_players", "busts": [{ "player": 1 }] } },
     {
-      "at_ms": 210000,
+      "atMs": 210000,
       "cmd": { "type": "bust_players", "busts": [{ "player": 7 }] },
-      "view": { "suggestions": { "break_table": 3, "balance": [] } }
+      "view": { "suggestions": { "breakTable": 3, "balance": [] } }
     },
     {
-      "at_ms": 220000,
+      "atMs": 220000,
       "cmd": { "type": "break_table", "table": 3 },
       "view": {
         "tables": [
@@ -92,23 +92,23 @@
           { "status": "open", "players": 6 },
           { "status": "closed", "players": 0, "button": null }
         ],
-        "suggestions": { "final_table": null, "break_table": null, "balance": [] }
+        "suggestions": { "finalTable": null, "breakTable": null, "balance": [] }
       }
     },
-    { "at_ms": 221000, "cmd": { "type": "break_table", "table": 2 }, "expect": { "error": "NOT_ENOUGH_SEATS" } },
-    { "at_ms": 230000, "cmd": { "type": "bust_players", "busts": [{ "player": 2 }] } },
-    { "at_ms": 240000, "cmd": { "type": "bust_players", "busts": [{ "player": 4 }] } },
-    { "at_ms": 250000, "cmd": { "type": "bust_players", "busts": [{ "player": 5 }] } },
-    { "at_ms": 260000, "cmd": { "type": "bust_players", "busts": [{ "player": 9 }] } },
-    { "at_ms": 270000, "cmd": { "type": "bust_players", "busts": [{ "player": 10 }] } },
-    { "at_ms": 280000, "cmd": { "type": "form_final_table", "table": 1 }, "expect": { "error": "TOO_MANY_FOR_FINAL_TABLE" } },
+    { "atMs": 221000, "cmd": { "type": "break_table", "table": 2 }, "expect": { "error": "NOT_ENOUGH_SEATS" } },
+    { "atMs": 230000, "cmd": { "type": "bust_players", "busts": [{ "player": 2 }] } },
+    { "atMs": 240000, "cmd": { "type": "bust_players", "busts": [{ "player": 4 }] } },
+    { "atMs": 250000, "cmd": { "type": "bust_players", "busts": [{ "player": 5 }] } },
+    { "atMs": 260000, "cmd": { "type": "bust_players", "busts": [{ "player": 9 }] } },
+    { "atMs": 270000, "cmd": { "type": "bust_players", "busts": [{ "player": 10 }] } },
+    { "atMs": 280000, "cmd": { "type": "form_final_table", "table": 1 }, "expect": { "error": "TOO_MANY_FOR_FINAL_TABLE" } },
     {
-      "at_ms": 290000,
+      "atMs": 290000,
       "cmd": { "type": "bust_players", "busts": [{ "player": 11 }] },
-      "view": { "suggestions": { "final_table": 1, "break_table": null, "balance": [] }, "itm": { "status": "not_yet", "to_money": 3 } }
+      "view": { "suggestions": { "finalTable": 1, "breakTable": null, "balance": [] }, "itm": { "status": "not_yet", "toMoney": 3 } }
     },
     {
-      "at_ms": 300000,
+      "atMs": 300000,
       "cmd": { "type": "form_final_table", "table": 1 },
       "view": {
         "tables": [
@@ -116,30 +116,30 @@
           { "status": "closed", "players": 0, "button": null },
           { "status": "closed", "players": 0 }
         ],
-        "suggestions": { "final_table": null, "break_table": null, "balance": [] }
+        "suggestions": { "finalTable": null, "breakTable": null, "balance": [] }
       }
     },
-    { "at_ms": 310000, "cmd": { "type": "close_registration" } },
+    { "atMs": 310000, "cmd": { "type": "close_registration" } },
     {
-      "at_ms": 320000,
-      "cmd": { "type": "bust_players", "busts": [{ "player": 13, "start_stack": 2000 }, { "player": 14, "start_stack": 2000 }] },
+      "atMs": 320000,
+      "cmd": { "type": "bust_players", "busts": [{ "player": 13, "startStack": 2000 }, { "player": 14, "startStack": 2000 }] },
       "view": { "itm": { "status": "bubble" } }
     },
-    { "at_ms": 330000, "cmd": { "type": "bust_players", "busts": [{ "player": 3 }] } },
-    { "at_ms": 340000, "cmd": { "type": "bust_players", "busts": [{ "player": 8 }] } },
-    { "at_ms": 350000, "cmd": { "type": "bust_players", "busts": [{ "player": 12 }] }, "view": { "phase": "finished", "winner": 6 } }
+    { "atMs": 330000, "cmd": { "type": "bust_players", "busts": [{ "player": 3 }] } },
+    { "atMs": 340000, "cmd": { "type": "bust_players", "busts": [{ "player": 8 }] } },
+    { "atMs": 350000, "cmd": { "type": "bust_players", "busts": [{ "player": 12 }] }, "view": { "phase": "finished", "winner": 6 } }
   ],
   "checks": [
     {
-      "now_ms": 400000,
+      "nowMs": 400000,
       "view": {
         "ranking": [
           { "name": "P6", "place": 1 },
           { "name": "P12", "place": 2 },
           { "name": "P8", "place": 3 },
-          { "name": "P3", "place": 4, "in_money": false },
-          { "name": "P13", "place": 5, "place_to": 6 },
-          { "name": "P14", "place": 5, "place_to": 6 },
+          { "name": "P3", "place": 4, "inMoney": false },
+          { "name": "P13", "place": 5, "placeTo": 6 },
+          { "name": "P14", "place": 5, "placeTo": 6 },
           { "name": "P11", "place": 7 },
           { "name": "P10", "place": 8 },
           { "name": "P9", "place": 9 },

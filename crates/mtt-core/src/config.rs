@@ -20,7 +20,7 @@ pub const MAX_LATE_REG_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 
 /// When late registration closes (registration is always open during setup).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub enum Deadline {
     /// Open until the end of the `n`-th play level (1-based, breaks not counted),
@@ -42,11 +42,16 @@ pub enum Deadline {
 
 /// Payout settings. Reserved: places paid is a fixed number for now.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
+#[cfg_attr(
+    any(test, feature = "ts"),
+    derive(ts_rs::TS),
+    ts(export, type = "Record<string, never>")
+)]
 pub struct PayoutConfig {}
 
 /// Tournament settings editable by the director.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct Config {
     pub name: String,
@@ -170,9 +175,9 @@ pub(crate) fn decide_update(state: &State, config: &Config) -> Result<Event, Dom
     }
     if state.phase != Phase::Setup {
         let locked = if config.seats_per_table != state.config.seats_per_table {
-            Some("seats_per_table")
+            Some("seatsPerTable")
         } else if config.starting_stack != state.config.starting_stack {
-            Some("starting_stack")
+            Some("startingStack")
         } else {
             None
         };
@@ -317,8 +322,8 @@ mod tests {
     #[test]
     fn optional_fields_have_defaults() {
         let json = serde_json::json!({
-            "name": "Sunday", "seats_per_table": 9, "max_tables": 4,
-            "starting_stack": 20000, "places_paid": 3
+            "name": "Sunday", "seatsPerTable": 9, "maxTables": 4,
+            "startingStack": 20000, "placesPaid": 3
         });
         let config: Config = serde_json::from_value(json).unwrap();
         assert_eq!(config.balance_trigger, 2);

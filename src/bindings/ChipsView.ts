@@ -4,8 +4,8 @@ import type { Chips } from "./Chips";
 /**
  * Chip statistics.
  */
-export type ChipsView = { starting_stack: Chips, in_play: Chips, avg_stack: Chips | null, 
+export type ChipsView = { startingStack: Chips, inPlay: Chips, avgStack: Chips | null, 
 /**
  * Average stack in big blinds, times 100 (break: next level's big blind).
  */
-avg_stack_bb_x100: number | null, };
+avgStackBbX100: number | null, };

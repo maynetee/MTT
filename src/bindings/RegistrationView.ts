@@ -8,12 +8,12 @@ export type RegistrationView = { open: boolean,
 /**
  * Director override (`CloseRegistration` / `ReopenRegistration`), if any.
  */
-override_open: boolean | null, deadline: Deadline, 
+overrideOpen: boolean | null, deadline: Deadline, 
 /**
  * Clock time until the deadline closes registration.
  */
-closes_in_ms: number | null, 
+closesInMs: number | null, 
 /**
  * Wall-clock close while the clock runs.
  */
-closes_at_ms: number | null, };
+closesAtMs: number | null, };

@@ -10,4 +10,4 @@ export type BustInput = { player: PlayerId,
  * Stack at the start of the hand; required for every player of a multi-bust
  * unless all are omitted (full tie).
  */
-start_stack?: Chips, };
+startStack?: Chips, };

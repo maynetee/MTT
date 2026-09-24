@@ -27,6 +27,7 @@ pub enum PhaseName {
 
 /// An undoable or redoable action, for "Undo: bust Alice" style labels.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct ActionLabel {
     pub seq: Seq,
@@ -41,6 +42,7 @@ pub struct ActionLabel {
 
 /// Undo/redo cursor.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct History {
     /// Number of active events.
@@ -51,6 +53,7 @@ pub struct History {
 
 /// A level with its display number.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct LevelRow {
     pub index: u16,
@@ -62,6 +65,7 @@ pub struct LevelRow {
 /// Clock at the time of the view. While running, the UI counts down to `ends_at_ms` on
 /// its own and asks for a fresh view at `recompute_at_ms`; nothing is written per tick.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct ClockView {
     pub level_index: u16,
@@ -90,6 +94,7 @@ pub struct ClockView {
 
 /// Registration status.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct RegistrationView {
     pub open: bool,
@@ -104,6 +109,7 @@ pub struct RegistrationView {
 
 /// Player counts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct Counts {
     /// Distinct players.
@@ -115,6 +121,7 @@ pub struct Counts {
 
 /// Chip statistics.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct ChipsView {
     pub starting_stack: Chips,
@@ -126,7 +133,7 @@ pub struct ChipsView {
 
 /// In-the-money status.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "status")]
+#[serde(tag = "status", rename_all_fields = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub enum Itm {
     /// `to_money` more players must bust before the bubble bursts.
@@ -141,6 +148,7 @@ pub enum Itm {
 
 /// One line of the ranking. Alive players come first, without a place.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct RankingRow {
     pub player: PlayerId,
@@ -158,6 +166,7 @@ pub struct RankingRow {
 
 /// One seat of a table.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct SeatView {
     pub seat: SeatNo,
@@ -167,6 +176,7 @@ pub struct SeatView {
 
 /// One table.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct TableView {
     pub table: TableNo,
@@ -181,6 +191,7 @@ pub struct TableView {
 
 /// Everything the UI renders.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct View {
     pub generated_at_ms: i64,

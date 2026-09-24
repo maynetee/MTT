@@ -26,7 +26,7 @@ pub struct Aggregate {
 
 /// What a successful dispatch changed, for the host to persist.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub enum Outcome {
     /// A new event was appended after dropping `discarded` undone events.
@@ -42,6 +42,7 @@ pub enum Outcome {
 
 /// Serializable log: all events plus the undo cursor.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub struct SavedLog {
     pub format: u16,
@@ -52,7 +53,12 @@ pub struct SavedLog {
 
 /// Why a stored log cannot be loaded.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "code", content = "params", rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(
+    tag = "code",
+    content = "params",
+    rename_all = "SCREAMING_SNAKE_CASE",
+    rename_all_fields = "camelCase"
+)]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub enum LogError {
     Malformed {

@@ -5,4 +5,4 @@ import type { Seq } from "./Seq";
 /**
  * A logged event with its position and wall-clock time.
  */
-export type Envelope = { seq: Seq, v: number, at_ms: number, event: Event, };
+export type Envelope = { seq: Seq, v: number, atMs: number, event: Event, };

@@ -3,4 +3,4 @@
 /**
  * In-the-money status.
  */
-export type Itm = { "status": "not_yet", to_money: number, } | { "status": "bubble" } | { "status": "in_money" };
+export type Itm = { "status": "not_yet", toMoney: number, } | { "status": "bubble" } | { "status": "in_money" };

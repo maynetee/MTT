@@ -17,7 +17,7 @@ pub const MAX_LEVEL_MS: i64 = 24 * 60 * 60 * 1000;
 
 /// Ante format of a play level.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub enum Ante {
     #[default]
@@ -43,7 +43,7 @@ impl Ante {
 
 /// One level of the structure.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub enum Level {
     #[serde(rename = "play")]
@@ -306,7 +306,7 @@ pub(crate) mod tests {
         let json = serde_json::to_value(play(25, 50, 1)).unwrap();
         assert_eq!(
             json,
-            serde_json::json!({"type": "play", "sb": 25, "bb": 50, "ante": {"type": "none"}, "duration_ms": 60000})
+            serde_json::json!({"type": "play", "sb": 25, "bb": 50, "ante": {"type": "none"}, "durationMs": 60000})
         );
     }
 }

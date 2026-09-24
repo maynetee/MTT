@@ -8,4 +8,4 @@ export type LevelRow = { index: number,
 /**
  * 1-based play-level number; `None` for breaks.
  */
-play_level: number | null, level: Level, };
+playLevel: number | null, level: Level, };

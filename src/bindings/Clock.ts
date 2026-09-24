@@ -3,4 +3,4 @@
 /**
  * Clock state as stored in events.
  */
-export type Clock = { "type": "paused", level: number, remaining_ms: number, } | { "type": "running", level: number, ends_at_ms: number, };
+export type Clock = { "type": "paused", level: number, remainingMs: number, } | { "type": "running", level: number, endsAtMs: number, };

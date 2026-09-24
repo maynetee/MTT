@@ -11,4 +11,4 @@ export type TableView = { table: TableNo, status: TableStatus, players: number, 
 /**
  * Blinds of the next hand, when the button is known.
  */
-next_sb: SeatNo | null, next_bb: SeatNo | null, seats: Array<SeatView>, };
+nextSb: SeatNo | null, nextBb: SeatNo | null, seats: Array<SeatView>, };

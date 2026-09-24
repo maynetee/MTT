@@ -4,7 +4,12 @@ use serde::{Deserialize, Serialize};
 
 /// Something the tournament director should look at; never blocks a command.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "code", content = "params", rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(
+    tag = "code",
+    content = "params",
+    rename_all = "SCREAMING_SNAKE_CASE",
+    rename_all_fields = "camelCase"
+)]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
 pub enum Warning {
     /// The ante of a play level is larger than its big blind.
