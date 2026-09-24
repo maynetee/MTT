@@ -6,6 +6,29 @@
   min-height: 100vh;
 }
 
+/* Hidden until focused: the first Tab stop jumps past the header and tabs. */
+.skip-link {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: var(--z-toast);
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: var(--weight-semibold);
+  transform: translateY(-200%);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}
+
+.page:focus {
+  outline: none;
+}
+
 .app-header {
   position: sticky;
   top: 0;

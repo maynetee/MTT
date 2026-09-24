@@ -149,17 +149,21 @@
 
 /* Structure editor. */
 
-/* Sized to its columns, like a printed structure sheet, rather than stretched. */
-.structure-table {
-  width: auto;
-}
-
 .structure-table tr > * {
   padding-inline: var(--space-2);
 }
 
 .structure-table .level-name {
   min-width: 170px;
+}
+
+/*
+ * Columns sized to their content, like a printed structure sheet: the last column takes the
+ * room left, so rows (and their break tint) still run the full width.
+ */
+.structure-table .actions {
+  width: 100%;
+  text-align: left;
 }
 
 .structure-table td.num .input {

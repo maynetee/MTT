@@ -147,6 +147,18 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "Import from the previous version" })).not.toBeInTheDocument();
   });
 
+  it("lets keyboard users skip the header", async () => {
+    const user = userEvent.setup();
+    const { engine, id } = await withTournament();
+    renderApp(engine, `/t/${id}/players`);
+    await screen.findByRole("heading", { name: "Players" });
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Skip to content" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("main")).toHaveFocus();
+  });
+
   it("shows when a tournament no longer exists", async () => {
     renderApp(createTestEngine(), "/t/missing/players");
     expect(await screen.findByText("This tournament does not exist anymore.")).toBeInTheDocument();

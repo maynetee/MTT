@@ -178,7 +178,7 @@ export default function PlayersScreen() {
                   {t("players.place")}
                 </th>
                 <th scope="col" className="actions">
-                  <span className="visually-hidden">{selection ? t("players.startStack") : t("players.eliminate")}</span>
+                  {selection ? t("players.startStack") : <span className="visually-hidden">{t("players.eliminate")}</span>}
                 </th>
               </tr>
             </thead>

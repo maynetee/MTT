@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "../../i18n";
 import { useEngine } from "../EngineContext";
@@ -27,8 +27,13 @@ export function AppShell({
 }) {
   const { t } = useI18n();
   const engine = useEngine();
+  const main = useRef<HTMLElement | null>(null);
   return (
     <div className="app-shell">
+      {/* A button, not a #main link: the hash holds the route. */}
+      <button type="button" className="skip-link" onClick={() => main.current?.focus()}>
+        {t("app.skipToContent")}
+      </button>
       <header className="app-header">
         <div className="app-header-bar">
           <div className="app-header-start">
@@ -54,7 +59,7 @@ export function AppShell({
         </div>
         {nav && <div className="app-header-nav">{nav}</div>}
       </header>
-      <main className="page">
+      <main ref={main} className="page" tabIndex={-1}>
         <DemoBanner />
         {children}
       </main>

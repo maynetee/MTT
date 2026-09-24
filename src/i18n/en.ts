@@ -139,6 +139,7 @@ export const en = {
     demoHint: "Browser demo: tournaments are saved in this browser only.",
     engineFailed: "The tournament engine could not start: {message}",
     allTournaments: "Tournaments",
+    skipToContent: "Skip to content",
     home: "All tournaments",
     sections: "Tournament sections",
     notFoundAction: "Back to the tournaments"
@@ -187,7 +188,6 @@ export const en = {
     notStarted: "Not started",
     running: "Running",
     paused: "Paused",
-    onBreak: "Break",
     overtime: "Overtime",
     finished: "Finished",
     lateRegOpen: "Late reg open",
@@ -242,7 +242,6 @@ export const en = {
     deleteTitle: "Delete “{name}”?",
     deleteMessage: "Its players, results and history are removed for good. This cannot be undone.",
     deleteConfirm: "Delete tournament",
-    players: { one: "{count} player", other: "{count} players" },
     importLegacy: "Import from the previous version",
     importLegacyHint: "A tournament from the previous version of the app was found on this computer."
   },
@@ -391,7 +390,7 @@ export const en = {
     sameHand: "Eliminated in the same hand…",
     sameHandHint: "Tick every player eliminated in this hand. Enter each starting stack to rank them (the bigger stack finishes higher), or none for a tie.",
     startStack: "Starting stack",
-    startStackOptional: "Stack (optional)",
+    startStackOptional: "Optional",
     eliminateSelected: { one: "Eliminate {count} player", other: "Eliminate {count} players" },
     select: "Select {name}",
     summary: "Field",
@@ -424,8 +423,6 @@ export const en = {
     move: "Move"
   },
   clock: {
-    remaining: "Remaining",
-    current: "Current",
     next: "Next",
     overtime: "Overtime +{duration}",
     previous: "Previous",
@@ -433,9 +430,7 @@ export const en = {
     minusMinute: "−1:00",
     plusMinute: "+1:00",
     nextBreak: "Next break",
-    nextBreakIn: "Next break in {duration}",
     noBreakLeft: "No break left",
-    structureEndsIn: "Structure ends in {duration}",
     breakIn: "Break in",
     endsIn: "Structure ends in",
     none: "None left",

@@ -108,8 +108,8 @@ describe("t", () => {
   });
 
   it("picks plural forms from the count", () => {
-    expect(t("list.players", { count: 1 })).toBe("1 player");
-    expect(t("list.players", { count: 0 })).toBe("0 players");
+    expect(t("seating.players", { count: 1 })).toBe("1 player");
+    expect(t("seating.players", { count: 0 })).toBe("0 players");
     expect(t("display.toMoney", { count: 3 })).toBe("3 eliminations to the money");
   });
 
