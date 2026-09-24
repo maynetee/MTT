@@ -104,7 +104,7 @@ describe("t", () => {
   it("interpolates parameters and formats numbers", () => {
     expect(t("common.tableSeat", { table: 2, seat: 5 })).toBe("Table 2 Seat 5");
     expect(t("config.capacitySeats", { count: 1200 })).toBe("1,200 seats");
-    expect(t("display.averageStackBb", { chips: "12,500", bb: "62.5" })).toBe("Average stack: 12,500 (62.5 BB)");
+    expect(t("display.nextPayout", { amount: "€480" })).toBe("Next payout €480");
   });
 
   it("picks plural forms from the count", () => {

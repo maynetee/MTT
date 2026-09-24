@@ -1,161 +1,700 @@
 /*
- * The TV display (/display/:id) and its preview. Always rendered with the dark tokens
- * (data-theme="dark"); its own redesign comes later, so sizes are unchanged.
+ * The TV display (/display/:id) and its preview in the director's Display tab. Read from across
+ * the room: always the dark tokens (data-theme="dark"), a 16:9 stage that scales with the screen
+ * (1280x720 to 1920x1080 and the preview alike), and one thing big, the time left.
+ *
+ * Every size is a multiple of --u, one hundredth of the stage width. The stage is the largest
+ * 16:9 box that fits the frame (container units; viewport units where those are missing), so
+ * the layout is the same on every screen and only the scale changes.
  */
 
-.display,
-.display-preview {
-  font-size: 1rem;
-  background: var(--color-bg);
+.tv-frame {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  container-type: size;
+  /* Around the stage on a screen that is not 16:9: the felt in shadow. */
+  background: #070d1d;
   color: var(--color-text);
 }
 
-.display {
-  min-height: 100vh;
-  padding: 36px;
+.tv-frame--preview {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.tv {
+  --u: min(1vw, 1.7778vh);
+  --tv-cream: var(--color-text);
+  --tv-muted: var(--color-text-muted);
+  --tv-faint: var(--color-text-subtle);
+  --tv-accent: var(--color-accent);
+  --tv-state: var(--color-accent);
+
+  position: relative;
+  box-sizing: border-box;
+  width: calc(var(--u) * 100);
+  height: calc(var(--u) * 56.25);
   display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 28px;
-}
-
-.display-preview {
-  padding: 20px;
-  display: grid;
-  grid-template-columns: 1fr 240px;
-  gap: 16px;
-}
-
-.display-card {
-  background: var(--color-surface);
-  border-radius: var(--radius-xl);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border: 1px solid var(--color-border);
-}
-
-.display-card h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: var(--weight-bold);
-}
-
-.display-left {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.display-right {
-  min-height: 100%;
-  max-width: 100%;
+  grid-template-columns: minmax(0, 1fr) calc(var(--u) * 34);
+  gap: calc(var(--u) * 3);
+  padding: calc(var(--u) * 2.4) calc(var(--u) * 3.2);
   overflow: hidden;
+  /* One lamp over the felt, above the clock. */
+  background:
+    radial-gradient(ellipse 70% 80% at 28% 30%, rgb(38 58 108 / 0.55), transparent 70%),
+    var(--color-bg);
+  font-size: calc(var(--u) * 1.5);
+  line-height: 1.2;
+  /* Inter's tabular set also widens the hyphen: words keep proportional spacing, and each
+     figure that ticks or lines up asks for tabular figures below. */
+  font-variant-numeric: proportional-nums;
 }
 
-.display-time {
-  font-size: 180px;
-  font-weight: var(--weight-bold);
-  line-height: 1;
-  text-align: center;
-  letter-spacing: -0.02em;
+.tv-time,
+.tv-reg-detail,
+.tv-ticking,
+.tv-stat-value,
+.tv-ladder,
+.tv-results {
+  font-variant-numeric: tabular-nums;
 }
 
-.display-break {
-  font-size: 120px;
-  font-weight: 800;
-  color: var(--color-accent);
-  text-align: center;
+@supports (width: 1cqw) {
+  .tv {
+    --u: min(1cqw, 1.7778cqh);
+  }
 }
 
-.display-paused {
-  font-size: 48px;
-  font-weight: 800;
-  color: var(--color-danger-fg);
-  text-align: center;
-  letter-spacing: 0.2em;
+.tv[data-break] {
+  --tv-state: var(--color-break);
+  background:
+    radial-gradient(ellipse 70% 80% at 28% 30%, rgb(84 98 190 / 0.34), transparent 70%),
+    var(--color-bg);
 }
 
-.display-level {
-  font-size: 48px;
-  font-weight: var(--weight-bold);
-  text-align: center;
-  margin-top: -20px;
-  color: var(--color-text-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+.tv[data-state="paused"] {
+  --tv-state: var(--color-text-subtle);
 }
 
-.display-blinds {
-  font-size: 64px;
-  font-weight: var(--weight-bold);
-  text-align: center;
+.tv[data-state="overtime"] {
+  --tv-state: var(--color-accent);
 }
 
-.display-next {
-  font-size: 32px;
-  text-align: center;
-  opacity: 0.7;
+.tv h1,
+.tv h2,
+.tv p,
+.tv dl,
+.tv dd,
+.tv ol {
+  margin: 0;
+  padding: 0;
 }
 
-.display-card:has(.display-time) {
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  min-height: 500px;
+.tv-muted {
+  color: var(--tv-muted);
 }
 
-.display-warning {
-  color: var(--color-accent-fg);
+/* Main column: the name, the clock, the money status. ------------------------------------- */
+
+.tv-main {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: calc(var(--u) * 1.6);
+  min-width: 0;
+  min-height: 0;
+}
+
+.tv-top {
+  display: flex;
+  /* The first line of late registration sits on the name's baseline. */
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--u) * 3);
+  min-width: 0;
+}
+
+.tv-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: calc(var(--u) * 2.3);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--tv-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Late registration, top right: its state, and under it when it closes. */
+.tv-reg {
+  display: grid;
+  flex: none;
+  justify-items: end;
+  gap: calc(var(--u) * 0.2);
+  font-size: calc(var(--u) * 1.6);
+  color: var(--tv-faint);
+}
+
+.tv-reg[data-open] .tv-reg-title {
+  color: var(--color-success-fg);
+}
+
+.tv-reg[data-open] .tv-reg-title::before {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  margin-right: 0.5em;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 0.1em;
+}
+
+.tv-reg-detail {
+  font-size: calc(var(--u) * 2);
+  color: var(--tv-cream);
   font-weight: var(--weight-semibold);
 }
 
-.display-success {
-  color: var(--color-success);
-  font-weight: var(--weight-semibold);
-}
-
-.display-list {
-  max-height: 560px;
-  overflow-y: auto;
+.tv-clock {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  justify-content: center;
+  min-height: 0;
 }
 
-/* Specific adjustments to fit the small ranking sidebar */
-.display-right h2 {
-  font-size: 18px;
-  margin-bottom: 12px;
+.tv-clock > * {
+  flex: none;
 }
 
-.display-row {
-  font-size: 16px;
-  padding: 8px 12px;
-  background: var(--color-surface-hover);
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
+.tv-level {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  min-height: calc(var(--u) * 4.6);
+}
+
+.tv-level-name {
+  font-size: calc(var(--u) * 3.6);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.015em;
+  color: var(--tv-cream);
+}
+
+.tv[data-break] .tv-level-name {
+  color: var(--color-break-fg);
+}
+
+.tv-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: calc(var(--u) * 0.35) calc(var(--u) * 1.2);
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  font-size: calc(var(--u) * 1.8);
+  font-weight: var(--weight-semibold);
+  color: var(--tv-muted);
+}
+
+.tv-badge .icon {
+  width: 0.8em;
+  height: 0.8em;
+}
+
+.tv-badge--warning {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-fg);
+}
+
+.tv-badge--paused {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-fg);
+  font-size: calc(var(--u) * 2.6);
+  padding-inline: calc(var(--u) * 1.8);
+}
+
+.tv-time {
+  /* The display cut of Inter at this size; semibold stays open and legible from afar. */
+  font-size: calc(var(--u) * 19.5);
+  font-weight: var(--weight-semibold);
+  line-height: 0.86;
+  letter-spacing: 0;
+  margin: calc(var(--u) * 0.4) 0 calc(var(--u) * 1.4) calc(var(--u) * -0.8);
+  color: var(--tv-cream);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  transition: color var(--duration-slow) var(--ease-out);
+}
+
+.tv-time[data-long] {
+  font-size: calc(var(--u) * 15);
+}
+
+/*
+ * Fixed cells: a 1 takes the room of an 8, so the colon never moves. Slightly narrower than
+ * the figures themselves (0.645em): display tracking.
+ */
+.tv-digit {
+  display: inline-block;
+  width: 0.6em;
+  text-align: center;
+}
+
+.tv-sign {
+  display: inline-block;
+  width: 0.56em;
+  text-align: center;
+}
+
+.tv-sep {
+  display: inline-block;
+  width: 0.3em;
+  text-align: center;
+  /* The colon sits on the digits' optical middle, not on the baseline's. */
+  transform: translateY(-0.06em);
+}
+
+.tv[data-last-minute] .tv-time {
+  color: var(--color-accent);
+}
+
+.tv[data-state="overtime"] .tv-time {
+  color: var(--color-accent-fg);
+}
+
+.tv[data-state="paused"] .tv-time,
+.tv[data-state="setup"] .tv-time {
+  color: var(--tv-faint);
+}
+
+.tv-progress {
+  position: relative;
+  height: calc(var(--u) * 0.55);
+  margin-right: calc(var(--u) * 2);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: rgb(242 236 223 / 0.09);
+}
+
+.tv-progress-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--tv-state);
+  transform-origin: left center;
+}
+
+.tv-blinds {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: calc(var(--u) * 2.2);
+  margin-top: calc(var(--u) * 1.8);
+}
+
+.tv-blinds-label {
+  flex-basis: 100%;
+  font-size: calc(var(--u) * 1.6);
+  color: var(--tv-faint);
+}
+
+.tv-blinds-value {
+  font-size: calc(var(--u) * var(--blinds-size, 6.8));
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--tv-cream);
+}
+
+.tv-blinds-ante {
+  font-size: calc(var(--u) * var(--blinds-size, 6.8) * 0.53);
+  font-weight: var(--weight-semibold);
+  color: var(--tv-cream);
+}
+
+.tv-upcoming {
+  display: flex;
+  column-gap: 2.2em;
+  margin-top: calc(var(--u) * 1.6);
+  font-size: calc(var(--u) * var(--upcoming-size, 2.3));
+  white-space: nowrap;
+}
+
+.tv-upcoming > div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6em;
+}
+
+.tv-upcoming dt {
+  font-size: 0.7em;
+  color: var(--tv-faint);
+}
+
+.tv-upcoming dd {
+  display: flex;
+  align-items: baseline;
+  gap: 0.52em;
+  font-weight: var(--weight-semibold);
+  color: var(--tv-cream);
+}
+
+.tv-upcoming dd .tv-muted {
+  font-weight: var(--weight-medium);
+}
+
+/* Money status, under the clock. */
+
+.tv-band {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--u) * 2);
+  padding: calc(var(--u) * 0.9) calc(var(--u) * 1.8);
+  border-radius: calc(var(--u) * 1);
+  border: 1px solid var(--color-border);
+  background: rgb(17 28 53 / 0.72);
+}
+
+.tv-band-text {
+  font-size: calc(var(--u) * 2.5);
+  font-weight: var(--weight-semibold);
+  color: var(--tv-cream);
+}
+
+.tv-band-hint {
+  font-size: calc(var(--u) * 1.7);
+  color: var(--tv-muted);
+}
+
+.tv-band[data-itm="bubble"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.tv-band[data-itm="bubble"] .tv-band-text,
+.tv-band[data-itm="bubble"] .tv-band-hint {
+  color: var(--color-accent-text);
+}
+
+.tv-band[data-itm="in_money"] {
+  border-color: rgb(76 195 138 / 0.4);
+  background: var(--color-success-soft);
+}
+
+.tv-band[data-itm="in_money"] .tv-band-text {
+  color: var(--color-success-fg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tv-band[data-itm="bubble"] {
+    animation: tv-bubble 2.6s ease-in-out infinite;
+  }
+}
+
+@keyframes tv-bubble {
+  50% {
+    box-shadow: 0 0 calc(var(--u) * 3) rgb(243 168 59 / 0.45);
+  }
+}
+
+/* Rail: the field and the money. ---------------------------------------------------------- */
+
+.tv-rail {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 1.8);
+  min-height: 0;
+  padding: calc(var(--u) * 2.2) calc(var(--u) * 2.4);
+  overflow: hidden;
+  border: 1px solid var(--color-divider);
+  border-radius: calc(var(--u) * 1.4);
+  background: var(--color-surface);
+}
+
+.tv-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(var(--u) * 1.6) calc(var(--u) * 2);
+}
+
+/* A statistic across the rail: its name on the left, the figure on the right. */
+.tv-stat {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--u) * 1.2);
+  min-width: 0;
+}
+
+.tv-stat dt,
+.tv-pool-label {
+  font-size: calc(var(--u) * 1.5);
+  color: var(--tv-faint);
+}
+
+.tv-stat dd {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--u) * 1);
+  min-width: 0;
+}
+
+.tv-stat-value {
+  font-size: calc(var(--u) * 2.6);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  color: var(--tv-cream);
+  white-space: nowrap;
+}
+
+.tv-stat-aside {
+  font-size: calc(var(--u) * 1.6);
+  line-height: 1.25;
+  color: var(--tv-muted);
+  white-space: nowrap;
+}
+
+/* Players left and the average stack lead, side by side: name, figure, detail under it. */
+.tv-stat--lead {
+  grid-column: auto;
+  display: grid;
+  align-content: start;
+  justify-content: start;
+  gap: calc(var(--u) * 0.3);
+}
+
+.tv-stat--lead dd {
+  display: grid;
+  gap: calc(var(--u) * 0.2);
+}
+
+.tv-stat--lead .tv-stat-value {
+  /* A longer figure gets a smaller size, so that it fits half the rail. */
+  font-size: calc(var(--u) * min(4.2, 22 / var(--chars, 1)));
+  line-height: 1.1;
+}
+
+.tv-money {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 1.2);
+  min-height: 0;
+  padding-top: calc(var(--u) * 1.6);
+  border-top: 1px solid var(--color-divider);
+}
+
+.tv-pool {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  column-gap: calc(var(--u) * 1);
+}
+
+.tv-pool-value {
+  grid-column: 1 / -1;
+  font-size: calc(var(--u) * 4.2);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  color: var(--color-accent-fg);
+}
+
+.tv-pool-note {
+  grid-column: 1 / -1;
+  font-size: calc(var(--u) * 1.5);
+  color: var(--tv-muted);
+}
+
+.tv-ladder,
+.tv-results {
+  display: grid;
+  gap: calc(var(--u) * 0.15);
+  list-style: none;
+}
+
+.tv-ladder-row,
+.tv-results-row {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--u) * 1.2);
+  padding: calc(var(--u) * 0.26) calc(var(--u) * 1);
+  border-radius: calc(var(--u) * 0.6);
+  font-size: calc(var(--u) * 1.65);
+}
+
+.tv-ladder-place {
+  min-width: 2.2ch;
+  color: var(--tv-faint);
+  font-weight: var(--weight-semibold);
+}
+
+.tv-ladder-amount {
+  margin-left: auto;
+  font-weight: var(--weight-semibold);
+  color: var(--tv-cream);
+}
+
+.tv-ladder-tag {
+  font-size: calc(var(--u) * 1.3);
+  color: inherit;
+}
+
+.tv-ladder-row[data-mark] {
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--color-accent-border);
+  color: var(--color-accent-fg);
+}
+
+.tv-ladder-row[data-mark] .tv-ladder-place,
+.tv-ladder-row[data-mark] .tv-ladder-amount {
+  color: var(--color-accent-fg);
+}
+
+.tv-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 1);
+  padding-top: calc(var(--u) * 1.6);
+  border-top: 1px solid var(--color-divider);
+}
+
+.tv-schedule .tv-ladder-row {
+  font-size: calc(var(--u) * 1.5);
+  white-space: nowrap;
+}
+
+.tv-schedule-level {
+  flex: none;
+  min-width: 4.8em;
+  font-weight: var(--weight-semibold);
+  color: var(--tv-cream);
+}
+
+.tv-schedule-blinds {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--tv-muted);
+}
+
+.tv-schedule .tv-ladder-row[data-break] .tv-schedule-level {
+  color: var(--color-break-fg);
+}
+
+.tv-ladder-gap {
+  padding-left: calc(var(--u) * 1);
+  font-size: calc(var(--u) * 1.6);
+  line-height: 1;
+  color: var(--tv-faint);
+}
+
+/* Winner. --------------------------------------------------------------------------------- */
+
+.tv-winner {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--u) * 1.2);
+  min-width: 0;
+}
+
+.tv-winner-label {
+  font-size: calc(var(--u) * 3.2);
+  font-weight: var(--weight-semibold);
+  color: var(--color-accent-fg);
+}
+
+.tv-winner-name {
+  /* As large as the column allows: about 0.55em per character of Inter. */
+  font-size: min(calc(var(--u) * 11), calc(var(--u) * 110 / var(--name-length)));
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.025em;
+  line-height: 1;
+  color: var(--tv-cream);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.display-exit {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: var(--z-sticky);
+.tv-winner-prize {
+  font-size: calc(var(--u) * 5);
+  font-weight: var(--weight-semibold);
+  color: var(--color-accent-fg);
+}
+
+.tv-rail-title {
+  font-size: calc(var(--u) * 2);
+  font-weight: var(--weight-semibold);
+  color: var(--tv-muted);
+}
+
+.tv-schedule .tv-rail-title {
+  font-size: calc(var(--u) * 1.5);
+  font-weight: var(--weight-regular);
+  color: var(--tv-faint);
+}
+
+.tv-results-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--tv-cream);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tv-results-row[data-winner] {
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--color-accent-border);
+}
+
+.tv-results-row[data-winner] .tv-ladder-place,
+.tv-results-row[data-winner] .tv-results-name {
+  color: var(--color-accent-fg);
+}
+
+/* Window chrome: the exit control, loading. -------------------------------- */
+
+.tv-exit {
+  position: absolute;
+  top: calc(var(--u) * 1.4);
+  right: calc(var(--u) * 1.6);
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 10px 16px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
-  padding: 10px 16px;
   background: var(--color-surface-raised);
+  box-shadow: var(--shadow-md);
   color: var(--color-text);
   font-weight: var(--weight-semibold);
 }
 
-.display-exit:hover {
+.tv-exit:hover {
   background: var(--color-surface-hover);
+}
+
+.tv-exit kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.tv-loading {
+  font-size: var(--text-xl);
+  color: var(--color-text-muted);
 }
