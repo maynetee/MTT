@@ -38,6 +38,9 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 CI runs the same checks on every pull request. `cargo test` regenerates the TypeScript types in
 `src/bindings/` from the Rust code: commit them with your change, CI fails when they drift.
 
+[docs/architecture.md](docs/architecture.md) explains how the pieces fit together and lists the
+steps to add a new command.
+
 ## Guidelines
 
 - One topic per pull request, linked to an issue (`Closes #123`).
