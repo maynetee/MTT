@@ -1,0 +1,4 @@
+{
+  // Prose is wrapped by hand around 100 columns; tables, links and commands may run longer.
+  "MD013": false
+}

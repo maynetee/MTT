@@ -5,10 +5,11 @@ Thanks for helping improve MTT Tournament Director.
 ## Setup
 
 - Node.js 24 LTS (see `.nvmrc`) and npm
-- Rust stable with `rustfmt` and `clippy`
-- The [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your platform
-- For the browser build of the core: `rustup target add wasm32-unknown-unknown` and
-  `cargo install wasm-pack --locked`
+- Rust through rustup: `rust-toolchain.toml` pins the version with `rustfmt`, `clippy` and the
+  `wasm32-unknown-unknown` target, installed the first time you run `cargo` in the repository
+  (or with `rustup toolchain install`)
+- wasm-pack for the WebAssembly engine: `cargo install wasm-pack --locked`
+- The [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your platform
 
 ```bash
 npm ci
@@ -34,7 +35,8 @@ npm run build
 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 ```
 
-CI runs the same checks on every pull request.
+CI runs the same checks on every pull request. `cargo test` regenerates the TypeScript types in
+`src/bindings/` from the Rust code: commit them with your change, CI fails when they drift.
 
 ## Guidelines
 
