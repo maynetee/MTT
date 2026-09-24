@@ -193,7 +193,8 @@ To back up your tournaments, copy that file while the app is closed.
 ## Download and install
 
 Installers are attached to each release on the
-[Releases page](https://github.com/maynetee/MTT/releases):
+[Releases page](https://github.com/maynetee/MTT/releases), and [CHANGELOG.md](CHANGELOG.md)
+lists what changed in each one:
 
 | System                                | File                                       |
 | ------------------------------------- | ------------------------------------------ |
