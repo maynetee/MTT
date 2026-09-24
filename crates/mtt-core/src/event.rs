@@ -7,7 +7,7 @@ use crate::clock::{Clock, ClockReason};
 use crate::command::MoveReason;
 use crate::config::Config;
 use crate::ids::{BustGroup, PlayerId, SeatNo, SeatRef, Seq, TableNo, TournamentId};
-use crate::money::{Chips, Price};
+use crate::money::{Chips, Money, Price};
 use crate::structure::Level;
 
 /// Current event schema version, stored in every envelope.
@@ -154,6 +154,16 @@ pub enum Event {
         #[serde(default)]
         starts_tournament: bool,
     },
+    /// Payouts frozen: later entries no longer change them.
+    #[serde(rename = "payouts_locked")]
+    PayoutsLocked {
+        /// Amount per place, first place first.
+        amounts: Vec<Money>,
+        /// Effective prize pool at that moment.
+        pool: Money,
+    },
+    #[serde(rename = "payouts_unlocked")]
+    PayoutsUnlocked {},
     #[serde(rename = "button_set")]
     ButtonSet { table: TableNo, seat: SeatNo },
     #[serde(rename = "table_opened")]
@@ -191,6 +201,8 @@ impl Event {
             Event::RegistrationOverridden { .. } => "registration_overridden",
             Event::TournamentFinished { .. } => "tournament_finished",
             Event::ClockChanged { .. } => "clock_changed",
+            Event::PayoutsLocked { .. } => "payouts_locked",
+            Event::PayoutsUnlocked {} => "payouts_unlocked",
             Event::ButtonSet { .. } => "button_set",
             Event::TableOpened { .. } => "table_opened",
             Event::TableBroken { .. } => "table_broken",

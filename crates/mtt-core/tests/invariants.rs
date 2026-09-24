@@ -6,10 +6,13 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use common::*;
 use mtt_core::clock::{Clock, effective, schedule};
+use mtt_core::config::{PayoutAmounts, PlacesPaid};
+use mtt_core::payouts;
 use mtt_core::seating::balance_plan;
 use mtt_core::{
     Aggregate, BustInput, Chips, Command, Config, Ctx, Deadline, Event, Level, Money, MoneyConfig,
-    MoveReason, Phase, PlayerId, Price, Purchase, PurchaseWindow, SeatNo, SeatRef, State, TableNo,
+    MoveReason, PayoutConfig, Phase, PlayerId, Price, Purchase, PurchaseWindow, SeatNo, SeatRef,
+    State, TableNo,
 };
 use proptest::prelude::*;
 
@@ -76,6 +79,8 @@ fn command() -> impl Strategy<Value = Command> {
         2 => player().prop_map(|player| Command::Rebuy { player }),
         1 => player().prop_map(|player| Command::AddOn { player }),
         2 => (player(), seat()).prop_map(|(player, to)| Command::MovePlayer { player, to, reason: None }),
+        1 => Just(Command::LockPayouts {}),
+        1 => Just(Command::UnlockPayouts {}),
         1 => Just(Command::CloseRegistration {}),
         1 => Just(Command::ReopenRegistration {}),
         1 => Just(Command::FinishTournament {}),
@@ -188,12 +193,86 @@ fn check_balance_plan(agg: &Aggregate, now: i64) {
 }
 
 fn money() -> impl Strategy<Value = Option<MoneyConfig>> {
-    prop::option::of((0i64..=5_000, 0i64..=500, prop::option::of(0i64..=80_000))).prop_map(|m| {
-        m.map(|(prize, fee, guarantee)| MoneyConfig {
+    let unit = prop_oneof![Just(1i64), Just(100), Just(500)];
+    let settings = (
+        0i64..=5_000,
+        0i64..=500,
+        prop::option::of(0i64..=80_000),
+        unit,
+        prop::option::of(0i64..=3_000),
+    );
+    prop::option::of(settings).prop_map(|m| {
+        m.map(|(prize, fee, guarantee, unit, min_cash)| MoneyConfig {
             guarantee: guarantee.map(Money),
+            rounding_unit: Money(unit),
+            min_cash: min_cash.map(Money),
             ..MoneyConfig::new("EUR", 2, prize, fee)
         })
     })
+}
+
+fn amounts() -> impl Strategy<Value = PayoutAmounts> {
+    prop_oneof![
+        prop::option::of(1u16..=10_000)
+            .prop_map(|first_share_bps| PayoutAmounts::Curve { first_share_bps }),
+        Just(PayoutAmounts::CustomBps {
+            bps: vec![5_000, 3_000, 2_000],
+        }),
+        Just(PayoutAmounts::CustomBps {
+            bps: vec![2_500; 4],
+        }),
+        Just(PayoutAmounts::CustomAmounts {
+            amounts: vec![Money(3_000), Money(2_000), Money(2_000)],
+        }),
+    ]
+}
+
+fn payout() -> impl Strategy<Value = PayoutConfig> {
+    let places = prop_oneof![
+        (1u16..=10_000).prop_map(|bps| PlacesPaid::Percent { bps }),
+        (1u16..=8).prop_map(|n| PlacesPaid::Fixed { n }),
+    ];
+    (prop::option::of(places), prop::option::of(amounts())).prop_map(|(places_paid, amounts)| {
+        PayoutConfig {
+            places_paid,
+            amounts,
+        }
+    })
+}
+
+/// Payouts in force are non-increasing and, unless locked or custom amounts, add up to
+/// the effective pool; once finished, the prizes add up to the payouts.
+fn check_payouts(agg: &Aggregate, now: i64) {
+    let view = agg.view(now);
+    let Some(money) = &view.money else {
+        return;
+    };
+    let payouts = &money.payouts;
+    assert!(payouts.windows(2).all(|w| w[0] >= w[1]), "{payouts:?}");
+    let total: i64 = payouts.iter().map(|m| m.0).sum();
+    let custom = matches!(
+        agg.state().config.payout.amounts,
+        Some(PayoutAmounts::CustomAmounts { .. })
+    );
+    if !money.locked {
+        assert_eq!(payouts.len() as u32, view.places_paid);
+        // Without players there is nobody to pay, guarantee or not.
+        if !custom && view.counts.unique > 0 {
+            assert_eq!(total, money.effective_pool.0, "payouts {payouts:?}");
+        }
+    }
+    assert!(view.places_paid <= view.counts.unique);
+    if view.winner.is_some() {
+        let paid = payouts.len().min(view.counts.unique as usize);
+        let expected: i64 = payouts[..paid].iter().map(|m| m.0).sum();
+        let won: i64 = view
+            .ranking
+            .iter()
+            .filter_map(|r| r.prize)
+            .map(|m| m.0)
+            .sum();
+        assert_eq!(won, expected, "prizes do not add up");
+    }
 }
 
 /// Chips in play and the pool are the sums of what the active events recorded, whatever
@@ -260,6 +339,7 @@ fn run_ops(
     late_reg: Deadline,
     trigger: u8,
     money: Option<MoneyConfig>,
+    payout: PayoutConfig,
     players: u32,
     start: bool,
     ops: Vec<Op>,
@@ -278,6 +358,7 @@ fn run_ops(
         late_reg,
         balance_trigger: trigger,
         money,
+        payout,
         reentry: Some(Purchase {
             max: Some(2),
             ..Purchase::new(p1, f1, 10_000)
@@ -373,6 +454,7 @@ fn run_ops(
         check_clock(h.agg.state(), h.now);
         check_balance_plan(&h.agg, h.now);
         check_money(&h.agg, h.now);
+        check_payouts(&h.agg, h.now);
     }
     let json = h.agg.to_json().expect("serializable log");
     let reloaded = Aggregate::from_json(&json).expect("replayable log");
@@ -386,11 +468,41 @@ proptest! {
         late_reg in deadline(),
         trigger in 2u8..=SEATS,
         money in money(),
+        payout in payout(),
         players in 2u32..=12,
         start in any::<bool>(),
         ops in prop::collection::vec(op(), 1..80),
     ) {
-        run_ops(late_reg, trigger, money, players, start, ops);
+        run_ops(late_reg, trigger, money, payout, players, start, ops);
+    }
+
+    #[test]
+    fn payouts_split_the_pool_exactly(
+        pool in 0i64..=(1i64 << 53) - 1,
+        places in 1u32..=300,
+        amounts in prop::option::of(amounts()),
+        unit in prop_oneof![Just(1i64), Just(100), Just(5_000)],
+        min_cash in prop::option::of(0i64..=1_000_000),
+    ) {
+        let table = payouts::compute(Money(pool), places, amounts.as_ref(), Money(unit), min_cash.map(Money));
+        let a = &table.amounts;
+        // A custom table pays at most its length.
+        let wanted = match &amounts {
+            Some(PayoutAmounts::CustomBps { bps }) => places.min(bps.len() as u32),
+            Some(PayoutAmounts::CustomAmounts { amounts }) => places.min(amounts.len() as u32),
+            _ => places,
+        };
+        prop_assert!(!a.is_empty() && a.len() <= wanted as usize);
+        prop_assert!(a.windows(2).all(|w| w[0] >= w[1]), "not decreasing: {:?}", a);
+        if !matches!(amounts, Some(PayoutAmounts::CustomAmounts { .. })) {
+            prop_assert_eq!(a.iter().map(|m| m.0).sum::<i64>(), pool);
+            prop_assert!(a[1..].iter().all(|m| m.0 % unit == 0));
+            let threshold = min_cash.unwrap_or(0).max(1);
+            if pool > 0 && a.len() > 1 {
+                prop_assert!(a[a.len() - 1].0 >= threshold);
+            }
+            prop_assert_eq!(table.reduced_from.is_some(), a.len() < wanted as usize);
+        }
     }
 
     #[test]

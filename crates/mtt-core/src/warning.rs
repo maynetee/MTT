@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::money::Money;
+
 /// Something the tournament director should look at; never blocks a command.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(
@@ -22,4 +24,11 @@ pub enum Warning {
     StructureExhausted,
     /// Only `levels_left` levels remain after the current one.
     StructureEnding { levels_left: u16 },
+    /// The minimum cash (or the rounding) cut the places paid from `from` to `to`.
+    PlacesReduced { from: u32, to: u32 },
+    /// Payouts were locked for `locked_pool`; the pool is now `pool` (lock them again to
+    /// follow it).
+    PayoutsStale { locked_pool: Money, pool: Money },
+    /// Custom amounts add up to `total`, not to the effective pool `pool`.
+    PayoutsMismatch { pool: Money, total: Money },
 }

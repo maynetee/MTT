@@ -3,12 +3,13 @@
 mod common;
 
 use common::*;
+use mtt_core::config::{PayoutAmounts, PlacesPaid};
 use mtt_core::seating::BalanceStep;
 use mtt_core::state::TableStatus;
 use mtt_core::view::Itm;
 use mtt_core::{
-    Aggregate, Chips, Clock, Command, Config, Deadline, DomainError, Money, MoveReason, Phase,
-    PlayerId, Purchase, SeatNo, SeatRef, TableNo, Warning,
+    Aggregate, Chips, Clock, Command, Config, Deadline, DomainError, Money, MoveReason,
+    PayoutConfig, Phase, PlayerId, Purchase, SeatNo, SeatRef, TableNo, Warning,
 };
 
 #[test]
@@ -53,7 +54,7 @@ fn bubble_is_paid_plus_one() {
     assert_eq!(h.view().itm, Itm::Bubble);
     h.bust(&[ids[2]]);
     let view = h.view();
-    assert_eq!(view.itm, Itm::InMoney);
+    assert_eq!(view.itm, Itm::InMoney { next_payout: None });
     assert!(view.ranking.iter().all(|r| r.in_money == r.alive));
 }
 
@@ -691,5 +692,179 @@ fn rebuys_and_addons_raise_chips_and_pool() {
     assert_eq!(
         (view.registration.rebuy_open, view.registration.reentry_open),
         (Some(true), None)
+    );
+}
+
+// Payouts.
+
+fn total(amounts: &[Money]) -> i64 {
+    amounts.iter().map(|m| m.0).sum()
+}
+
+fn percent_config(guarantee: Option<i64>, min_cash: Option<i64>) -> Config {
+    Config {
+        payout: PayoutConfig {
+            places_paid: Some(PlacesPaid::Percent { bps: 1_500 }),
+            amounts: None,
+        },
+        money: Some(mtt_core::MoneyConfig {
+            guarantee: guarantee.map(Money),
+            min_cash: min_cash.map(Money),
+            ..money()
+        }),
+        reentry: Some(Purchase::new(10_000, 1_000, 10_000)),
+        addon: Some(Purchase::new(5_000, 0, 10_000)),
+        ..config(10, 10)
+    }
+}
+
+#[test]
+fn payouts_sum_to_effective_pool() {
+    let mut h = Harness::new(percent_config(Some(500_000), None), levels());
+    let ids = h.register_many(40);
+    let check = |h: &Harness| {
+        let view = h.view();
+        let money = view.money.as_ref().unwrap();
+        assert_eq!(total(&money.payouts), money.effective_pool.0);
+        assert_eq!(money.payouts.len() as u32, view.places_paid);
+        money.effective_pool
+    };
+    // The guarantee is split while the pool is below it.
+    assert_eq!(check(&h), Money(500_000));
+    h.start();
+    for &id in &ids[..5] {
+        h.bust(&[id]);
+        h.ok(Command::ReEnter {
+            player: id,
+            seat: None,
+        });
+    }
+    h.ok(Command::AddOn { player: ids[7] });
+    h.register_many_from(41, 80);
+    // 85 entries at 100 + one add-on at 50: 8550 EUR, above the guarantee.
+    assert_eq!(check(&h), Money(855_000));
+    assert_eq!(h.view().places_paid, 13);
+    h.ok(Command::CloseRegistration {});
+    let alive: Vec<PlayerId> = h
+        .view()
+        .ranking
+        .iter()
+        .filter(|r| r.alive)
+        .map(|r| r.player)
+        .collect();
+    for &id in &alive[1..] {
+        h.bust(&[id]);
+    }
+    let view = h.view();
+    assert_eq!(view.phase, mtt_core::view::PhaseName::Finished);
+    // Every place is assigned: the prizes add up to the pool.
+    let won: i64 = view
+        .ranking
+        .iter()
+        .filter_map(|r| r.prize)
+        .map(|m| m.0)
+        .sum();
+    assert_eq!(won, 855_000);
+    assert_eq!(view.ranking[0].prize, Some(view.money.unwrap().payouts[0]));
+}
+
+#[test]
+fn payouts_non_increasing() {
+    let mut h = Harness::new(percent_config(None, Some(30_000)), levels());
+    for i in 1..=90 {
+        h.register(&format!("P{i}"));
+        let view = h.view();
+        let payouts = &view.money.as_ref().unwrap().payouts;
+        assert!(
+            payouts.windows(2).all(|w| w[0] >= w[1]),
+            "{i} entries: {payouts:?}"
+        );
+        assert!(payouts[1..].iter().all(|a| a.0 % 100 == 0 && a.0 >= 30_000));
+        assert_eq!(total(payouts), i64::from(i) * 10_000);
+    }
+    // 90 entries want 14 places; with a 300 EUR minimum cash, 12 are paid (13 would pay
+    // 292 EUR last, 12 pay 334 EUR: values checked by an independent computation).
+    let view = h.view();
+    assert_eq!(view.places_paid, 12);
+    let payouts = &view.money.as_ref().unwrap().payouts;
+    assert_eq!((payouts[0], payouts[11]), (Money(225_700), Money(33_400)));
+    assert!(
+        view.warnings
+            .contains(&Warning::PlacesReduced { from: 14, to: 12 })
+    );
+}
+
+#[test]
+fn tie_split_across_paid_boundary() {
+    let config = Config {
+        payout: PayoutConfig {
+            places_paid: Some(PlacesPaid::Fixed { n: 3 }),
+            amounts: Some(PayoutAmounts::CustomBps {
+                bps: vec![5_000, 3_000, 2_000],
+            }),
+        },
+        money: Some(mtt_core::MoneyConfig {
+            rounding_unit: Money(1),
+            ..money()
+        }),
+        ..config(9, 1)
+    };
+    let mut h = Harness::new(config, levels());
+    // Pool 50001: payouts 25001, 15000, 10000.
+    let ids = h.register_many(5);
+    h.ok(Command::UpdateConfig {
+        config: Config {
+            money: Some(mtt_core::MoneyConfig {
+                buy_in: mtt_core::Price {
+                    prize: Money(10_001),
+                    fee: Money(1_000),
+                },
+                rounding_unit: Money(1),
+                ..money()
+            }),
+            ..h.agg.state().config.clone()
+        },
+    });
+    h.ok(Command::Unregister { player: ids[4] });
+    let last = h.register("P5b");
+    h.start();
+    h.bust(&[last]);
+    assert_eq!(h.view().itm, Itm::Bubble);
+    // Places 3 and 4 tie: 10000 + 0 split in two.
+    h.bust(&[ids[3], ids[2]]);
+    let view = h.view();
+    assert_eq!(
+        view.money.as_ref().unwrap().payouts,
+        vec![Money(25_001), Money(15_000), Money(10_000)]
+    );
+    for id in [ids[2], ids[3]] {
+        let r = row(&view, id);
+        assert_eq!((r.place, r.place_to, r.in_money), (Some(3), Some(4), true));
+        assert_eq!(r.prize, Some(Money(5_000)));
+    }
+    assert_eq!(row(&view, last).prize, None);
+    assert_eq!(
+        view.itm,
+        Itm::InMoney {
+            next_payout: Some(Money(15_000))
+        }
+    );
+    // An odd amount: the leftover minor unit goes to the lower player id.
+    h.ok(Command::Undo {});
+    let mut config = h.agg.state().config.clone();
+    config.payout.amounts = Some(PayoutAmounts::CustomAmounts {
+        amounts: vec![Money(25_000), Money(15_000), Money(10_001)],
+    });
+    h.ok(Command::UpdateConfig { config });
+    h.bust(&[ids[3], ids[2]]);
+    let view = h.view();
+    assert_eq!(row(&view, ids[2]).prize, Some(Money(5_001)));
+    assert_eq!(row(&view, ids[3]).prize, Some(Money(5_000)));
+    // These custom amounts add up to the pool: no mismatch.
+    assert!(
+        !view
+            .warnings
+            .iter()
+            .any(|w| matches!(w, Warning::PayoutsMismatch { .. }))
     );
 }

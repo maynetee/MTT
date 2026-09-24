@@ -148,6 +148,16 @@ impl Player {
     }
 }
 
+/// Payouts frozen by `LockPayouts`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LockedPayouts {
+    /// Amount per place, first place first.
+    pub amounts: Vec<Money>,
+    /// Effective prize pool when locked.
+    pub pool: Money,
+}
+
 /// Full tournament state, rebuilt by folding events.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -164,6 +174,8 @@ pub struct State {
     pub next_player_id: u32,
     pub next_bust_group: u32,
     pub final_table_formed: bool,
+    #[serde(default)]
+    pub payouts_locked: Option<LockedPayouts>,
 }
 
 /// An event that does not fit the state it is applied to (corrupted or foreign log).
@@ -185,6 +197,7 @@ impl State {
             next_player_id: 1,
             next_bust_group: 1,
             final_table_formed: false,
+            payouts_locked: None,
         };
         state.sync_tables();
         state
@@ -462,6 +475,13 @@ pub fn apply(state: &mut State, event: &Event) -> Result<(), ApplyError> {
                 state.phase = Phase::Running;
             }
         }
+        Event::PayoutsLocked { amounts, pool } => {
+            state.payouts_locked = Some(LockedPayouts {
+                amounts: amounts.clone(),
+                pool: *pool,
+            });
+        }
+        Event::PayoutsUnlocked {} => state.payouts_locked = None,
         Event::ButtonSet { table, seat } => state.table_mut(*table)?.button = Some(*seat),
         Event::TableOpened { table } => state.table_mut(*table)?.status = TableStatus::Open,
         Event::TableBroken { table, moves } => {

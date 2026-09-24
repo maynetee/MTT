@@ -40,14 +40,60 @@ pub enum Deadline {
     Manual,
 }
 
-/// Payout settings. Reserved: places paid is a fixed number for now.
+/// Longest custom payout table.
+pub const MAX_PAID_PLACES: usize = 10_000;
+/// Basis points in 100 %.
+pub const BPS: u16 = 10_000;
+
+/// How many places are paid (always at least 1 and at most the number of players).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
+#[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
+pub enum PlacesPaid {
+    /// A share of the entries (re-entries included) in basis points, rounded up.
+    #[serde(rename = "percent")]
+    Percent { bps: u16 },
+    #[serde(rename = "fixed")]
+    Fixed { n: u16 },
+}
+
+/// How the effective prize pool is split between the places paid.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
+#[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
+pub enum PayoutAmounts {
+    /// Power-law curve giving first place `first_share_bps` of the pool (default by the
+    /// number of places paid).
+    #[serde(rename = "curve")]
+    Curve {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+        first_share_bps: Option<u16>,
+    },
+    /// Share of each place in basis points (non-increasing, sum 10000). The table sets the
+    /// places paid.
+    #[serde(rename = "custom_bps")]
+    CustomBps { bps: Vec<u16> },
+    /// Amount of each place (non-increasing), paid as is. The table sets the places paid.
+    #[serde(rename = "custom_amounts")]
+    CustomAmounts { amounts: Vec<Money> },
+}
+
+/// Payout settings. Everything is optional: by default `Config.places_paid` places are
+/// paid on the default curve.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(
-    any(test, feature = "ts"),
-    derive(ts_rs::TS),
-    ts(export, type = "Record<string, never>")
-)]
-pub struct PayoutConfig {}
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
+pub struct PayoutConfig {
+    /// Rule for the places paid; absent: `Config.places_paid`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub places_paid: Option<PlacesPaid>,
+    /// Split of the pool; absent: the default curve.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub amounts: Option<PayoutAmounts>,
+}
 
 /// Largest currency exponent accepted (ISO 4217 uses 0 to 4).
 pub const MAX_CURRENCY_EXPONENT: u8 = 4;
@@ -303,6 +349,7 @@ pub fn validate(config: &Config, levels: &[Level]) -> Result<(), DomainError> {
     if config.places_paid == 0 {
         return Err(DomainError::InvalidPlacesPaid { min: 1 });
     }
+    validate_payout(&config.payout)?;
     if let Some(money) = &config.money {
         validate_money(money)?;
     }
@@ -348,6 +395,56 @@ fn deadline_is_valid(deadline: Deadline, levels: &[Level]) -> bool {
         }
         Deadline::Elapsed { ms } => ms > 0 && ms <= MAX_LATE_REG_MS,
         Deadline::Manual => true,
+    }
+}
+
+fn non_increasing<T: PartialOrd>(values: &[T]) -> bool {
+    values.windows(2).all(|w| w[0] >= w[1])
+}
+
+fn validate_payout(payout: &PayoutConfig) -> Result<(), DomainError> {
+    match payout.places_paid {
+        Some(PlacesPaid::Fixed { n: 0 }) => {
+            return Err(DomainError::InvalidPlacesPaid { min: 1 });
+        }
+        Some(PlacesPaid::Percent { bps }) if bps == 0 || bps > BPS => {
+            return Err(DomainError::InvalidPlacesPaidPercent { min: 1, max: BPS });
+        }
+        _ => {}
+    }
+    match &payout.amounts {
+        Some(PayoutAmounts::Curve {
+            first_share_bps: Some(bps),
+        }) if *bps == 0 || *bps > BPS => Err(DomainError::InvalidFirstShare { min: 1, max: BPS }),
+        Some(PayoutAmounts::CustomBps { bps }) => {
+            let sum: u32 = bps.iter().map(|&b| u32::from(b)).sum();
+            let valid = !bps.is_empty()
+                && bps.len() <= MAX_PAID_PLACES
+                && bps.iter().all(|&b| b > 0)
+                && non_increasing(bps)
+                && sum == u32::from(BPS);
+            if valid {
+                Ok(())
+            } else {
+                Err(DomainError::InvalidPayoutShares { total: BPS })
+            }
+        }
+        Some(PayoutAmounts::CustomAmounts { amounts }) => {
+            let total = amounts
+                .iter()
+                .try_fold(Money::ZERO, |sum, &a| sum.checked_add(a));
+            let valid = !amounts.is_empty()
+                && amounts.len() <= MAX_PAID_PLACES
+                && amounts.iter().all(|a| a.is_positive())
+                && non_increasing(amounts)
+                && total.is_some();
+            if valid {
+                Ok(())
+            } else {
+                Err(DomainError::InvalidPayoutAmounts)
+            }
+        }
+        _ => Ok(()),
     }
 }
 
@@ -426,8 +523,15 @@ fn locked_field(state: &State, config: &Config) -> Option<&'static str> {
     }
 }
 
-/// `UpdateConfig`: see [`locked_field`]; tables in use cannot be removed. Amounts already
-/// paid are recorded in their events, so a new buy-in only applies to later entries.
+/// Settings that shape the payouts (the pool aside).
+fn payout_rules(config: &Config) -> (u16, &PayoutConfig, Option<(Money, Option<Money>)>) {
+    let money = config.money.as_ref().map(|m| (m.rounding_unit, m.min_cash));
+    (config.places_paid, &config.payout, money)
+}
+
+/// `UpdateConfig`: see [`locked_field`]; payout settings are frozen while payouts are
+/// locked; tables in use cannot be removed. Amounts already paid are recorded in their
+/// events, so a new buy-in only applies to later entries.
 pub(crate) fn decide_update(state: &State, config: &Config) -> Result<Event, DomainError> {
     validate(config, &state.structure)?;
     if *config == state.config {
@@ -437,6 +541,9 @@ pub(crate) fn decide_update(state: &State, config: &Config) -> Result<Event, Dom
         return Err(DomainError::ConfigLocked {
             field: field.to_owned(),
         });
+    }
+    if state.payouts_locked.is_some() && payout_rules(config) != payout_rules(&state.config) {
+        return Err(DomainError::PayoutsLocked);
     }
     for table in state.tables.values() {
         if table.no.0 > config.max_tables && table.status != TableStatus::Idle {
@@ -643,6 +750,83 @@ mod tests {
         for (config, expected) in cases {
             assert_eq!(validate(&config, &levels()), Err(expected));
         }
+    }
+
+    #[test]
+    fn payout_settings_json_and_validation() {
+        let json = serde_json::json!({
+            "placesPaid": {"type": "percent", "bps": 1500},
+            "amounts": {"type": "curve", "firstShareBps": 2500}
+        });
+        let payout: PayoutConfig = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&payout).unwrap(), json);
+        // The old empty object still reads as the defaults.
+        let empty: PayoutConfig = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert_eq!(empty, PayoutConfig::default());
+        let check = |places_paid, amounts| {
+            validate(
+                &Config {
+                    payout: PayoutConfig {
+                        places_paid,
+                        amounts,
+                    },
+                    ..Config::new("Sunday", 9, 10, 20_000)
+                },
+                &levels(),
+            )
+        };
+        assert_eq!(
+            check(Some(PlacesPaid::Percent { bps: 1_500 }), None),
+            Ok(())
+        );
+        assert_eq!(
+            check(Some(PlacesPaid::Fixed { n: 0 }), None),
+            Err(DomainError::InvalidPlacesPaid { min: 1 })
+        );
+        for bps in [0, 10_001] {
+            assert_eq!(
+                check(Some(PlacesPaid::Percent { bps }), None),
+                Err(DomainError::InvalidPlacesPaidPercent {
+                    min: 1,
+                    max: 10_000
+                })
+            );
+        }
+        assert_eq!(
+            check(
+                None,
+                Some(PayoutAmounts::Curve {
+                    first_share_bps: Some(0)
+                })
+            ),
+            Err(DomainError::InvalidFirstShare {
+                min: 1,
+                max: 10_000
+            })
+        );
+        let shares =
+            |bps: &[u16]| check(None, Some(PayoutAmounts::CustomBps { bps: bps.to_vec() }));
+        assert_eq!(shares(&[5_000, 3_000, 2_000]), Ok(()));
+        let bad_shares = Err(DomainError::InvalidPayoutShares { total: 10_000 });
+        assert_eq!(shares(&[5_000, 3_000]), bad_shares);
+        assert_eq!(shares(&[3_000, 5_000, 2_000]), bad_shares);
+        assert_eq!(shares(&[10_000, 0]), bad_shares);
+        assert_eq!(shares(&[]), bad_shares);
+        let amounts = |values: &[i64]| {
+            check(
+                None,
+                Some(PayoutAmounts::CustomAmounts {
+                    amounts: values.iter().copied().map(Money).collect(),
+                }),
+            )
+        };
+        assert_eq!(amounts(&[500, 300, 300]), Ok(()));
+        assert_eq!(amounts(&[300, 500]), Err(DomainError::InvalidPayoutAmounts));
+        assert_eq!(amounts(&[500, 0]), Err(DomainError::InvalidPayoutAmounts));
+        assert_eq!(
+            amounts(&[Money::MAX.0, 1]),
+            Err(DomainError::InvalidPayoutAmounts)
+        );
     }
 
     mod locks {

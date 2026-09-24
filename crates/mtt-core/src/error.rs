@@ -65,6 +65,20 @@ pub enum DomainError {
     InvalidGuarantee,
     InvalidRoundingUnit,
     InvalidMinCash,
+    InvalidPlacesPaidPercent {
+        min: u16,
+        max: u16,
+    },
+    InvalidFirstShare {
+        min: u16,
+        max: u16,
+    },
+    /// Custom shares must be positive, non-increasing and sum to `total` basis points.
+    InvalidPayoutShares {
+        total: u16,
+    },
+    /// Custom amounts must be positive and non-increasing.
+    InvalidPayoutAmounts,
     /// Negative price, non-positive stack, `max` of 0, or a price without money tracking.
     InvalidPurchase {
         purchase: PurchaseKind,
@@ -218,6 +232,13 @@ pub enum DomainError {
     InvalidRemaining {
         max_ms: i64,
     },
+
+    // Payouts.
+    MoneyNotConfigured,
+    NoEntries,
+    /// Unlock the payouts before changing how they are computed.
+    PayoutsLocked,
+    PayoutsNotLocked,
 
     // History.
     NothingToUndo,

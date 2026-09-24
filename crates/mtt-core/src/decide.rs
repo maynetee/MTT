@@ -6,7 +6,7 @@ use crate::error::DomainError;
 use crate::event::Event;
 use crate::rng::Rng;
 use crate::state::{Phase, State};
-use crate::{clock, config, players, purchase, registration, seating, structure};
+use crate::{clock, config, payouts, players, purchase, registration, seating, structure};
 
 /// Longest accepted tournament id.
 pub const MAX_TOURNAMENT_ID: usize = 64;
@@ -53,6 +53,8 @@ pub fn decide(state: &State, cmd: &Command, ctx: &Ctx) -> Result<Event, DomainEr
         Command::MovePlayer { player, to, reason } => {
             seating::decide_move(state, *player, *to, reason.unwrap_or_default())
         }
+        Command::LockPayouts {} => payouts::decide_lock(state),
+        Command::UnlockPayouts {} => payouts::decide_unlock(state),
         Command::CloseRegistration {} => registration::decide_close(state, now),
         Command::ReopenRegistration {} => registration::decide_reopen(state),
         Command::FinishTournament {} => players::decide_finish(state, now),

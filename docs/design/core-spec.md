@@ -9,8 +9,10 @@ event log and render the view. This document describes what is implemented.
 - Event sourced: `decide(&State, &Command, &Ctx) -> Result<Event, DomainError>`, then
   `apply(&mut State, &Event)`. `apply` never sees time or randomness; events store outcomes
   (seat draws, absolute clock states), so replay is deterministic.
-- `#![forbid(unsafe_code)]`, no I/O, no system clock, no OS entropy, no floats in state or
-  events, no `HashMap`/`HashSet` (clippy `disallowed-types`). User input never panics: every
+- `#![forbid(unsafe_code)]`, no I/O, no system clock, no OS entropy, no `HashMap`/`HashSet`
+  (clippy `disallowed-types`). No floats in state, events or views: floats only live inside
+  the payout curve weights (turned into integers at once) and the ICM computation, with
+  `libm` so native and WASM give the same bits. User input never panics: every
   rejection is a `DomainError` and leaves the aggregate unchanged.
 - Integers stay within the JavaScript safe range (`2^53 - 1`); `Chips`/`Money` are `i64`
   newtypes exported to TypeScript as `number`.
@@ -55,7 +57,8 @@ let agg = Aggregate::from_log(events, head)?;         // replay from stored rows
 ```
 State { id, phase: Setup | Running | Finished { winner }, config, structure: Vec<Level>,
         clock, reg_override: Option<bool>, players: BTreeMap<PlayerId, Player>,
-        tables: BTreeMap<TableNo, Table>, next_player_id, next_bust_group, final_table_formed }
+        tables: BTreeMap<TableNo, Table>, next_player_id, next_bust_group, final_table_formed,
+        payouts_locked: Option<{ amounts, pool }> }
 Player { id, name, name_key, status: Seated { seat } | Busted { group, start_stack, last_seat },
          entries, rebuys, addons, chips_bought, prize_paid, fees_paid }
 Table  { no, seats, status: Idle | Open | Closed, occupants: BTreeMap<SeatNo, PlayerId>,
@@ -69,8 +72,14 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
 
 - `Config { name, seats_per_table (2..=12), max_tables (1..=1000), final_table_size
   (default seats_per_table), balance_trigger (default 2), break_order, starting_stack,
-  places_paid (>= 1, fixed number for now), late_reg: Deadline, payout (reserved),
-  money?: MoneyConfig, reentry?, rebuy?, addon?: Purchase }`.
+  places_paid (>= 1), late_reg: Deadline, payout: PayoutConfig, money?: MoneyConfig,
+  reentry?, rebuy?, addon?: Purchase }`.
+- `PayoutConfig { placesPaid?: Percent { bps } | Fixed { n }, amounts?: Curve {
+  firstShareBps? } | CustomBps { bps } | CustomAmounts { amounts } }`; `{}` (the old
+  format) means `places_paid` places on the default curve. Errors: `INVALID_PLACES_PAID`,
+  `INVALID_PLACES_PAID_PERCENT { min, max }`, `INVALID_FIRST_SHARE { min, max }`,
+  `INVALID_PAYOUT_SHARES { total }` (positive, non-increasing, sum 10000),
+  `INVALID_PAYOUT_AMOUNTS` (positive, non-increasing), tables up to 10000 places.
 - `MoneyConfig { currency: { code, exponent }, buyIn: { prize, fee }, guarantee?,
   roundingUnit, minCash? }`, absent for a tournament without money tracking. Amounts are
   `Money` in minor units (`exponent` digits, 0..=4; code: three uppercase letters). Errors:
@@ -90,7 +99,9 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
   `sb <= 0`, `bb < sb`, negative ante, duration outside `(0, 24h]`. Warnings: ante above big
   blind, big blind lower than the previous play level.
 - Play-level numbers skip breaks (`[P, P, B, P]` is 1, 2, -, 3).
-- `UpdateConfig`: seats per table, starting stack and `money.buyIn` are locked once started;
+- `UpdateConfig`: while payouts are locked, changing `placesPaid`, `payout`,
+  `money.roundingUnit` or `money.minCash` is `PAYOUTS_LOCKED`. Seats per table, starting
+  stack and `money.buyIn` are locked once started;
   enabling/disabling money tracking and the currency are locked as soon as a player is
   registered (`CONFIG_LOCKED { field }`, e.g. `money.currency`); `max_tables` cannot drop
   below a table in use; identical config is `NO_CHANGE`.
@@ -172,6 +183,35 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
 removed), `fees` likewise; `effective = max(pool, guarantee)` is what the payouts
 distribute; `overlay = effective - pool` is paid by the house.
 
+## Payouts
+
+- Places paid (`payouts::rule_places`): a custom table pays its length; otherwise
+  `Percent { bps }` of the entries (re-entries included) rounded up, `Fixed { n }`, or
+  `Config.places_paid` when `placesPaid` is absent; then clamped to `[1, N]` (0 without
+  players). Without money tracking this is all (it drives ITM).
+- Amounts (`payouts::compute`), from the effective pool `E`:
+  - `Curve`: weights `w_i = i^-a`, `a` in `[0, 20]` found by 64 bisection steps so that
+    `w_1 / sum(w) = s` (flat when `s <= 1/m`), turned into integers (2^40 scale,
+    non-increasing). Default `s` by places paid: 1: 100 %, 2: 65 %, 3: 50 %, 4-5: 40 %,
+    6-9: 30 %, 10-27: 25 %, 28+: 20 %.
+  - `CustomBps`: the shares (renormalized when fewer players than places).
+  - Rounding: `a_i = floor(E * w_i / sum(w) / unit) * unit`, first place gets the rest, so
+    the table sums exactly to `E` and is non-increasing.
+  - Minimum cash: while the last payout is below `max(minCash, 1)`, fewer places are paid
+    (largest count that pays it; binary search inside each default-share bracket, where
+    the last payout decreases with the places) and the view warns
+    `PLACES_REDUCED { from, to }`.
+  - `CustomAmounts`: paid as configured (first `N`); if they do not add up to `E` the view
+    warns `PAYOUTS_MISMATCH { pool, total }`.
+- Ties (`payouts::prizes`): a cluster tied over `[p, p + c - 1]` shares the amounts of
+  those places (0 beyond the places paid): `floor(total / c)` each, the leftover minor
+  units one each by ascending player id.
+- `LockPayouts {}` -> `PayoutsLocked { amounts, pool }` (`MONEY_NOT_CONFIGURED`,
+  `NO_ENTRIES`, `NO_CHANGE` when identical; locking again refreshes). `UnlockPayouts {}`
+  -> `PayoutsUnlocked {}` (`PAYOUTS_NOT_LOCKED`). While locked the view uses the stored
+  amounts (places paid = their count, capped by N) and warns
+  `PAYOUTS_STALE { lockedPool, pool }` when the pool would now give other amounts.
+
 ## Busts, ranking, finish
 
 - `BustPlayers { busts: [{ player, start_stack? }] }` is one hand = one bust group.
@@ -246,13 +286,15 @@ then), registration (open, override, deadline, `closes_in_ms`, `closes_at_ms`,
 `reentryOpen?` / `rebuyOpen?` / `addonOpen?` when offered), counts (unique, entries, alive,
 busted, `reentries?` / `rebuys?` / `addons?` when offered or bought), chips
 (starting stack, in play = sum of stacks bought, average, average in big blinds x100 using
-the next play level during a break), places paid (capped by N), ITM status
+the next play level during a break), places paid (see Payouts), ITM status
 (`not_yet { to_money }` / `bubble` when alive == paid + 1 / `in_money`), ranking rows (alive
 first, then by place, with ties, provisional and in-money flags, entries, `rebuys?` /
 `addons?`), tables with seats,
 names, button and next blinds, suggestions (final table, table break, balance plan),
 warnings, and `money?` when money is tracked (currency, pool, fees, guarantee, overlay,
-effective pool).
+effective pool, `payouts` per place, `locked`). With money, ranking rows carry `prize?`
+(ties split, provisional like the place) and `itm` `in_money` carries `nextPayout?`, the
+prize of the next player out. `placesPaid` is the count in force (reduced or locked).
 
 Compatibility: every field added to an existing wire type (config, events, view) is
 optional (`#[serde(default, skip_serializing_if = "Option::is_none")]`, `#[ts(optional)]`)
@@ -275,13 +317,17 @@ no `getrandom`. The host passes a fresh seed per command; outcomes are stored in
   remaining time, and once every button is known the full balance plan applies cleanly,
   moves nobody twice and leaves the open tables within `balance_trigger - 1` players; the
   prize pool and the chips in play equal what the active events recorded (entries,
-  re-entries, rebuys, add-ons, refunds), `effective = max(pool, guarantee)`, and entries
-  are never fewer than unique players.
-- JSON scenarios (`tests/scenarios/*.json`) with partial view matching:
+  re-entries, rebuys, add-ons, refunds), `effective = max(pool, guarantee)`, entries are
+  never fewer than unique players, payouts are non-increasing and (unlocked, not custom
+  amounts, with players) sum exactly to the effective pool, and once finished the prizes
+  add up to the payouts. A pure property checks `payouts::compute` for any pool, places,
+  curve or custom shares, unit and minimum cash.
+- JSON scenarios (`tests/scenarios/*.json`, among them 100 entries with re-entries, a
+  guarantee, curve payouts, rounding and a bubble tie) with partial view matching:
   `{ name, seed, tournament, steps: [{ atMs, cmd, expect?, view? }], checks: [{ nowMs, view }] }`.
 
 ## Not implemented yet
 
-Payouts curve, ICM, deals, WASM crate,
+ICM, deals, WASM crate,
 Tauri integration. The model keeps room for them (`entries`, `chips_bought`, `payout`,
 `Money`, provisional places).

@@ -173,6 +173,10 @@ pub struct MoneyView {
     pub overlay: Money,
     /// Distributed to the players: the larger of `pool` and `guarantee`.
     pub effective_pool: Money,
+    /// Payouts in force, first place first (`payouts[0]` is 1st place).
+    pub payouts: Vec<Money>,
+    /// The payouts are frozen by `LockPayouts`.
+    pub locked: bool,
 }
 
 /// In-the-money status.
@@ -187,7 +191,12 @@ pub enum Itm {
     #[serde(rename = "bubble")]
     Bubble,
     #[serde(rename = "in_money")]
-    InMoney,
+    InMoney {
+        /// Prize of the next player out, when money is tracked.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+        next_payout: Option<Money>,
+    },
 }
 
 /// One line of the ranking. Alive players come first, without a place.
@@ -214,6 +223,11 @@ pub struct RankingRow {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(any(test, feature = "ts"), ts(optional))]
     pub addons: Option<u8>,
+    /// Prize won (provisional like the place); present for placed players when money is
+    /// tracked and the prize is not zero.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub prize: Option<Money>,
 }
 
 /// One seat of a table.
@@ -257,7 +271,8 @@ pub struct View {
     pub registration: RegistrationView,
     pub counts: Counts,
     pub chips: ChipsView,
-    /// Places paid, capped by the number of players.
+    /// Places paid, capped by the number of players (after the minimum-cash reduction, or
+    /// as locked).
     pub places_paid: u32,
     pub itm: Itm,
     pub ranking: Vec<RankingRow>,
@@ -274,7 +289,8 @@ pub struct View {
 pub fn view(state: &State, now_ms: i64) -> View {
     let registration_open = registration::is_open(state, now_ms);
     let counts = counts(state);
-    let places_paid = u32::from(state.config.places_paid).min(counts.unique);
+    let payouts = payouts::in_force(state);
+    let places_paid = payouts.places_paid;
     let mut clock = clock_view(state, now_ms);
     let registration = registration_view(state, now_ms, registration_open, clock.running);
     let purchase_closes = PURCHASE_KINDS
@@ -304,20 +320,20 @@ pub fn view(state: &State, now_ms: i64) -> View {
             .filter_map(|i| level_row(&state.structure, i))
             .collect(),
         chips: chips(state, &counts, usize::from(clock.level_index)),
-        warnings: warnings(state, entries_open, &clock),
+        warnings: warnings(state, entries_open, &clock, &payouts),
         clock,
         registration,
         places_paid,
-        itm: itm(state.phase, counts.alive, places_paid),
-        ranking: ranking_rows(state, now_ms, registration_open, places_paid),
+        itm: itm_with_payout(state, counts.alive, &payouts),
+        ranking: ranking_rows(state, now_ms, registration_open, &payouts),
         tables: tables(state),
         suggestions: seating::suggestions(state),
         counts,
-        money: money_view(state),
+        money: money_view(state, payouts),
     }
 }
 
-fn money_view(state: &State) -> Option<MoneyView> {
+fn money_view(state: &State, payouts: payouts::InForce) -> Option<MoneyView> {
     let money = state.config.money.as_ref()?;
     let pool = payouts::pool(state);
     Some(MoneyView {
@@ -327,7 +343,20 @@ fn money_view(state: &State) -> Option<MoneyView> {
         guarantee: pool.guarantee,
         overlay: pool.overlay,
         effective_pool: pool.effective,
+        payouts: payouts.amounts,
+        locked: payouts.locked,
     })
+}
+
+/// [`itm`] with the prize of the next player out while running.
+fn itm_with_payout(state: &State, alive: u32, payouts: &payouts::InForce) -> Itm {
+    match itm(state.phase, alive, payouts.places_paid) {
+        Itm::InMoney { .. } => Itm::InMoney {
+            next_payout: Some(payouts::amount_at(&payouts.amounts, alive))
+                .filter(|amount| amount.0 > 0 && state.phase == Phase::Running),
+        },
+        other => other,
+    }
 }
 
 fn level_row(levels: &[Level], index: usize) -> Option<LevelRow> {
@@ -448,7 +477,7 @@ pub fn itm(phase: Phase, alive: u32, places_paid: u32) -> Itm {
     } else if alive == places_paid + 1 {
         Itm::Bubble
     } else {
-        Itm::InMoney
+        Itm::InMoney { next_payout: None }
     }
 }
 
@@ -456,9 +485,17 @@ fn ranking_rows(
     state: &State,
     now_ms: i64,
     registration_open: bool,
-    places_paid: u32,
+    payouts: &payouts::InForce,
 ) -> Vec<RankingRow> {
-    let alive_in_money = itm(state.phase, state.alive_count() as u32, places_paid) == Itm::InMoney;
+    let places_paid = payouts.places_paid;
+    let alive_in_money = matches!(
+        itm(state.phase, state.alive_count() as u32, places_paid),
+        Itm::InMoney { .. }
+    );
+    let prizes = match state.config.money {
+        Some(_) => payouts::prizes(state, &payouts.amounts),
+        None => Default::default(),
+    };
     let places = ranking::placements(state);
     let running = state.phase == Phase::Running;
     let mut rows: Vec<RankingRow> = state
@@ -485,6 +522,7 @@ fn ranking_rows(
                 entries: p.entries,
                 rebuys: (p.rebuys > 0).then_some(p.rebuys),
                 addons: (p.addons > 0).then_some(p.addons),
+                prize: prizes.get(&p.id).copied().filter(|prize| prize.0 > 0),
             }
         })
         .collect();
@@ -523,8 +561,45 @@ fn tables(state: &State) -> Vec<TableView> {
 /// Levels after the current one below which `STRUCTURE_ENDING` is raised.
 const ENDING_LEVELS: usize = 2;
 
-fn warnings(state: &State, entries_open: bool, clock: &ClockView) -> Vec<Warning> {
+fn payout_warnings(state: &State, payouts: &payouts::InForce) -> Vec<Warning> {
+    let Some(derived) = &payouts.derived else {
+        return Vec::new();
+    };
+    let pool = payouts::pool(state).effective;
+    match &state.payouts_locked {
+        Some(locked) if locked.amounts != derived.amounts => vec![Warning::PayoutsStale {
+            locked_pool: locked.pool,
+            pool,
+        }],
+        Some(_) => Vec::new(),
+        None => {
+            let mut out = Vec::new();
+            if let Some(from) = derived.reduced_from {
+                out.push(Warning::PlacesReduced {
+                    from,
+                    to: derived.amounts.len() as u32,
+                });
+            }
+            let total = derived
+                .amounts
+                .iter()
+                .fold(Money::ZERO, |sum, &a| sum.saturating_add(a));
+            if !derived.amounts.is_empty() && total != pool {
+                out.push(Warning::PayoutsMismatch { pool, total });
+            }
+            out
+        }
+    }
+}
+
+fn warnings(
+    state: &State,
+    entries_open: bool,
+    clock: &ClockView,
+    payouts: &payouts::InForce,
+) -> Vec<Warning> {
     let mut out = structure::validate(&state.structure).unwrap_or_default();
+    out.extend(payout_warnings(state, payouts));
     if state.phase != Phase::Running {
         return out;
     }
@@ -555,8 +630,9 @@ mod tests {
         assert_eq!(itm(running, 6, 3), Itm::NotYet { to_money: 3 });
         assert_eq!(itm(running, 5, 3), Itm::NotYet { to_money: 2 });
         assert_eq!(itm(running, 4, 3), Itm::Bubble);
-        assert_eq!(itm(running, 3, 3), Itm::InMoney);
-        assert_eq!(itm(running, 1, 3), Itm::InMoney);
+        let in_money = Itm::InMoney { next_payout: None };
+        assert_eq!(itm(running, 3, 3), in_money);
+        assert_eq!(itm(running, 1, 3), in_money);
         assert_eq!(itm(Phase::Setup, 3, 3), Itm::NotYet { to_money: 0 });
     }
 }

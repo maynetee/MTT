@@ -2,7 +2,9 @@
 //!
 //! A host (Tauri shell, WASM build) creates an [`Aggregate`], feeds it [`Command`]s with a
 //! [`Ctx`] carrying the wall-clock time and a random seed, persists the resulting
-//! [`Envelope`]s and renders [`View`]s. No I/O, no system clock, no OS randomness, no floats.
+//! [`Envelope`]s and renders [`View`]s. No I/O, no system clock, no OS randomness. Floats
+//! only appear inside pure computations (payout curve weights, via `libm` so every target
+//! gives the same bits) and never in the state, the events or the view.
 
 #![forbid(unsafe_code)]
 
@@ -33,7 +35,8 @@ pub mod warning;
 pub use clock::{Clock, ClockReason};
 pub use command::{BustInput, Command, Ctx, MoveReason, NewTournament};
 pub use config::{
-    Config, Currency, Deadline, MoneyConfig, PayoutConfig, Purchase, PurchaseKind, PurchaseWindow,
+    Config, Currency, Deadline, MoneyConfig, PayoutAmounts, PayoutConfig, PlacesPaid, Purchase,
+    PurchaseKind, PurchaseWindow,
 };
 pub use decide::{decide, decide_create};
 pub use engine::{Aggregate, LogError, Outcome, SavedLog};

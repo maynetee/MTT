@@ -7,6 +7,7 @@ import type { ClockReason } from "./ClockReason";
 import type { Config } from "./Config";
 import type { Finish } from "./Finish";
 import type { Level } from "./Level";
+import type { Money } from "./Money";
 import type { MoveReason } from "./MoveReason";
 import type { PlayerId } from "./PlayerId";
 import type { Price } from "./Price";
@@ -43,4 +44,12 @@ price?: Price, } | { "type": "rebuy_recorded", player: PlayerId, stack: Chips, p
 /**
  * True for the first start, which moves the tournament out of setup.
  */
-startsTournament: boolean, } | { "type": "button_set", table: TableNo, seat: SeatNo, } | { "type": "table_opened", table: TableNo, } | { "type": "table_broken", table: TableNo, moves: Array<SeatMove>, } | { "type": "final_table_formed", table: TableNo, moves: Array<SeatMove>, closed: Array<TableNo>, };
+startsTournament: boolean, } | { "type": "payouts_locked", 
+/**
+ * Amount per place, first place first.
+ */
+amounts: Array<Money>, 
+/**
+ * Effective prize pool at that moment.
+ */
+pool: Money, } | { "type": "payouts_unlocked", } | { "type": "button_set", table: TableNo, seat: SeatNo, } | { "type": "table_opened", table: TableNo, } | { "type": "table_broken", table: TableNo, moves: Array<SeatMove>, } | { "type": "final_table_formed", table: TableNo, moves: Array<SeatMove>, closed: Array<TableNo>, };

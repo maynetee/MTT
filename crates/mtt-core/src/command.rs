@@ -108,6 +108,12 @@ pub enum Command {
         #[cfg_attr(any(test, feature = "ts"), ts(optional))]
         reason: Option<MoveReason>,
     },
+    /// Freezes the payouts derived from the current pool.
+    #[serde(rename = "lock_payouts")]
+    LockPayouts {},
+    /// Payouts follow the pool again.
+    #[serde(rename = "unlock_payouts")]
+    UnlockPayouts {},
     #[serde(rename = "close_registration")]
     CloseRegistration {},
     #[serde(rename = "reopen_registration")]

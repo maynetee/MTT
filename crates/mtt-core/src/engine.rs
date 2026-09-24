@@ -567,6 +567,11 @@ mod tests {
                 clock,
                 starts_tournament: true,
             },
+            Event::PayoutsLocked {
+                amounts: vec![crate::money::Money(3), crate::money::Money(1)],
+                pool: crate::money::Money(4),
+            },
+            Event::PayoutsUnlocked {},
             Event::ButtonSet {
                 table,
                 seat: SeatNo(1),

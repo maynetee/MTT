@@ -21,4 +21,12 @@ overlay: Money,
 /**
  * Distributed to the players: the larger of `pool` and `guarantee`.
  */
-effectivePool: Money, };
+effectivePool: Money, 
+/**
+ * Payouts in force, first place first (`payouts[0]` is 1st place).
+ */
+payouts: Array<Money>, 
+/**
+ * The payouts are frozen by `LockPayouts`.
+ */
+locked: boolean, };
