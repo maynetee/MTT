@@ -1,81 +1,123 @@
-import { useState } from "react";
-import type { BalanceStep, Command } from "../../engine/types";
+import { useRef, useState, type ReactNode } from "react";
+import type { BalanceStep, View } from "../../engine/types";
 import { useI18n } from "../../i18n";
-import { Button, ButtonLink } from "../components/Button";
+import { Button } from "../components/Button";
 import { Section } from "../components/Card";
 import { Callout } from "../components/Callout";
-import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Field, Select } from "../components/Field";
-import { SeatChanges } from "../components/SeatChanges";
-import { BreakTableDialog } from "../components/TableDialogs";
+import { Pill } from "../components/Pill";
 import { useTournament } from "../TournamentContext";
-import { freeSeats, seatChanges, seatKey, type SeatChange } from "../utils/view";
+import { freeSeats, seatKey } from "../utils/view";
+import { useTableActions } from "./MovesActions";
+import { AnnouncePanel, buttonToSet, useAnnounceContent, usePendingFocus } from "./MovesAnnouncement";
+import { BreakTableDialog, FinalTableDialog } from "./MovesDialogs";
+import { isResolved, openTables, tableAttention, todoList, type TodoItem } from "./MovesPlan";
+import { ButtonSeatPicker } from "./SeatingButtonPicker";
 
-function BalanceStepRow({ step, onApply }: { step: BalanceStep; onApply(command: Command): void }) {
-  const { t, list } = useI18n();
-  const { playerName } = useTournament();
-  const known = step.player !== null && step.fromSeat !== null && step.toSeat !== null;
-  const text = known
-    ? t("moves.step", {
-        name: playerName(step.player!) ?? `#${step.player}`,
-        fromTable: step.fromTable,
-        fromSeat: step.fromSeat!,
-        toTable: step.toTable,
-        toSeat: step.toSeat!
-      })
-    : t("moves.stepUnknown", { fromTable: step.fromTable, toTable: step.toTable });
-
+function Todo({
+  index,
+  kind,
+  title,
+  reason,
+  action,
+  children
+}: {
+  index: number;
+  kind: string;
+  title: string;
+  reason?: string;
+  action?: ReactNode;
+  children?: ReactNode;
+}) {
+  const { t } = useI18n();
+  const current = index === 0;
   return (
-    <li className="list-row balance-step">
-      <div className="balance-step-text">
-        <p>{text}</p>
-        {step.waitsForBb && <p className="list-subtitle">{t("moves.waitsForBb")}</p>}
-        {step.needsButton.length > 0 && (
-          <p className="list-subtitle warning-text">{t("moves.needsButton", { count: step.needsButton.length, tables: list(step.needsButton.map(String)) })}</p>
-        )}
+    <li className={current ? "todo is-current" : "todo"} tabIndex={-1} data-todo={index}>
+      <span className="todo-index" aria-hidden="true">
+        {index + 1}
+      </span>
+      <div className="todo-body">
+        <p className="todo-kind">
+          <span>{kind}</span>
+          {current && (
+            <Pill tone="accent" className="todo-now">
+              {t("moves.now")}
+            </Pill>
+          )}
+        </p>
+        <p className="todo-title">{title}</p>
+        {reason && <p className="todo-reason">{reason}</p>}
+        {children}
       </div>
-      {known ? (
-        <Button
-          size="sm"
-          icon="arrowRight"
-          className="list-row-action"
-          onClick={() =>
-            onApply({
-              type: "move_player",
-              player: step.player!,
-              to: { table: step.toTable, seat: step.toSeat! },
-              reason: "balance"
-            })
-          }
-        >
-          {t("moves.apply")}
-        </Button>
-      ) : (
-        <ButtonLink size="sm" className="list-row-action" to="../seating" relative="path">
-          {t("moves.goToSeating")}
-        </ButtonLink>
-      )}
+      {action && <div className="todo-action">{action}</div>}
     </li>
   );
 }
 
-export default function MovesScreen() {
+/** "Move Ann from table 1 seat 3 to table 2 seat 4", with whatever the buttons tell so far. */
+function stepTitle(t: ReturnType<typeof useI18n>["t"], step: BalanceStep, name: (player: number) => string): string {
+  const { fromTable, toTable, fromSeat, toSeat, player } = step;
+  if (player !== null && fromSeat !== null) {
+    return toSeat !== null
+      ? t("moves.step", { name: name(player), fromTable, fromSeat, toTable, toSeat })
+      : t("moves.stepToTable", { name: name(player), fromTable, fromSeat, toTable });
+  }
+  return toSeat !== null ? t("moves.stepToSeat", { fromTable, toTable, toSeat }) : t("moves.stepUnknown", { fromTable, toTable });
+}
+
+function TableCounts({ view }: { view: View }) {
   const { t } = useI18n();
-  const { view, run } = useTournament();
+  const attention = tableAttention(view);
+  const seats = view.config.seatsPerTable;
+  return (
+    <Section title={t("moves.tables")}>
+      <ul className="plain-list table-counts">
+        {openTables(view).map((table) => {
+          const marks = attention.get(table.table);
+          const change = (marks?.incoming ?? 0) - (marks?.outgoing ?? 0);
+          return (
+            <li key={table.table} className="table-count">
+              <span className="table-count-name">{t("seating.tableTitle", { table: table.table })}</span>
+              <span className="table-count-bar" aria-hidden="true">
+                <span style={{ width: `${Math.min(100, (table.players / seats) * 100)}%` }} />
+              </span>
+              <span className="table-count-value">{t("moves.seatsTaken", { players: table.players, seats })}</span>
+              <span className="table-count-change">
+                {change !== 0 && <Pill tone="accent">{change > 0 ? t("moves.incoming", { count: change }) : t("moves.outgoing", { count: -change })}</Pill>}
+                {marks?.breakNext && <Pill tone="danger">{t("seating.breakNext")}</Pill>}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </Section>
+  );
+}
+
+export default function MovesScreen() {
+  const i18n = useI18n();
+  const { t, list } = i18n;
+  const { view, run, playerName } = useTournament();
+  const actions = useTableActions();
   const [selectedPlayer, setSelectedPlayer] = useState<number | "">("");
   const [selectedSeat, setSelectedSeat] = useState("");
-  const [moves, setMoves] = useState<SeatChange[]>([]);
   const [breaking, setBreaking] = useState<number | null>(null);
   const [drawing, setDrawing] = useState<number | null>(null);
-  const { suggestions } = view;
+  const [applying, setApplying] = useState(false);
+  const announceRef = useRef<HTMLHeadingElement | null>(null);
+  const todoRef = useRef<HTMLOListElement | null>(null);
+  const focusLater = usePendingFocus();
+  const announcement = useAnnounceContent();
   const seats = freeSeats(view);
   const target = seats.find((seat) => seatKey(seat) === selectedSeat) ?? null;
   const editable = view.phase !== "finished";
+  const items = todoList(view);
+  const balance = items.filter((item): item is Extract<TodoItem, { kind: "balance" }> => item.kind === "balance");
+  const canApplyAll = balance.length >= 2 && balance.every((item) => isResolved(item.step));
+  const name = (player: number) => playerName(player) ?? `#${player}`;
 
-  const runAndReport = async (command: Command) => {
-    const next = await run(command);
-    if (next) setMoves(seatChanges(view, next));
-  };
+  /** After an action, focus the next thing to do, else the list to announce. */
+  const focusNext = () => focusLater(() => todoRef.current?.querySelector<HTMLElement>("[data-todo='0']") ?? announceRef.current);
 
   const handleMove = async () => {
     if (selectedPlayer === "" || !target) return;
@@ -85,94 +127,204 @@ export default function MovesScreen() {
     }
   };
 
-  const hasSuggestion = suggestions.finalTable !== null || suggestions.breakTable !== null || suggestions.balance.length > 0;
-  const breakingPlayers = view.tables.find((table) => table.table === breaking)?.players ?? 0;
+  const apply = async (step: BalanceStep) => {
+    setApplying(true);
+    const next = await actions.applyStep(step);
+    setApplying(false);
+    if (next) focusNext();
+  };
+
+  const applyAll = async () => {
+    setApplying(true);
+    const next = await actions.applyAll();
+    setApplying(false);
+    if (next) focusNext();
+  };
+
+  // A button asked by an earlier step is not asked again.
+  const asked = new Set<number>();
+  const pickersFor = (tables: number[]) => {
+    const pickers: ReactNode[] = [];
+    for (const no of tables) {
+      const table = view.tables.find((candidate) => candidate.table === no);
+      if (!table || asked.has(no)) continue;
+      asked.add(no);
+      pickers.push(<ButtonSeatPicker key={no} table={table} onSet={focusNext} />);
+    }
+    return pickers;
+  };
+
+  const renderItem = (item: TodoItem, index: number) => {
+    switch (item.kind) {
+      case "finalTable":
+        return (
+          <Todo
+            key="final"
+            index={index}
+            kind={t("moves.kind.finalTable")}
+            title={t("moves.finalTable", { count: item.alive, table: item.table })}
+            reason={t("moves.finalReason", { count: item.alive, size: item.size })}
+            action={
+              editable && (
+                <Button variant="primary" icon="shuffle" onClick={() => setDrawing(item.table)}>
+                  {t("moves.drawFinalTable")}
+                </Button>
+              )
+            }
+          />
+        );
+      case "breakTable":
+        return (
+          <Todo
+            key="break"
+            index={index}
+            kind={t("moves.kind.breakTable")}
+            title={t("moves.breakTable", { table: item.table })}
+            reason={t("moves.breakReason", {
+              table: item.table,
+              players: t("moves.playerCount", { count: item.players }),
+              alive: t("moves.playerCount", { count: item.alive }),
+              count: item.remaining,
+              seats: item.remaining * item.seats
+            })}
+            action={
+              <Button variant="primary" icon="shuffle" onClick={() => setBreaking(item.table)}>
+                {t("moves.breakTableAction", { table: item.table })}
+              </Button>
+            }
+          />
+        );
+      case "button": {
+        const table = view.tables.find((candidate) => candidate.table === item.table)!;
+        // Right after the final table draw, the list to announce asks for it.
+        const inPanel = buttonToSet(announcement) === item.table;
+        return (
+          <Todo
+            key="button"
+            index={index}
+            kind={t("moves.kind.button")}
+            title={t("moves.setButton", { table: item.table })}
+            reason={inPanel ? t("moves.setButtonAbove") : t("moves.setButtonReason")}
+          >
+            {!inPanel && <ButtonSeatPicker table={table} label={t("moves.buttonPickerLabel")} onSet={focusNext} />}
+          </Todo>
+        );
+      }
+      case "balance": {
+        const { step } = item;
+        const resolved = isResolved(step);
+        const first = balance[0] === item;
+        return (
+          <Todo
+            key={`balance-${index}`}
+            index={index}
+            kind={t("moves.kind.balance")}
+            title={stepTitle(t, step, name)}
+            reason={t("moves.balanceReason", {
+              fromTable: step.fromTable,
+              toTable: step.toTable,
+              fromPlayers: t("moves.playerCount", { count: item.fromCount }),
+              toPlayers: t("moves.playerCount", { count: item.toCount }),
+              trigger: item.trigger
+            })}
+            action={
+              first &&
+              resolved && (
+                <Button variant="primary" icon="arrowRight" loading={applying} onClick={() => void apply(step)}>
+                  {t("moves.apply")}
+                </Button>
+              )
+            }
+          >
+            {step.waitsForBb && <p className="todo-note">{t("moves.waitsForBb")}</p>}
+            {step.needsButton.length > 0 && (
+              <>
+                <p className="todo-note warning-text">{t("moves.needsButton", { count: step.needsButton.length, tables: list(step.needsButton.map(String)) })}</p>
+                {pickersFor(step.needsButton)}
+              </>
+            )}
+            {!first && resolved && <p className="todo-note">{t("moves.afterPrevious")}</p>}
+          </Todo>
+        );
+      }
+    }
+  };
 
   return (
     <div className="stack">
-      {moves.length > 0 && <SeatChanges changes={moves} onDismiss={() => setMoves([])} />}
+      <AnnouncePanel headingRef={announceRef} />
       <div className="moves-layout">
-        <Section title={t("moves.suggestions")}>
-          {!hasSuggestion && <Callout tone="success">{t("moves.balanced")}</Callout>}
-          {suggestions.finalTable !== null && (
-            <div className="suggestion">
-              <p>{t("moves.finalTable", { count: view.counts.alive, table: suggestions.finalTable })}</p>
-              <Button variant="primary" icon="shuffle" onClick={() => setDrawing(suggestions.finalTable)}>
-                {t("moves.drawFinalTable")}
+        <Section
+          title={t("moves.todo")}
+          description={items.length > 0 ? t("moves.todoHint") : undefined}
+          actions={
+            canApplyAll && (
+              <Button icon="check" loading={applying} onClick={() => void applyAll()}>
+                {t("moves.applyAll", { count: balance.length })}
               </Button>
-            </div>
-          )}
-          {suggestions.breakTable !== null && (
-            <div className="suggestion">
-              <p>{t("moves.breakTable", { table: suggestions.breakTable })}</p>
-              <Button variant="primary" icon="shuffle" onClick={() => setBreaking(suggestions.breakTable)}>
-                {t("moves.breakTableAction", { table: suggestions.breakTable })}
-              </Button>
-            </div>
-          )}
-          {suggestions.balance.length > 0 && (
-            <div className="stack stack--tight">
-              <h3>{t("moves.balance")}</h3>
-              <ol className="plain-list">
-                {suggestions.balance.map((step, index) => (
-                  <BalanceStepRow key={`${step.fromTable}-${step.toTable}-${step.player ?? index}`} step={step} onApply={(command) => void run(command)} />
-                ))}
-              </ol>
-            </div>
+            )
+          }
+        >
+          {items.length === 0 ? (
+            <Callout tone="success">{t("moves.balanced")}</Callout>
+          ) : (
+            <ol ref={todoRef} className="plain-list todo-list">
+              {items.map(renderItem)}
+            </ol>
           )}
         </Section>
 
-        {editable && (
-          <Section title={t("moves.manual")} description={t("moves.manualHint")}>
-            <Field label={t("common.player")}>
-              <Select value={selectedPlayer} onChange={(event) => setSelectedPlayer(event.target.value === "" ? "" : Number(event.target.value))}>
-                <option value="">{t("common.selectPlayer")}</option>
-                {view.ranking
-                  .filter((row) => row.alive)
-                  .map((row) => (
-                    <option key={row.player} value={row.player}>
-                      {row.name}
+        <div className="stack">
+          {openTables(view).length > 1 && <TableCounts view={view} />}
+          {editable && (
+            <Section title={t("moves.manual")} description={t("moves.manualHint")}>
+              <Field label={t("common.player")}>
+                <Select value={selectedPlayer} onChange={(event) => setSelectedPlayer(event.target.value === "" ? "" : Number(event.target.value))}>
+                  <option value="">{t("common.selectPlayer")}</option>
+                  {view.ranking
+                    .filter((row) => row.alive)
+                    .map((row) => (
+                      <option key={row.player} value={row.player}>
+                        {row.name}
+                      </option>
+                    ))}
+                </Select>
+              </Field>
+              <Field label={t("common.seat")}>
+                <Select value={target ? selectedSeat : ""} onChange={(event) => setSelectedSeat(event.target.value)}>
+                  <option value="">{t("common.selectSeat")}</option>
+                  {seats.map((seat) => (
+                    <option key={seatKey(seat)} value={seatKey(seat)}>
+                      {t("common.tableSeat", { table: seat.table, seat: seat.seat })}
                     </option>
                   ))}
-              </Select>
-            </Field>
-            <Field label={t("common.seat")}>
-              <Select value={target ? selectedSeat : ""} onChange={(event) => setSelectedSeat(event.target.value)}>
-                <option value="">{t("common.selectSeat")}</option>
-                {seats.map((seat) => (
-                  <option key={seatKey(seat)} value={seatKey(seat)}>
-                    {t("common.tableSeat", { table: seat.table, seat: seat.seat })}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <div>
-              <Button variant="primary" icon="arrowRight" onClick={() => void handleMove()} disabled={selectedPlayer === "" || !target}>
-                {t("moves.move")}
-              </Button>
-            </div>
-          </Section>
-        )}
+                </Select>
+              </Field>
+              <div>
+                <Button variant="primary" icon="arrowRight" onClick={() => void handleMove()} disabled={selectedPlayer === "" || !target}>
+                  {t("moves.move")}
+                </Button>
+              </div>
+            </Section>
+          )}
+        </div>
       </div>
       <BreakTableDialog
         table={breaking}
-        players={breakingPlayers}
         onCancel={() => setBreaking(null)}
-        onConfirm={(table) => {
+        onConfirm={async (table) => {
+          const next = await actions.breakTable(table);
           setBreaking(null);
-          return runAndReport({ type: "break_table", table });
+          if (next) focusLater(() => announceRef.current);
         }}
       />
-      <ConfirmDialog
-        open={drawing !== null}
-        title={t("moves.finalTitle")}
-        message={t("moves.finalMessage", { count: view.counts.alive, table: drawing ?? "" })}
-        confirmLabel={t("moves.drawFinalTable")}
+      <FinalTableDialog
+        table={drawing}
         onCancel={() => setDrawing(null)}
-        onConfirm={() => {
-          const table = drawing!;
+        onConfirm={async (table) => {
+          const next = await actions.drawFinalTable(table);
           setDrawing(null);
-          return runAndReport({ type: "form_final_table", table });
+          if (next) focusLater(() => announceRef.current);
         }}
       />
     </div>

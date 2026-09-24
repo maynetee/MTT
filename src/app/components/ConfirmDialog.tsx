@@ -15,6 +15,9 @@ export interface ConfirmDialogProps {
   confirmText?: string;
   /** Label of the field for `confirmText`. */
   confirmTextLabel?: string;
+  /** Details under the message, not read out as the dialog's description (e.g. a list). */
+  children?: ReactNode;
+  size?: "sm" | "md";
   /** May return a promise: the button shows progress until it settles. */
   onConfirm(): void | Promise<unknown>;
   onCancel(): void;
@@ -30,6 +33,8 @@ export function ConfirmDialog({
   tone = "primary",
   confirmText,
   confirmTextLabel,
+  children,
+  size,
   onConfirm,
   onCancel
 }: ConfirmDialogProps) {
@@ -69,6 +74,7 @@ export function ConfirmDialog({
       title={title}
       description={message}
       role="alertdialog"
+      size={size}
       tone={tone === "danger" ? "danger" : "default"}
       initialFocus={initialFocus}
       footer={
@@ -82,6 +88,7 @@ export function ConfirmDialog({
         </>
       }
     >
+      {children}
       {confirmText !== undefined && (
         <form
           className="confirm-type"
