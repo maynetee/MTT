@@ -36,6 +36,11 @@ export interface WasmEngineOptions {
   storage?: Storage;
   /** `null` disables cross-tab notifications. Defaults to a `BroadcastChannel`. */
   channel?: ChannelLike | null;
+  /**
+   * Where `storage` events arrive (`window` by default when `storage` is localStorage).
+   * Another tab's write can reach this tab's localStorage after its broadcast message.
+   */
+  storageEvents?: EventTarget | null;
   /** Wall clock in ms. */
   now?: () => number;
   /** A random u64 as a decimal string. */
@@ -85,6 +90,16 @@ function summaryOf(entry: IndexEntry): TournamentSummary {
   return summary;
 }
 
+function parseIndex(raw: string | null): IndexEntry[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as IndexEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Browser host: mtt-core compiled to WebAssembly, one `WasmTournament` per open tournament,
  * saved logs in localStorage. Only the tab that dispatches writes; other tabs (the display)
@@ -95,23 +110,53 @@ export class WasmEngine implements Engine {
   readonly kind = "wasm";
   private readonly storage: Storage;
   private readonly channel: ChannelLike | null;
+  private readonly storageEvents: EventTarget | null;
   private readonly now: () => number;
   private readonly seed: () => string;
   private readonly newId: () => string;
   private readonly cache = new Map<string, { tournament: WasmTournament; rev: number }>();
   private readonly listeners = new Set<(id: string) => void>();
+  /** Stored revision last announced to listeners for a change made by another tab (-1: deleted). */
+  private readonly announced = new Map<string, number>();
 
   constructor(options: WasmEngineOptions = {}) {
     this.storage = options.storage ?? window.localStorage;
     this.channel = options.channel === undefined ? defaultChannel() : options.channel;
+    const usesLocalStorage = typeof window !== "undefined" && this.storage === window.localStorage;
+    this.storageEvents = options.storageEvents === undefined ? (usesLocalStorage ? window : null) : options.storageEvents;
     this.now = options.now ?? Date.now;
     this.seed = options.seed ?? randomSeed;
     this.newId = options.newId ?? randomId;
     if (this.channel) {
       this.channel.onmessage = (event) => {
-        if (isChangeMessage(event.data)) this.emit(event.data.id);
+        if (isChangeMessage(event.data)) this.remoteChange(event.data.id);
       };
     }
+    this.storageEvents?.addEventListener("storage", this.onStorage);
+  }
+
+  /**
+   * Another tab rewrote the index. Its broadcast message may have arrived before the write
+   * was visible here: announce the tournaments whose stored revision moved.
+   */
+  private readonly onStorage = (event: Event) => {
+    const { key, oldValue, newValue } = event as StorageEvent;
+    if (key === null) {
+      for (const id of this.cache.keys()) this.remoteChange(id);
+      return;
+    }
+    if (key !== INDEX_KEY) return;
+    const ids = new Set([...parseIndex(oldValue), ...parseIndex(newValue)].map((entry) => entry.id));
+    for (const id of ids) this.remoteChange(id);
+  };
+
+  /** Tells listeners about another tab's change once, as soon as the stored revision shows it. */
+  private remoteChange(id: string): void {
+    const rev = this.readIndex().find((entry) => entry.id === id)?.rev ?? -1;
+    const last = this.announced.get(id);
+    if (last !== undefined && (rev === last || (rev !== -1 && rev < last))) return;
+    this.announced.set(id, rev);
+    this.emit(id);
   }
 
   async listTournaments(): Promise<TournamentSummary[]> {
@@ -211,6 +256,7 @@ export class WasmEngine implements Engine {
   /** Stops listening to other tabs and frees every loaded tournament. */
   dispose(): void {
     this.channel?.close();
+    this.storageEvents?.removeEventListener("storage", this.onStorage);
     for (const id of [...this.cache.keys()]) this.evict(id);
     this.listeners.clear();
   }
@@ -245,14 +291,7 @@ export class WasmEngine implements Engine {
   }
 
   private readIndex(): IndexEntry[] {
-    const raw = this.storage.getItem(INDEX_KEY);
-    if (!raw) return [];
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      return Array.isArray(parsed) ? (parsed as IndexEntry[]) : [];
-    } catch {
-      return [];
-    }
+    return parseIndex(this.storage.getItem(INDEX_KEY));
   }
 
   private writeIndex(index: IndexEntry[]): void {

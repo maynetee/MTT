@@ -255,6 +255,42 @@ describe("WasmEngine", () => {
     expect(writes).not.toHaveBeenCalled();
   });
 
+  it("waits for another tab's write to reach its storage when the message comes first", async () => {
+    // Browsers propagate localStorage between tabs asynchronously: model each tab's copy.
+    const directorStorage = new MemoryStorage();
+    const displayStorage = new MemoryStorage();
+    const storageEvents = new EventTarget();
+    const connect = channelHub();
+    const director = createTestEngine({ storage: directorStorage, channel: connect() });
+    const display = createTestEngine({ storage: displayStorage, channel: connect(), storageEvents });
+    const sync = () => {
+      const oldValue = displayStorage.getItem(INDEX_KEY);
+      for (let i = 0; i < directorStorage.length; i++) {
+        const key = directorStorage.key(i)!;
+        displayStorage.setItem(key, directorStorage.getItem(key)!);
+      }
+      const event = Object.assign(new Event("storage"), { key: INDEX_KEY, oldValue, newValue: displayStorage.getItem(INDEX_KEY) });
+      storageEvents.dispatchEvent(event);
+    };
+    const id = await director.createTournament(tournamentInput());
+    sync();
+    expect((await display.getView(id)).counts.unique).toBe(0);
+
+    const changes: number[] = [];
+    display.subscribe(async (changed) => changes.push((await display.getView(changed)).counts.unique));
+    await director.dispatch(id, { type: "register", name: "Ann" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    sync();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The message came first and changed nothing visible; the storage event announced the change, once.
+    expect(changes).toEqual([1]);
+    sync();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(changes).toEqual([1]);
+    display.dispose();
+  });
+
   it("notifies its own listeners after a change, and stops when unsubscribed", async () => {
     const engine = createTestEngine({ now: clock().now });
     const id = await engine.createTournament(tournamentInput());
