@@ -222,8 +222,9 @@ export class WasmEngine implements Engine {
     };
   }
 
+  /** Opens the display in a tab of its own, under the app's base path (`/MTT/` on GitHub Pages). */
   async openDisplayWindow(id: string): Promise<void> {
-    window.open(`#/display/${encodeURIComponent(id)}`, `mtt-display-${id}`);
+    window.open(`${import.meta.env.BASE_URL}#/display/${encodeURIComponent(id)}`, `mtt-display-${id}`);
   }
 
   async closeCurrentWindow(): Promise<void> {

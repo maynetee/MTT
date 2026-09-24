@@ -16,8 +16,12 @@ npm run tauri dev   # desktop app
 npm run dev         # browser demo only
 ```
 
-`npm run wasm` builds `crates/mtt-wasm` into `src/wasm/pkg`; `dev`, `build`, `typecheck` and
-`test` rebuild it first when it is missing or older than the Rust sources.
+`npm run wasm` builds `crates/mtt-wasm` into `src/wasm/pkg`; `dev`, `build`, `build:pages`,
+`typecheck` and `test` rebuild it first when it is missing or older than the Rust sources.
+
+`npm run build:pages` builds the browser demo published on GitHub Pages: served under `/MTT/`,
+with a Content-Security-Policy `<meta>`. `npx vite preview --mode pages` serves it at
+http://localhost:4173/MTT/.
 
 Set `MTT_DATA_DIR` to a throwaway directory (`MTT_DATA_DIR=/tmp/mtt-dev npm run tauri dev`) to keep development data apart from your real tournaments.
 

@@ -19,6 +19,8 @@
     "dev": "vite",
     "prebuild": "node scripts/wasm.mjs --if-stale",
     "build": "tsc --noEmit && vite build",
+    "prebuild:pages": "node scripts/wasm.mjs --if-stale",
+    "build:pages": "tsc --noEmit && vite build --mode pages",
     "preview": "vite preview",
     "pretypecheck": "node scripts/wasm.mjs --if-stale",
     "typecheck": "tsc --noEmit",

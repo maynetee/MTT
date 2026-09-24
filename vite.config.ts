@@ -4,6 +4,43 @@ import react from "@vitejs/plugin-react";
 
 const INITIAL_LOAD_BUDGET_KB = 500;
 
+/** `vite build --mode pages`: the browser demo, served by GitHub Pages under /MTT/. */
+const PAGES_MODE = "pages";
+const PAGES_BASE = "/MTT/";
+
+/**
+ * Content Security Policy of the browser demo. GitHub Pages cannot send headers, so it goes in
+ * a <meta>. 'wasm-unsafe-eval' lets the page compile the engine's WebAssembly module; styles
+ * allow the inline `style` attributes React sets.
+ */
+const PAGES_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'"
+].join("; ");
+
+/**
+ * Adds the CSP <meta> right after the charset declaration, before any script or stylesheet it
+ * must cover. Build only: the dev server injects inline scripts.
+ */
+function contentSecurityPolicy(policy: string): Plugin {
+  return {
+    name: "mtt:content-security-policy",
+    apply: "build",
+    transformIndexHtml(html) {
+      const charset = /<meta charset="[^"]*"\s*\/?>/i;
+      if (!charset.test(html)) throw new Error("index.html needs a <meta charset> for the CSP <meta> to follow");
+      return html.replace(charset, (tag) => `${tag}\n    <meta http-equiv="Content-Security-Policy" content="${policy}" />`);
+    }
+  };
+}
+
 /**
  * Warns when a chunk loaded at startup (an entry chunk or one of its static imports)
  * exceeds the budget. Vite's own chunkSizeWarningLimit applies to every chunk and has
@@ -38,8 +75,15 @@ function initialLoadBudget(limitKb: number): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), initialLoadBudget(INITIAL_LOAD_BUDGET_KB)],
+export default defineConfig(({ mode }) => ({
+  // The desktop app loads from the root of its origin; the demo lives under the repository path.
+  base: mode === PAGES_MODE ? PAGES_BASE : "/",
+  plugins: [
+    react(),
+    initialLoadBudget(INITIAL_LOAD_BUDGET_KB),
+    // The desktop app's CSP comes from src-tauri/tauri.conf.json.
+    mode === PAGES_MODE && contentSecurityPolicy(PAGES_CSP)
+  ],
   clearScreen: false,
   server: {
     port: 1420,
@@ -67,4 +111,4 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     restoreMocks: true
   }
-});
+}));

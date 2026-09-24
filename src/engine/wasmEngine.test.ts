@@ -307,6 +307,20 @@ describe("WasmEngine", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it("opens the display in a tab of its own under the app's base path", async () => {
+    const engine = createTestEngine();
+    const open = vi.fn();
+    vi.stubGlobal("window", { open });
+    vi.stubEnv("BASE_URL", "/MTT/");
+    try {
+      await engine.openDisplayWindow("a b");
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+    expect(open).toHaveBeenCalledWith("/MTT/#/display/a%20b", "mtt-display-a b");
+  });
+
   it("stores the list and the logs under versioned keys", async () => {
     const storage = new MemoryStorage();
     const engine = createTestEngine({ storage, now: clock().now });
