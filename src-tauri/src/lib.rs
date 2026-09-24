@@ -96,10 +96,14 @@ mod tests {
             .expect("failed to build the app")
     }
 
-    fn main_window(app: &App<MockRuntime>) -> WebviewWindow<MockRuntime> {
-        WebviewWindowBuilder::new(app, "main", Default::default())
+    fn window(app: &App<MockRuntime>, label: &str) -> WebviewWindow<MockRuntime> {
+        WebviewWindowBuilder::new(app, label, Default::default())
             .build()
-            .expect("failed to create the main window")
+            .expect("failed to create the window")
+    }
+
+    fn main_window(app: &App<MockRuntime>) -> WebviewWindow<MockRuntime> {
+        window(app, "main")
     }
 
     fn invoke(
@@ -149,6 +153,32 @@ mod tests {
             }))
         );
         assert!(data_dir.path().join("mtt.sqlite").is_file());
+    }
+
+    #[test]
+    fn the_display_window_can_read_the_state_but_not_run_director_commands() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let app = mock_app(data_dir.path());
+        let display = window(&app, "display");
+
+        let state = invoke(
+            &display,
+            "get_state",
+            InvokeBody::default(),
+            HeaderMap::default(),
+        );
+        assert!(state.is_ok(), "get_state was refused: {state:?}");
+
+        for cmd in ["reset_tournament", "undo_last_event", "save_export"] {
+            let denied =
+                invoke(&display, cmd, InvokeBody::default(), HeaderMap::default()).expect_err(cmd);
+            assert!(
+                denied
+                    .as_str()
+                    .is_some_and(|message| message.contains("not allowed")),
+                "{cmd}: {denied}"
+            );
+        }
     }
 
     #[test]
