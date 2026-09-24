@@ -185,7 +185,7 @@ pub(crate) fn decide_update(
     now_ms: i64,
 ) -> Result<Event, DomainError> {
     validate(levels)?;
-    config::validate_late_reg(&state.config, levels)?;
+    config::validate_deadlines(&state.config, levels)?;
     if levels == state.structure.as_slice() {
         return Err(DomainError::NoChange);
     }

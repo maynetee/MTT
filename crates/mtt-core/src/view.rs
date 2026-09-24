@@ -3,14 +3,15 @@
 use serde::{Deserialize, Serialize};
 
 use crate::clock::{self, Boundary};
-use crate::config::{Config, Currency, Deadline};
+use crate::config::{Config, Currency, Deadline, PURCHASE_KINDS, PurchaseKind};
 use crate::ids::{PlayerId, SeatNo, SeatRef, Seq, TableNo, TournamentId};
 use crate::money::{Chips, Money};
 use crate::payouts;
+use crate::purchase;
 use crate::ranking;
 use crate::registration;
 use crate::seating::{self, Suggestions};
-use crate::state::{Phase, State, TableStatus};
+use crate::state::{Phase, Player, State, TableStatus};
 use crate::structure::{self, Ante, Level};
 use crate::warning::Warning;
 
@@ -106,6 +107,18 @@ pub struct RegistrationView {
     pub closes_in_ms: Option<i64>,
     /// Wall-clock close while the clock runs.
     pub closes_at_ms: Option<i64>,
+    /// Whether a busted player can re-enter now; absent when re-entries are not offered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub reentry_open: Option<bool>,
+    /// Whether rebuys are open; absent when not offered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub rebuy_open: Option<bool>,
+    /// Whether add-ons are open; absent when not offered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub addon_open: Option<bool>,
 }
 
 /// Player counts.
@@ -115,9 +128,22 @@ pub struct RegistrationView {
 pub struct Counts {
     /// Distinct players.
     pub unique: u32,
+    /// First entries plus re-entries.
     pub entries: u32,
     pub alive: u32,
     pub busted: u32,
+    /// Re-entries; present when offered or bought.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub reentries: Option<u32>,
+    /// Rebuys; present when offered or bought.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub rebuys: Option<u32>,
+    /// Add-ons; present when offered or bought.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub addons: Option<u32>,
 }
 
 /// Chip statistics.
@@ -176,10 +202,18 @@ pub struct RankingRow {
     pub place: Option<u32>,
     /// Last place of a tie (`place..=place_to`).
     pub place_to: Option<u32>,
-    /// The place may still change (late registration open).
+    /// The place may still change (late registration open, or the player may re-enter).
     pub provisional: bool,
     pub in_money: bool,
     pub entries: u8,
+    /// Rebuys bought; present when any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub rebuys: Option<u8>,
+    /// Add-ons bought; present when any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub addons: Option<u8>,
 }
 
 /// One seat of a table.
@@ -243,9 +277,15 @@ pub fn view(state: &State, now_ms: i64) -> View {
     let places_paid = u32::from(state.config.places_paid).min(counts.unique);
     let mut clock = clock_view(state, now_ms);
     let registration = registration_view(state, now_ms, registration_open, clock.running);
-    if let Some(close) = registration.closes_at_ms {
+    let purchase_closes = PURCHASE_KINDS
+        .iter()
+        .filter_map(|&kind| purchase::closes_in_ms(state, kind, now_ms))
+        .map(|left| now_ms.saturating_add(left))
+        .filter(|_| clock.running);
+    for close in registration.closes_at_ms.into_iter().chain(purchase_closes) {
         clock.recompute_at_ms = Some(clock.recompute_at_ms.map_or(close, |at| at.min(close)));
     }
+    let entries_open = purchase::entries_open(state, now_ms);
     View {
         generated_at_ms: now_ms,
         id: state.id.clone(),
@@ -264,12 +304,12 @@ pub fn view(state: &State, now_ms: i64) -> View {
             .filter_map(|i| level_row(&state.structure, i))
             .collect(),
         chips: chips(state, &counts, usize::from(clock.level_index)),
-        warnings: warnings(state, registration_open, &clock),
+        warnings: warnings(state, entries_open, &clock),
         clock,
         registration,
         places_paid,
         itm: itm(state.phase, counts.alive, places_paid),
-        ranking: ranking_rows(state, registration_open, places_paid),
+        ranking: ranking_rows(state, now_ms, registration_open, places_paid),
         tables: tables(state),
         suggestions: seating::suggestions(state),
         counts,
@@ -339,6 +379,12 @@ fn registration_view(state: &State, now_ms: i64, open: bool, running: bool) -> R
         (Phase::Finished { .. }, _) | (_, Some(_)) => None,
         _ => registration::deadline_in_ms(state, now_ms).filter(|&left| left > 0 && open),
     };
+    let window = |kind| {
+        state
+            .config
+            .purchase(kind)
+            .map(|_| purchase::is_open(state, kind, now_ms))
+    };
     RegistrationView {
         open,
         override_open: state.reg_override,
@@ -347,17 +393,28 @@ fn registration_view(state: &State, now_ms: i64, open: bool, running: bool) -> R
         closes_at_ms: closes_in_ms
             .filter(|_| running && state.phase == Phase::Running)
             .map(|left| now_ms.saturating_add(left)),
+        reentry_open: window(PurchaseKind::Reentry),
+        rebuy_open: window(PurchaseKind::Rebuy),
+        addon_open: window(PurchaseKind::Addon),
     }
 }
 
 fn counts(state: &State) -> Counts {
     let unique = state.players.len() as u32;
     let alive = state.alive_count() as u32;
+    let total = |count: fn(&Player) -> u8| -> u32 {
+        state.players.values().map(|p| u32::from(count(p))).sum()
+    };
+    let entries = total(|p| p.entries);
+    let shown = |kind, n: u32| (state.config.purchase(kind).is_some() || n > 0).then_some(n);
     Counts {
         unique,
-        entries: state.players.values().map(|p| u32::from(p.entries)).sum(),
+        entries,
         alive,
         busted: unique - alive,
+        reentries: shown(PurchaseKind::Reentry, entries - unique),
+        rebuys: shown(PurchaseKind::Rebuy, total(|p| p.rebuys)),
+        addons: shown(PurchaseKind::Addon, total(|p| p.addons)),
     }
 }
 
@@ -395,10 +452,15 @@ pub fn itm(phase: Phase, alive: u32, places_paid: u32) -> Itm {
     }
 }
 
-fn ranking_rows(state: &State, registration_open: bool, places_paid: u32) -> Vec<RankingRow> {
+fn ranking_rows(
+    state: &State,
+    now_ms: i64,
+    registration_open: bool,
+    places_paid: u32,
+) -> Vec<RankingRow> {
     let alive_in_money = itm(state.phase, state.alive_count() as u32, places_paid) == Itm::InMoney;
     let places = ranking::placements(state);
-    let provisional = registration_open && state.phase == Phase::Running;
+    let running = state.phase == Phase::Running;
     let mut rows: Vec<RankingRow> = state
         .players
         .values()
@@ -413,12 +475,16 @@ fn ranking_rows(state: &State, registration_open: bool, places_paid: u32) -> Vec
                 place_to: placement
                     .filter(|pl| pl.place_to > pl.place)
                     .map(|pl| pl.place_to),
-                provisional: provisional && placement.is_some(),
+                provisional: running
+                    && placement.is_some()
+                    && (registration_open || purchase::can_reenter(state, p, now_ms)),
                 in_money: match placement {
                     Some(pl) => pl.place <= places_paid,
                     None => alive_in_money,
                 },
                 entries: p.entries,
+                rebuys: (p.rebuys > 0).then_some(p.rebuys),
+                addons: (p.addons > 0).then_some(p.addons),
             }
         })
         .collect();
@@ -457,12 +523,12 @@ fn tables(state: &State) -> Vec<TableView> {
 /// Levels after the current one below which `STRUCTURE_ENDING` is raised.
 const ENDING_LEVELS: usize = 2;
 
-fn warnings(state: &State, registration_open: bool, clock: &ClockView) -> Vec<Warning> {
+fn warnings(state: &State, entries_open: bool, clock: &ClockView) -> Vec<Warning> {
     let mut out = structure::validate(&state.structure).unwrap_or_default();
     if state.phase != Phase::Running {
         return out;
     }
-    if registration_open && state.alive_count() == 1 {
+    if entries_open && state.alive_count() == 1 {
         out.push(Warning::FinishPending);
     }
     let levels_left = state

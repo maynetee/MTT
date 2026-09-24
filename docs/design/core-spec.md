@@ -57,7 +57,7 @@ State { id, phase: Setup | Running | Finished { winner }, config, structure: Vec
         clock, reg_override: Option<bool>, players: BTreeMap<PlayerId, Player>,
         tables: BTreeMap<TableNo, Table>, next_player_id, next_bust_group, final_table_formed }
 Player { id, name, name_key, status: Seated { seat } | Busted { group, start_stack, last_seat },
-         entries, chips_bought, prize_paid, fees_paid }
+         entries, rebuys, addons, chips_bought, prize_paid, fees_paid }
 Table  { no, seats, status: Idle | Open | Closed, occupants: BTreeMap<SeatNo, PlayerId>,
          button: Option<SeatNo> }
 ```
@@ -70,12 +70,19 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
 - `Config { name, seats_per_table (2..=12), max_tables (1..=1000), final_table_size
   (default seats_per_table), balance_trigger (default 2), break_order, starting_stack,
   places_paid (>= 1, fixed number for now), late_reg: Deadline, payout (reserved),
-  money?: MoneyConfig }`.
+  money?: MoneyConfig, reentry?, rebuy?, addon?: Purchase }`.
 - `MoneyConfig { currency: { code, exponent }, buyIn: { prize, fee }, guarantee?,
   roundingUnit, minCash? }`, absent for a tournament without money tracking. Amounts are
   `Money` in minor units (`exponent` digits, 0..=4; code: three uppercase letters). Errors:
   `INVALID_CURRENCY`, `INVALID_BUY_IN`, `INVALID_GUARANTEE`, `INVALID_ROUNDING_UNIT` (must be
   positive), `INVALID_MIN_CASH`.
+- `Purchase { prize, fee, stack, max?, window? }`: `max` is the most purchases of that
+  kind per player (re-entries do not count the first entry), unlimited when absent;
+  `window: PurchaseWindow` is `Until { deadline: Deadline }` or `BreakAfter { n }` (see
+  Re-entries).
+  Errors: `INVALID_PURCHASE { purchase }` (negative price, non-positive stack, `max` 0, or
+  a price without money tracking), `INVALID_PURCHASE_WINDOW { purchase }` (missing play
+  level, or no break right after play level `n`; also checked by `UpdateStructure`).
 - `Deadline`: `EndOfPlayLevel { n, through_break }` (n is a 1-based play-level number and
   must exist), `Elapsed { ms }`, `Manual` (default).
 - `Level::Play { sb, bb, ante: None | Classic { amount } | BigBlind { amount }, duration_ms }`
@@ -140,6 +147,25 @@ Tables `1..=max_tables` always exist; `Idle` means never opened. Seats and table
   `table` (not closed; an idle table opens), every other open table closes, the button is
   cleared for the director to set after the draw (`TOO_MANY_FOR_FINAL_TABLE`).
 
+## Re-entries, rebuys, add-ons
+
+- `ReEnter { player, seat? }` -> `PlayerReEntered { player, entry, seat, stack, price?,
+  openedTable? }`: a busted player comes back as entry number `entry`, seated like a
+  registration (forced seat or automatic). Entries count, unique players do not. Errors:
+  `NOT_STARTED`, `PLAYER_NOT_FOUND`, `PLAYER_NOT_BUSTED`, `REENTRY_CLOSED`,
+  `MAX_ENTRIES { max }`, seat errors, `TOURNAMENT_FULL`.
+- `Rebuy { player }` -> `RebuyRecorded { player, stack, price? }`, `AddOn { player }` ->
+  `AddOnRecorded { player, stack, price? }`: a player still in buys chips. Errors:
+  `NOT_STARTED`, `PLAYER_NOT_FOUND`, `PLAYER_NOT_ACTIVE`, `REBUY_CLOSED` /
+  `ADDON_CLOSED`, `REBUY_LIMIT { max }` / `ADDON_LIMIT { max }`.
+- Events record the stack and the price applied (price only with money tracking).
+- Windows, only while running: no window or `Until { manual }` follows registration
+  (director override included); `Until { deadline }` uses the late registration deadline
+  machinery; `BreakAfter { n }` is open during the break right after play level `n`. A
+  re-entry also needs registration to be open, so closing registration closes re-entry.
+- Chips in play = sum of every stack bought (entries, re-entries, rebuys, add-ons); the
+  average stack uses it.
+
 ## Prize pool
 
 `payouts::pool`: `pool` = sum of the prize parts recorded by the active events (refunds
@@ -151,17 +177,20 @@ distribute; `overlay = effective - pool` is paid by the house.
 - `BustPlayers { busts: [{ player, start_stack? }] }` is one hand = one bust group.
   Multi-bust stacks: all or none (none = explicit full tie), otherwise
   `BUST_STACK_REQUIRED`. A bust leaving nobody is `LAST_PLAYER_STANDING`.
-- Finish: when a bust leaves one player and registration is closed, the event carries
-  `finish { winner, clock }` with the clock paused. If registration was open, the view
-  warns `FINISH_PENDING`; `CloseRegistration` then finishes, or `FinishTournament`.
+- Finish: when a bust leaves one player and no entry can arrive (registration and
+  re-entry closed), the event carries `finish { winner, clock }` with the clock paused.
+  Otherwise the view warns `FINISH_PENDING`; `CloseRegistration` then finishes, or
+  `FinishTournament` (`LATE_REG_OPEN` while entries can arrive).
 - `Finished` freezes everything (`TOURNAMENT_FINISHED`) except undo/redo.
 - `RevivePlayer { player, seat }` corrects a mistaken bust that can no longer be undone
   (not a re-entry). Rejected once finished.
 - Ranking (`ranking::placements`): with N registered players, for each bust group in log
   order, `top = N - before - |M| + 1`; inside a group the larger starting stack finishes
-  higher, equal stacks tie over `[place, place_to]`. Only a player's latest bust counts, so
-  re-entries will slot in. Invariant: busted places cover exactly `[alive + 1, N]`. Places
-  are provisional while registration is open.
+  higher, equal stacks tie over `[place, place_to]`. N counts unique players, not entries,
+  and only a player's latest bust gets a place: a re-entry takes the player out of the
+  busted set until the next bust. Invariant: busted places cover exactly `[alive + 1, N]`.
+  Places are provisional while registration is open or the busted player can still
+  re-enter.
 
 ## Clock
 
@@ -212,12 +241,15 @@ Late registration deadlines, evaluated at `now` when running without override:
 player names and table), config, levels with play numbers, clock (level index, play level, break,
 running, blinds and ante, duration, remaining, `ends_at_ms`, overtime, next level, next
 break, schedule, structure end, `recompute_at_ms` = next level change or registration
-close while running: the UI counts down locally and refetches then), registration (open,
-override, deadline, `closes_in_ms`, `closes_at_ms`), counts (unique, entries, alive, busted), chips
+close while running, purchase deadlines included: the UI counts down locally and refetches
+then), registration (open, override, deadline, `closes_in_ms`, `closes_at_ms`,
+`reentryOpen?` / `rebuyOpen?` / `addonOpen?` when offered), counts (unique, entries, alive,
+busted, `reentries?` / `rebuys?` / `addons?` when offered or bought), chips
 (starting stack, in play = sum of stacks bought, average, average in big blinds x100 using
 the next play level during a break), places paid (capped by N), ITM status
 (`not_yet { to_money }` / `bubble` when alive == paid + 1 / `in_money`), ranking rows (alive
-first, then by place, with ties, provisional and in-money flags), tables with seats,
+first, then by place, with ties, provisional and in-money flags, entries, `rebuys?` /
+`addons?`), tables with seats,
 names, button and next blinds, suggestions (final table, table break, balance plan),
 warnings, and `money?` when money is tracked (currency, pool, fees, guarantee, overlay,
 effective pool).
@@ -242,13 +274,14 @@ no `getrandom`. The host passes a fresh seed per command; outcomes are stored in
   never decreases with time, schedules are strictly increasing, pause/resume keeps the
   remaining time, and once every button is known the full balance plan applies cleanly,
   moves nobody twice and leaves the open tables within `balance_trigger - 1` players; the
-  prize pool equals the prices recorded by the active events and
-  `effective = max(pool, guarantee)`.
+  prize pool and the chips in play equal what the active events recorded (entries,
+  re-entries, rebuys, add-ons, refunds), `effective = max(pool, guarantee)`, and entries
+  are never fewer than unique players.
 - JSON scenarios (`tests/scenarios/*.json`) with partial view matching:
   `{ name, seed, tournament, steps: [{ atMs, cmd, expect?, view? }], checks: [{ nowMs, view }] }`.
 
 ## Not implemented yet
 
-Payouts curve, re-entry/rebuy/add-on, ICM, deals, WASM crate,
+Payouts curve, ICM, deals, WASM crate,
 Tauri integration. The model keeps room for them (`entries`, `chips_bought`, `payout`,
 `Money`, provisional places).

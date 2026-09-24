@@ -14,8 +14,13 @@ use crate::structure::{self, Level};
 /// Clock time left before the deadline closes registration (`<= 0`: closed), or `None`
 /// for a manual deadline. Ignores the phase and the director's override.
 pub fn deadline_in_ms(state: &State, now_ms: i64) -> Option<i64> {
+    time_left_ms(state, state.config.late_reg, now_ms)
+}
+
+/// Clock time left before `deadline` passes (`<= 0`: passed), or `None` when manual.
+pub fn time_left_ms(state: &State, deadline: Deadline, now_ms: i64) -> Option<i64> {
     let levels = &state.structure;
-    match state.config.late_reg {
+    match deadline {
         Deadline::Manual => None,
         Deadline::Elapsed { ms } => {
             Some(ms.saturating_sub(clock::elapsed_ms(&state.clock, levels, now_ms)))
@@ -113,6 +118,26 @@ pub(crate) fn auto_seat(
     ))
 }
 
+/// Seat for a new entry (registration or re-entry): `forced` if free, else
+/// [`auto_seat`]. Also returns the idle table this opens, if any.
+pub(crate) fn seat_new_entry(
+    state: &State,
+    forced: Option<SeatRef>,
+    rng: &mut Rng,
+) -> Result<(SeatRef, Option<TableNo>), DomainError> {
+    match forced {
+        Some(seat) => {
+            check_free_seat(state, seat)?;
+            let idle = state
+                .tables
+                .get(&seat.table)
+                .is_some_and(|t| t.status == TableStatus::Idle);
+            Ok((seat, idle.then_some(seat.table)))
+        }
+        None => auto_seat(state, rng),
+    }
+}
+
 /// `Register`.
 pub(crate) fn decide_register(
     state: &State,
@@ -142,17 +167,7 @@ pub(crate) fn decide_register(
     if state.next_player_id == u32::MAX {
         return Err(DomainError::TournamentFull);
     }
-    let (seat, opened_table) = match forced {
-        Some(seat) => {
-            check_free_seat(state, seat)?;
-            let idle = state
-                .tables
-                .get(&seat.table)
-                .is_some_and(|t| t.status == TableStatus::Idle);
-            (seat, idle.then_some(seat.table))
-        }
-        None => auto_seat(state, rng)?,
-    };
+    let (seat, opened_table) = seat_new_entry(state, forced, rng)?;
     Ok(Event::PlayerRegistered {
         player: PlayerId(state.next_player_id),
         name,

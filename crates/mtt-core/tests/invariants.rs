@@ -2,14 +2,14 @@
 
 mod common;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use common::*;
 use mtt_core::clock::{Clock, effective, schedule};
 use mtt_core::seating::balance_plan;
 use mtt_core::{
     Aggregate, BustInput, Chips, Command, Config, Ctx, Deadline, Event, Level, Money, MoneyConfig,
-    MoveReason, Phase, PlayerId, SeatNo, SeatRef, State, TableNo,
+    MoveReason, Phase, PlayerId, Price, Purchase, PurchaseWindow, SeatNo, SeatRef, State, TableNo,
 };
 use proptest::prelude::*;
 
@@ -20,6 +20,7 @@ fn table() -> impl Strategy<Value = TableNo> {
     (1u16..=TABLES + 1).prop_map(TableNo)
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 enum Op {
     Cmd(Command),
@@ -71,6 +72,9 @@ fn command() -> impl Strategy<Value = Command> {
             }
         }),
         2 => (player(), seat()).prop_map(|(player, seat)| Command::RevivePlayer { player, seat }),
+        4 => (player(), prop::option::of(seat())).prop_map(|(player, seat)| Command::ReEnter { player, seat }),
+        2 => player().prop_map(|player| Command::Rebuy { player }),
+        1 => player().prop_map(|player| Command::AddOn { player }),
         2 => (player(), seat()).prop_map(|(player, to)| Command::MovePlayer { player, to, reason: None }),
         1 => Just(Command::CloseRegistration {}),
         1 => Just(Command::ReopenRegistration {}),
@@ -192,33 +196,60 @@ fn money() -> impl Strategy<Value = Option<MoneyConfig>> {
     })
 }
 
-/// The pool is the sum of the prices recorded in the active events, whatever the
-/// configuration says now; the guarantee only tops it up.
+/// Chips in play and the pool are the sums of what the active events recorded, whatever
+/// the configuration says now; the guarantee only tops the pool up.
 fn check_money(agg: &Aggregate, now: i64) {
     let view = agg.view(now);
-    let Some(money) = view.money else {
-        assert!(agg.state().config.money.is_none());
-        return;
+    // Per player: chips, prize, fee (an unregistration removes the player).
+    let mut bought: BTreeMap<PlayerId, (i64, i64, i64)> = BTreeMap::new();
+    let mut add = |player: PlayerId, stack: Chips, price: &Option<Price>| {
+        let entry = bought.entry(player).or_default();
+        entry.0 += stack.0;
+        if let Some(price) = price {
+            entry.1 += price.prize.0;
+            entry.2 += price.fee.0;
+        }
     };
-    let (mut prize, mut fees) = (0i64, 0i64);
+    let mut removed = BTreeSet::new();
     for env in &agg.events()[..agg.head()] {
         match &env.event {
             Event::PlayerRegistered {
-                price: Some(price), ..
-            } => {
-                prize += price.prize.0;
-                fees += price.fee.0;
-            }
-            Event::PlayerUnregistered {
-                refund: Some(refund),
+                player,
+                stack,
+                price,
                 ..
-            } => {
-                prize -= refund.prize.0;
-                fees -= refund.fee.0;
+            }
+            | Event::PlayerReEntered {
+                player,
+                stack,
+                price,
+                ..
+            }
+            | Event::RebuyRecorded {
+                player,
+                stack,
+                price,
+            }
+            | Event::AddOnRecorded {
+                player,
+                stack,
+                price,
+            } => add(*player, *stack, price),
+            Event::PlayerUnregistered { player, .. } => {
+                removed.insert(*player);
             }
             _ => {}
         }
     }
+    let kept = bought.iter().filter(|(p, _)| !removed.contains(p));
+    let (chips, prize, fees) = kept.fold((0, 0, 0), |acc, (_, b)| {
+        (acc.0 + b.0, acc.1 + b.1, acc.2 + b.2)
+    });
+    assert_eq!(view.chips.in_play.0, chips, "chips in play");
+    let Some(money) = view.money else {
+        assert!(agg.state().config.money.is_none());
+        return;
+    };
     assert_eq!((money.pool.0, money.fees.0), (prize, fees));
     let guarantee = money.guarantee.map_or(0, |g| g.0);
     assert_eq!(money.effective_pool.0, prize.max(guarantee));
@@ -233,11 +264,40 @@ fn run_ops(
     start: bool,
     ops: Vec<Op>,
 ) {
+    // Purchases are free without money tracking.
+    let price = |prize: i64, fee: i64| {
+        if money.is_some() {
+            (prize, fee)
+        } else {
+            (0, 0)
+        }
+    };
+    let ((p1, f1), (p2, f2), (p3, f3)) = (price(1_000, 100), price(1_000, 0), price(500, 50));
     let config = Config {
         places_paid: 2,
         late_reg,
         balance_trigger: trigger,
         money,
+        reentry: Some(Purchase {
+            max: Some(2),
+            ..Purchase::new(p1, f1, 10_000)
+        }),
+        rebuy: Some(Purchase {
+            window: Some(PurchaseWindow::Until {
+                deadline: Deadline::Elapsed { ms: 60 * MIN },
+            }),
+            ..Purchase::new(p2, f2, 10_000)
+        }),
+        addon: Some(Purchase {
+            max: Some(1),
+            window: Some(PurchaseWindow::Until {
+                deadline: Deadline::EndOfPlayLevel {
+                    n: 1,
+                    through_break: true,
+                },
+            }),
+            ..Purchase::new(p3, f3, 15_000)
+        }),
         ..Config::new("Prop", SEATS, TABLES, 10_000)
     };
     let mut h = Harness::new(config, levels());
@@ -255,14 +315,37 @@ fn run_ops(
             }
             Op::Cmd(cmd) => cmd,
         };
-        // Keep the money settings: switching them is rejected once someone paid.
+        // Keep the money and purchase settings: switching money tracking is rejected once
+        // someone paid.
         let cmd = match cmd {
-            Command::UpdateConfig { config } => Command::UpdateConfig {
-                config: Config {
-                    money: h.agg.state().config.money.clone(),
-                    ..config
-                },
-            },
+            Command::UpdateConfig { config } => {
+                let current = &h.agg.state().config;
+                Command::UpdateConfig {
+                    config: Config {
+                        money: current.money.clone(),
+                        reentry: current.reentry,
+                        rebuy: current.rebuy,
+                        addon: current.addon,
+                        ..config
+                    },
+                }
+            }
+            // Half the re-entries target a busted player, the rest stay random.
+            Command::ReEnter { player, seat } if player.0 % 2 == 0 => {
+                let busted: Vec<PlayerId> = h
+                    .agg
+                    .state()
+                    .players
+                    .values()
+                    .filter(|p| !p.is_alive())
+                    .map(|p| p.id)
+                    .collect();
+                let player = busted
+                    .get(player.0 as usize % busted.len().max(1))
+                    .copied()
+                    .unwrap_or(player);
+                Command::ReEnter { player, seat }
+            }
             other => other,
         };
         let before = h.agg.clone();

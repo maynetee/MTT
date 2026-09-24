@@ -11,6 +11,14 @@ export type RankingRow = { player: PlayerId, name: string, alive: boolean, seat:
  */
 placeTo: number | null, 
 /**
- * The place may still change (late registration open).
+ * The place may still change (late registration open, or the player may re-enter).
  */
-provisional: boolean, inMoney: boolean, entries: number, };
+provisional: boolean, inMoney: boolean, entries: number, 
+/**
+ * Rebuys bought; present when any.
+ */
+rebuys?: number, 
+/**
+ * Add-ons bought; present when any.
+ */
+addons?: number, };

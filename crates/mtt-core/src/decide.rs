@@ -1,11 +1,12 @@
 //! Command validation: `decide(&State, &Command, &Ctx) -> Event`.
 
 use crate::command::{Command, Ctx, NewTournament};
+use crate::config::PurchaseKind;
 use crate::error::DomainError;
 use crate::event::Event;
 use crate::rng::Rng;
 use crate::state::{Phase, State};
-use crate::{clock, config, players, registration, seating, structure};
+use crate::{clock, config, players, purchase, registration, seating, structure};
 
 /// Longest accepted tournament id.
 pub const MAX_TOURNAMENT_ID: usize = 64;
@@ -42,6 +43,11 @@ pub fn decide(state: &State, cmd: &Command, ctx: &Ctx) -> Result<Event, DomainEr
             registration::decide_register(state, name, *seat, now, &mut rng)
         }
         Command::Unregister { player } => registration::decide_unregister(state, *player),
+        Command::ReEnter { player, seat } => {
+            purchase::decide_reenter(state, *player, *seat, now, &mut rng)
+        }
+        Command::Rebuy { player } => purchase::decide_buy(state, PurchaseKind::Rebuy, *player, now),
+        Command::AddOn { player } => purchase::decide_buy(state, PurchaseKind::Addon, *player, now),
         Command::BustPlayers { busts } => players::decide_bust(state, busts, now),
         Command::RevivePlayer { player, seat } => players::decide_revive(state, *player, *seat),
         Command::MovePlayer { player, to, reason } => {

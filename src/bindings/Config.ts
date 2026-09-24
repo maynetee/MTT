@@ -3,6 +3,7 @@ import type { Chips } from "./Chips";
 import type { Deadline } from "./Deadline";
 import type { MoneyConfig } from "./MoneyConfig";
 import type { PayoutConfig } from "./PayoutConfig";
+import type { Purchase } from "./Purchase";
 import type { TableNo } from "./TableNo";
 
 /**
@@ -24,4 +25,8 @@ breakOrder: Array<TableNo>, startingStack: Chips, placesPaid: number, lateReg: D
 /**
  * Buy-ins and prize pool; absent for a tournament without money tracking.
  */
-money?: MoneyConfig, };
+money?: MoneyConfig, 
+/**
+ * Busted players may come back as new entries.
+ */
+reentry?: Purchase, rebuy?: Purchase, addon?: Purchase, };

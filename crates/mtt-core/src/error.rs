@@ -7,6 +7,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::config::PurchaseKind;
 use crate::ids::{PlayerId, SeatNo, TableNo};
 
 /// Why a command was rejected. A rejected command never changes state.
@@ -64,6 +65,14 @@ pub enum DomainError {
     InvalidGuarantee,
     InvalidRoundingUnit,
     InvalidMinCash,
+    /// Negative price, non-positive stack, `max` of 0, or a price without money tracking.
+    InvalidPurchase {
+        purchase: PurchaseKind,
+    },
+    /// The window names a missing play level, or no break follows it.
+    InvalidPurchaseWindow {
+        purchase: PurchaseKind,
+    },
     ConfigLocked {
         field: String,
     },
@@ -126,6 +135,20 @@ pub enum DomainError {
     TournamentFull,
     RegistrationAlreadyClosed,
     RegistrationAlreadyOpen,
+
+    // Re-entries, rebuys, add-ons (`max` is the configured limit per player).
+    ReentryClosed,
+    MaxEntries {
+        max: u8,
+    },
+    RebuyClosed,
+    RebuyLimit {
+        max: u8,
+    },
+    AddonClosed,
+    AddonLimit {
+        max: u8,
+    },
 
     // Seats and tables.
     TableNotFound {

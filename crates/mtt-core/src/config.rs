@@ -102,6 +102,80 @@ impl MoneyConfig {
     }
 }
 
+/// A purchase after the first entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
+pub enum PurchaseKind {
+    /// A busted player comes back as a new entry.
+    #[serde(rename = "reentry")]
+    Reentry,
+    /// A player still in buys more chips.
+    #[serde(rename = "rebuy")]
+    Rebuy,
+    /// A player still in buys the add-on stack.
+    #[serde(rename = "addon")]
+    Addon,
+}
+
+/// When a purchase can be made (only while the tournament runs). Without a window, it
+/// follows registration, the director's override included.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
+#[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
+pub enum PurchaseWindow {
+    /// Until `deadline`, evaluated like the late registration deadline; `manual`
+    /// follows registration.
+    #[serde(rename = "until")]
+    Until { deadline: Deadline },
+    /// Only during the break right after play level `n` (1-based, breaks not counted).
+    #[serde(rename = "break_after")]
+    BreakAfter { n: u16 },
+}
+
+/// Re-entry, rebuy or add-on settings. Events record the price and stack applied, so
+/// editing these never changes past purchases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
+pub struct Purchase {
+    /// Part added to the prize pool (0 without money tracking).
+    pub prize: Money,
+    /// Part kept by the house (0 without money tracking).
+    pub fee: Money,
+    /// Chips received.
+    pub stack: Chips,
+    /// Most purchases of this kind per player (re-entries: not counting the first
+    /// entry); unlimited when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub max: Option<u8>,
+    /// When it can be bought; absent: while registration is open.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub window: Option<PurchaseWindow>,
+}
+
+impl Purchase {
+    /// A purchase at `prize + fee` for `stack` chips, unlimited, following registration.
+    pub fn new(prize: i64, fee: i64, stack: i64) -> Self {
+        Self {
+            prize: Money(prize),
+            fee: Money(fee),
+            stack: Chips(stack),
+            max: None,
+            window: None,
+        }
+    }
+
+    /// Price paid, split between the pool and the house.
+    pub fn price(&self) -> Price {
+        Price {
+            prize: self.prize,
+            fee: self.fee,
+        }
+    }
+}
+
 /// Tournament settings editable by the director.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -129,6 +203,16 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(any(test, feature = "ts"), ts(optional))]
     pub money: Option<MoneyConfig>,
+    /// Busted players may come back as new entries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub reentry: Option<Purchase>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub rebuy: Option<Purchase>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+    pub addon: Option<Purchase>,
 }
 
 fn default_balance_trigger() -> u8 {
@@ -150,6 +234,9 @@ impl Config {
             late_reg: Deadline::Manual,
             payout: PayoutConfig::default(),
             money: None,
+            reentry: None,
+            rebuy: None,
+            addon: None,
         }
     }
 
@@ -157,7 +244,23 @@ impl Config {
     pub fn final_table_size(&self) -> u8 {
         self.final_table_size.unwrap_or(self.seats_per_table)
     }
+
+    /// Settings of a purchase kind, when offered.
+    pub fn purchase(&self, kind: PurchaseKind) -> Option<&Purchase> {
+        match kind {
+            PurchaseKind::Reentry => self.reentry.as_ref(),
+            PurchaseKind::Rebuy => self.rebuy.as_ref(),
+            PurchaseKind::Addon => self.addon.as_ref(),
+        }
+    }
 }
+
+/// Every purchase kind, in display order.
+pub const PURCHASE_KINDS: [PurchaseKind; 3] = [
+    PurchaseKind::Reentry,
+    PurchaseKind::Rebuy,
+    PurchaseKind::Addon,
+];
 
 /// Validates a configuration against the structure it will run with.
 pub fn validate(config: &Config, levels: &[Level]) -> Result<(), DomainError> {
@@ -203,7 +306,49 @@ pub fn validate(config: &Config, levels: &[Level]) -> Result<(), DomainError> {
     if let Some(money) = &config.money {
         validate_money(money)?;
     }
-    validate_late_reg(config, levels)
+    for purchase in PURCHASE_KINDS {
+        let Some(p) = config.purchase(purchase) else {
+            continue;
+        };
+        let priced = p.prize != Money::ZERO || p.fee != Money::ZERO;
+        let invalid = !p.price().is_valid()
+            || !p.stack.is_positive()
+            || p.max == Some(0)
+            || (priced && config.money.is_none());
+        if invalid {
+            return Err(DomainError::InvalidPurchase { purchase });
+        }
+    }
+    validate_deadlines(config, levels)
+}
+
+/// Checks the late registration deadline and the purchase windows against a structure.
+pub fn validate_deadlines(config: &Config, levels: &[Level]) -> Result<(), DomainError> {
+    validate_late_reg(config, levels)?;
+    for purchase in PURCHASE_KINDS {
+        let window = config.purchase(purchase).and_then(|p| p.window);
+        let valid = match window {
+            None => true,
+            Some(PurchaseWindow::Until { deadline }) => deadline_is_valid(deadline, levels),
+            Some(PurchaseWindow::BreakAfter { n }) => structure::play_level_index(levels, n)
+                .and_then(|i| levels.get(i + 1))
+                .is_some_and(Level::is_break),
+        };
+        if !valid {
+            return Err(DomainError::InvalidPurchaseWindow { purchase });
+        }
+    }
+    Ok(())
+}
+
+fn deadline_is_valid(deadline: Deadline, levels: &[Level]) -> bool {
+    match deadline {
+        Deadline::EndOfPlayLevel { n, .. } => {
+            (1..=structure::play_level_count(levels)).contains(&n)
+        }
+        Deadline::Elapsed { ms } => ms > 0 && ms <= MAX_LATE_REG_MS,
+        Deadline::Manual => true,
+    }
 }
 
 fn validate_money(money: &MoneyConfig) -> Result<(), DomainError> {

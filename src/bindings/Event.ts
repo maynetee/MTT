@@ -31,7 +31,15 @@ price?: Price, } | { "type": "player_unregistered", player: PlayerId,
 /**
  * Amounts given back, when money is tracked.
  */
-refund?: Price, } | { "type": "players_busted", group: BustGroup, busts: Array<Bust>, finish: Finish | null, } | { "type": "player_revived", player: PlayerId, seat: SeatRef, } | { "type": "player_moved", player: PlayerId, from: SeatRef, to: SeatRef, reason: MoveReason, } | { "type": "registration_overridden", open: boolean, finish: Finish | null, } | { "type": "tournament_finished", finish: Finish, } | { "type": "clock_changed", reason: ClockReason, clock: Clock, 
+refund?: Price, } | { "type": "player_reentered", player: PlayerId, entry: number, seat: SeatRef, stack: Chips, 
+/**
+ * Table opened to seat this player, if any.
+ */
+openedTable: TableNo | null, 
+/**
+ * Price paid, when money is tracked.
+ */
+price?: Price, } | { "type": "rebuy_recorded", player: PlayerId, stack: Chips, price?: Price, } | { "type": "addon_recorded", player: PlayerId, stack: Chips, price?: Price, } | { "type": "players_busted", group: BustGroup, busts: Array<Bust>, finish: Finish | null, } | { "type": "player_revived", player: PlayerId, seat: SeatRef, } | { "type": "player_moved", player: PlayerId, from: SeatRef, to: SeatRef, reason: MoveReason, } | { "type": "registration_overridden", open: boolean, finish: Finish | null, } | { "type": "tournament_finished", finish: Finish, } | { "type": "clock_changed", reason: ClockReason, clock: Clock, 
 /**
  * True for the first start, which moves the tournament out of setup.
  */

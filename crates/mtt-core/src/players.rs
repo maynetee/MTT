@@ -7,8 +7,8 @@ use crate::command::BustInput;
 use crate::error::DomainError;
 use crate::event::{Bust, Event, Finish};
 use crate::ids::{BustGroup, PlayerId, SeatRef};
-use crate::registration;
 use crate::state::{Phase, State};
+use crate::{purchase, registration};
 
 fn require_running(state: &State) -> Result<(), DomainError> {
     match state.phase {
@@ -19,7 +19,7 @@ fn require_running(state: &State) -> Result<(), DomainError> {
 }
 
 /// `BustPlayers`: one hand, one bust group. Finishes the tournament when a single
-/// player remains and registration is closed.
+/// player remains and no entry can arrive any more (registration and re-entry closed).
 pub(crate) fn decide_bust(
     state: &State,
     inputs: &[BustInput],
@@ -58,7 +58,7 @@ pub(crate) fn decide_bust(
     if busts.len() >= alive {
         return Err(DomainError::LastPlayerStanding);
     }
-    let finish = if alive - busts.len() == 1 && !registration::is_open(state, now_ms) {
+    let finish = if alive - busts.len() == 1 && !purchase::entries_open(state, now_ms) {
         state
             .players
             .values()
@@ -102,7 +102,7 @@ pub(crate) fn decide_finish(state: &State, now_ms: i64) -> Result<Event, DomainE
             alive: state.alive_count() as u32,
         });
     };
-    if registration::is_open(state, now_ms) {
+    if purchase::entries_open(state, now_ms) {
         return Err(DomainError::LateRegOpen);
     }
     Ok(Event::TournamentFinished {

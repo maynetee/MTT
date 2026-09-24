@@ -58,6 +58,8 @@ pub enum MoveReason {
 }
 
 /// Everything the director can do.
+// Short-lived (one per dispatch): boxing the config would only complicate host code.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all_fields = "camelCase")]
 #[cfg_attr(any(test, feature = "ts"), derive(ts_rs::TS), ts(export))]
@@ -77,6 +79,21 @@ pub enum Command {
     /// Removes a registration before the start.
     #[serde(rename = "unregister")]
     Unregister { player: PlayerId },
+    /// A busted player buys a new entry and is seated like a registration (at `seat`
+    /// when forced).
+    #[serde(rename = "reenter")]
+    ReEnter {
+        player: PlayerId,
+        #[serde(default)]
+        #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+        seat: Option<SeatRef>,
+    },
+    /// A player still in buys the rebuy stack.
+    #[serde(rename = "rebuy")]
+    Rebuy { player: PlayerId },
+    /// A player still in buys the add-on stack.
+    #[serde(rename = "addon")]
+    AddOn { player: PlayerId },
     /// Eliminates one or more players in the same hand.
     #[serde(rename = "bust_players")]
     BustPlayers { busts: Vec<BustInput> },

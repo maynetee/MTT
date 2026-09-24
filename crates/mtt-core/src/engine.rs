@@ -527,6 +527,24 @@ mod tests {
                 player: p,
                 refund: None,
             },
+            Event::PlayerReEntered {
+                player: p,
+                entry: 2,
+                seat,
+                stack: crate::money::Chips(1),
+                opened_table: None,
+                price: None,
+            },
+            Event::RebuyRecorded {
+                player: p,
+                stack: crate::money::Chips(1),
+                price: None,
+            },
+            Event::AddOnRecorded {
+                player: p,
+                stack: crate::money::Chips(1),
+                price: None,
+            },
             Event::PlayersBusted {
                 group: crate::ids::BustGroup(1),
                 busts: Vec::new(),

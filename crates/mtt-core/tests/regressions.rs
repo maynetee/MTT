@@ -7,8 +7,8 @@ use mtt_core::seating::BalanceStep;
 use mtt_core::state::TableStatus;
 use mtt_core::view::Itm;
 use mtt_core::{
-    Aggregate, Clock, Command, Config, Deadline, DomainError, Money, MoveReason, Phase, PlayerId,
-    SeatNo, SeatRef, TableNo, Warning,
+    Aggregate, Chips, Clock, Command, Config, Deadline, DomainError, Money, MoveReason, Phase,
+    PlayerId, Purchase, SeatNo, SeatRef, TableNo, Warning,
 };
 
 #[test]
@@ -568,4 +568,128 @@ fn v1_log_without_money_replays() {
 
 fn h_names(view: &mtt_core::View) -> Vec<&str> {
     view.ranking.iter().map(|r| r.name.as_str()).collect()
+}
+
+// Re-entries, rebuys, add-ons.
+
+fn reentry_harness(players: u32) -> (Harness, Vec<PlayerId>) {
+    let config = Config {
+        reentry: Some(Purchase::new(10_000, 1_000, 10_000)),
+        ..money_config(9, 2)
+    };
+    let mut h = Harness::new(config, levels());
+    let ids = h.register_many(players);
+    h.start();
+    (h, ids)
+}
+
+fn row(view: &mtt_core::View, player: PlayerId) -> &mtt_core::view::RankingRow {
+    view.ranking.iter().find(|r| r.player == player).unwrap()
+}
+
+#[test]
+fn reentry_does_not_add_a_player() {
+    let (mut h, ids) = reentry_harness(4);
+    h.bust(&[ids[0]]);
+    h.ok(Command::ReEnter {
+        player: ids[0],
+        seat: None,
+    });
+    let view = h.view();
+    let c = &view.counts;
+    assert_eq!(
+        (c.unique, c.entries, c.alive, c.busted, c.reentries),
+        (4, 5, 4, 0, Some(1))
+    );
+    // Chips in play count every stack bought; the average uses them.
+    assert_eq!(view.chips.in_play, Chips(50_000));
+    assert_eq!(view.chips.avg_stack, Some(Chips(12_500)));
+    assert_eq!(view.money.as_ref().unwrap().pool, Money(50_000));
+    assert_eq!(view.ranking.len(), 4);
+    let back = row(&view, ids[0]);
+    assert!(back.alive && back.place.is_none());
+    assert_eq!(back.entries, 2);
+}
+
+#[test]
+fn only_final_bust_gets_a_place() {
+    let (mut h, ids) = reentry_harness(5);
+    h.bust(&[ids[0]]);
+    let view = h.view();
+    assert_eq!(place_of(&view, ids[0]), Some((5, None)));
+    assert!(row(&view, ids[0]).provisional);
+    h.ok(Command::ReEnter {
+        player: ids[0],
+        seat: None,
+    });
+    h.bust(&[ids[1]]);
+    h.bust(&[ids[0]]);
+    h.ok(Command::CloseRegistration {});
+    let view = h.view();
+    // One row per player: the first bust of ids[0] no longer counts.
+    assert_eq!(view.ranking.len(), 5);
+    assert_eq!(place_of(&view, ids[1]), Some((5, None)));
+    assert_eq!(place_of(&view, ids[0]), Some((4, None)));
+    assert!(view.ranking.iter().all(|r| !r.provisional));
+    check_invariants(h.agg.state(), &view);
+}
+
+#[test]
+fn finish_waits_while_entries_can_arrive() {
+    let (mut h, ids) = reentry_harness(3);
+    h.bust(&[ids[0]]);
+    h.bust(&[ids[1]]);
+    // Registration and re-entry are open: no winner yet.
+    assert_eq!(h.agg.state().phase, Phase::Running);
+    assert!(h.view().warnings.contains(&Warning::FinishPending));
+    h.ok(Command::ReEnter {
+        player: ids[1],
+        seat: None,
+    });
+    assert!(!h.view().warnings.contains(&Warning::FinishPending));
+    h.ok(Command::CloseRegistration {});
+    assert_eq!(
+        h.err(Command::ReEnter {
+            player: ids[0],
+            seat: None
+        }),
+        DomainError::ReentryClosed
+    );
+    h.bust(&[ids[1]]);
+    assert_eq!(h.agg.state().phase, Phase::Finished { winner: ids[2] });
+    let view = h.view();
+    assert_eq!(place_of(&view, ids[1]), Some((2, None)));
+    assert_eq!(view.counts.entries, 4);
+}
+
+#[test]
+fn rebuys_and_addons_raise_chips_and_pool() {
+    let config = Config {
+        rebuy: Some(Purchase::new(10_000, 0, 10_000)),
+        addon: Some(Purchase {
+            max: Some(1),
+            ..Purchase::new(5_000, 500, 20_000)
+        }),
+        ..money_config(9, 1)
+    };
+    let mut h = Harness::new(config, levels());
+    let ids = h.register_many(3);
+    h.start();
+    h.ok(Command::Rebuy { player: ids[0] });
+    h.ok(Command::AddOn { player: ids[0] });
+    h.ok(Command::AddOn { player: ids[1] });
+    let view = h.view();
+    assert_eq!(view.chips.in_play, Chips(30_000 + 10_000 + 40_000));
+    assert_eq!(
+        (view.counts.entries, view.counts.rebuys, view.counts.addons),
+        (3, Some(1), Some(2))
+    );
+    let money = view.money.as_ref().unwrap();
+    assert_eq!((money.pool, money.fees), (Money(50_000), Money(4_000)));
+    let first = row(&view, ids[0]);
+    assert_eq!((first.rebuys, first.addons), (Some(1), Some(1)));
+    assert_eq!(
+        (view.registration.rebuy_open, view.registration.reentry_open),
+        (Some(true), None)
+    );
 }

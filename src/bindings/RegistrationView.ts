@@ -16,4 +16,16 @@ closesInMs: number | null,
 /**
  * Wall-clock close while the clock runs.
  */
-closesAtMs: number | null, };
+closesAtMs: number | null, 
+/**
+ * Whether a busted player can re-enter now; absent when re-entries are not offered.
+ */
+reentryOpen?: boolean, 
+/**
+ * Whether rebuys are open; absent when not offered.
+ */
+rebuyOpen?: boolean, 
+/**
+ * Whether add-ons are open; absent when not offered.
+ */
+addonOpen?: boolean, };

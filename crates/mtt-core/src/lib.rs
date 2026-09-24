@@ -18,6 +18,7 @@ pub mod money;
 pub mod name;
 pub mod payouts;
 pub mod players;
+pub mod purchase;
 pub mod ranking;
 pub mod registration;
 pub mod rng;
@@ -31,7 +32,9 @@ pub mod warning;
 
 pub use clock::{Clock, ClockReason};
 pub use command::{BustInput, Command, Ctx, MoveReason, NewTournament};
-pub use config::{Config, Currency, Deadline, MoneyConfig, PayoutConfig};
+pub use config::{
+    Config, Currency, Deadline, MoneyConfig, PayoutConfig, Purchase, PurchaseKind, PurchaseWindow,
+};
 pub use decide::{decide, decide_create};
 pub use engine::{Aggregate, LogError, Outcome, SavedLog};
 pub use error::DomainError;

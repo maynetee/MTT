@@ -7,4 +7,20 @@ export type Counts = {
 /**
  * Distinct players.
  */
-unique: number, entries: number, alive: number, busted: number, };
+unique: number, 
+/**
+ * First entries plus re-entries.
+ */
+entries: number, alive: number, busted: number, 
+/**
+ * Re-entries; present when offered or bought.
+ */
+reentries?: number, 
+/**
+ * Rebuys; present when offered or bought.
+ */
+rebuys?: number, 
+/**
+ * Add-ons; present when offered or bought.
+ */
+addons?: number, };

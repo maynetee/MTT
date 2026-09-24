@@ -91,6 +91,37 @@ pub enum Event {
         #[cfg_attr(any(test, feature = "ts"), ts(optional))]
         refund: Option<Price>,
     },
+    /// A busted player comes back as entry number `entry`, seated like a registration.
+    #[serde(rename = "player_reentered")]
+    PlayerReEntered {
+        player: PlayerId,
+        entry: u8,
+        seat: SeatRef,
+        stack: Chips,
+        /// Table opened to seat this player, if any.
+        #[serde(default)]
+        opened_table: Option<TableNo>,
+        /// Price paid, when money is tracked.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+        price: Option<Price>,
+    },
+    #[serde(rename = "rebuy_recorded")]
+    RebuyRecorded {
+        player: PlayerId,
+        stack: Chips,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+        price: Option<Price>,
+    },
+    #[serde(rename = "addon_recorded")]
+    AddOnRecorded {
+        player: PlayerId,
+        stack: Chips,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(any(test, feature = "ts"), ts(optional))]
+        price: Option<Price>,
+    },
     #[serde(rename = "players_busted")]
     PlayersBusted {
         group: BustGroup,
@@ -151,6 +182,9 @@ impl Event {
             Event::StructureUpdated { .. } => "structure_updated",
             Event::PlayerRegistered { .. } => "player_registered",
             Event::PlayerUnregistered { .. } => "player_unregistered",
+            Event::PlayerReEntered { .. } => "player_reentered",
+            Event::RebuyRecorded { .. } => "rebuy_recorded",
+            Event::AddOnRecorded { .. } => "addon_recorded",
             Event::PlayersBusted { .. } => "players_busted",
             Event::PlayerRevived { .. } => "player_revived",
             Event::PlayerMoved { .. } => "player_moved",
@@ -181,6 +215,9 @@ impl Event {
         match self {
             Event::PlayerRegistered { player, .. }
             | Event::PlayerUnregistered { player, .. }
+            | Event::PlayerReEntered { player, .. }
+            | Event::RebuyRecorded { player, .. }
+            | Event::AddOnRecorded { player, .. }
             | Event::PlayerRevived { player, .. }
             | Event::PlayerMoved { player, .. } => vec![*player],
             Event::PlayersBusted { busts, .. } => busts.iter().map(|b| b.player).collect(),

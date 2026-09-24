@@ -97,7 +97,7 @@ pub enum PlayerStatus {
     },
 }
 
-/// A registered player (one per person; re-entries will add entries, not players).
+/// A registered player (one per person: re-entries add entries, not players).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Player {
@@ -105,8 +105,13 @@ pub struct Player {
     pub name: String,
     pub name_key: String,
     pub status: PlayerStatus,
+    /// First entry plus re-entries.
     pub entries: u8,
-    /// Chips received from all entries.
+    #[serde(default)]
+    pub rebuys: u8,
+    #[serde(default)]
+    pub addons: u8,
+    /// Chips received from all entries, rebuys and add-ons.
     pub chips_bought: Chips,
     /// Prize-pool parts paid, as recorded in the events.
     #[serde(default)]
@@ -117,15 +122,18 @@ pub struct Player {
 }
 
 impl Player {
+    fn buy(&mut self, stack: Chips, price: Option<Price>) {
+        self.chips_bought = self.chips_bought.saturating_add(stack);
+        self.pay(price);
+    }
+
     fn pay(&mut self, price: Option<Price>) {
         if let Some(price) = price {
             self.prize_paid = self.prize_paid.saturating_add(price.prize);
             self.fees_paid = self.fees_paid.saturating_add(price.fee);
         }
     }
-}
 
-impl Player {
     /// Current seat, if still in.
     pub fn seat(&self) -> Option<SeatRef> {
         match self.status {
@@ -256,6 +264,14 @@ impl State {
             .ok_or(ApplyError("unknown player"))
     }
 
+    fn alive_player_mut(&mut self, id: PlayerId) -> Result<&mut Player, ApplyError> {
+        let player = self.player_mut(id)?;
+        if !player.is_alive() {
+            return Err(ApplyError("player not in play"));
+        }
+        Ok(player)
+    }
+
     fn move_player(
         &mut self,
         player: PlayerId,
@@ -341,6 +357,8 @@ pub fn apply(state: &mut State, event: &Event) -> Result<(), ApplyError> {
                 name_key: name::key(name),
                 status: PlayerStatus::Seated { seat: *seat },
                 entries: 1,
+                rebuys: 0,
+                addons: 0,
                 chips_bought: *stack,
                 prize_paid: Money::ZERO,
                 fees_paid: Money::ZERO,
@@ -377,6 +395,45 @@ pub fn apply(state: &mut State, event: &Event) -> Result<(), ApplyError> {
             if let Some(finish) = finish {
                 state.finish(finish);
             }
+        }
+        Event::PlayerReEntered {
+            player,
+            entry,
+            seat,
+            stack,
+            price,
+            ..
+        } => {
+            let found = state.player(*player).ok_or(ApplyError("unknown player"))?;
+            if found.is_alive() {
+                return Err(ApplyError("re-entering player not busted"));
+            }
+            if *entry != found.entries.saturating_add(1) {
+                return Err(ApplyError("unexpected entry number"));
+            }
+            state.seat_player(*player, *seat)?;
+            let p = state.player_mut(*player)?;
+            p.status = PlayerStatus::Seated { seat: *seat };
+            p.entries = *entry;
+            p.buy(*stack, *price);
+        }
+        Event::RebuyRecorded {
+            player,
+            stack,
+            price,
+        } => {
+            let p = state.alive_player_mut(*player)?;
+            p.rebuys = p.rebuys.saturating_add(1);
+            p.buy(*stack, *price);
+        }
+        Event::AddOnRecorded {
+            player,
+            stack,
+            price,
+        } => {
+            let p = state.alive_player_mut(*player)?;
+            p.addons = p.addons.saturating_add(1);
+            p.buy(*stack, *price);
         }
         Event::PlayerRevived { player, seat } => {
             if state.player(*player).is_none_or(Player::is_alive) {

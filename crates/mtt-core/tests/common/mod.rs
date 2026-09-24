@@ -230,6 +230,7 @@ pub fn check_invariants(state: &State, view: &View) {
     assert_eq!(seen.len(), alive, "alive players missing from tables");
     let unique = state.players.len() as u32;
     assert_eq!(view.counts.alive + view.counts.busted, unique);
+    assert!(view.counts.entries >= unique, "fewer entries than players");
     if state.phase != Phase::Setup {
         assert!(alive >= 1, "nobody left");
     }
