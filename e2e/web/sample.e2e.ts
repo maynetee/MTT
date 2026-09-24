@@ -51,7 +51,8 @@ test("the display window opens at its own URL and can be left", async ({ page, c
   await display.mouse.move(400, 300);
   const exit = display.getByRole("button", { name: /exit/i });
   await expect(exit).toBeVisible();
-  await Promise.all([display.waitForEvent("close"), exit.click()]);
+  // The click closes the page, which can end the click itself: the close event is the check.
+  await Promise.all([display.waitForEvent("close"), exit.click({ noWaitAfter: true }).catch(() => undefined)]);
 
   // D opens it again, Esc closes it.
   await page.getByRole("heading", { name: "Display preview" }).click();
