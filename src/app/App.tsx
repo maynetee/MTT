@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ToastProvider } from "./components/Toast";
 import ClockScreen from "./screens/ClockScreen";
+import DealScreen from "./screens/DealScreen";
 import { DirectorRoute } from "./screens/DirectorShell";
 import { DisplayPreview, DisplayRoute } from "./screens/DisplayScreen";
 import ExportsScreen from "./screens/ExportsScreen";
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="moves" element={<MovesScreen />} />
           <Route path="clock" element={<ClockScreen />} />
           <Route path="payouts" element={<PayoutsScreen />} />
+          <Route path="deal" element={<DealScreen />} />
           <Route path="display" element={<DisplayPreview />} />
           <Route path="exports" element={<ExportsScreen />} />
           <Route path="settings" element={<SettingsScreen />} />

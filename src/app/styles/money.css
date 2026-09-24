@@ -244,3 +244,99 @@
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* Deal: the calculator on the left, the prerequisites and the recording on the right. */
+.deal-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .deal-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.deal-table td.num,
+.deal-table th.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.deal-table tfoot th,
+.deal-table tfoot td {
+  border-top: 1px solid var(--color-border);
+  font-weight: var(--weight-semibold);
+}
+
+.deal-table tfoot th {
+  text-align: left;
+}
+
+.deal-table tfoot tr > * {
+  border-bottom: 0;
+}
+
+.deal-table .deal-chips {
+  margin-left: auto;
+  text-align: right;
+}
+
+.deal-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.deal-steps {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deal-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-sunken);
+}
+
+.deal-step-icon {
+  flex: none;
+  color: var(--color-accent-fg);
+}
+
+.deal-step.is-done .deal-step-icon {
+  color: var(--color-success-fg);
+}
+
+.deal-step-label {
+  flex: 1 1 160px;
+}
+
+.deal-step.is-done .deal-step-label {
+  color: var(--color-text-muted);
+}
+
+.deal-confirm-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.deal-confirm-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  font-variant-numeric: tabular-nums;
+}

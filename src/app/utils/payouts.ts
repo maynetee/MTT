@@ -4,6 +4,15 @@ import { shareBps } from "./money";
 
 /** 100 % in basis points. */
 export const BPS = 10_000;
+/** Most players the core's ICM calculation takes (`ICM_TOO_MANY_PLAYERS` beyond). */
+export const MAX_DEAL_PLAYERS = 20;
+
+/** Whether the Deal tab is offered: money tracked, and a deal recorded or 2 to 20 players left in play. */
+export function dealAvailable(view: View): boolean {
+  if (!view.money) return false;
+  if (view.money.deal) return true;
+  return view.phase === "running" && view.counts.alive >= 2 && view.counts.alive <= MAX_DEAL_PLAYERS;
+}
 
 export type PlacesMode = "fixed" | "percent";
 export type SplitMode = "curve" | "custom_bps" | "custom_amounts";

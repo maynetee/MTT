@@ -367,5 +367,5 @@ no `getrandom`. The host passes a fresh seed per command; outcomes are stored in
 ## Hosts
 
 The desktop app (`src-tauri`) and the browser demo (`crates/mtt-wasm`) both wrap `Aggregate`;
-see [../architecture.md](../architecture.md). Exposing `icm::quote` to the UI comes with the
-deal calculator screen.
+see [../architecture.md](../architecture.md). The Deal tab of the director's window quotes deals
+with `icm::quote` through `Engine.quoteDeal`.

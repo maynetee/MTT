@@ -13,6 +13,7 @@ import { useToast } from "../components/Toast";
 import { useTournamentView } from "../hooks/useTournamentView";
 import { TAB_KEYS, useDirectorShortcuts, useShortcutText } from "../keyboard";
 import { LevelSounds } from "../sound/LevelSounds";
+import { dealAvailable } from "../utils/payouts";
 import { TournamentContext, type TournamentContextValue } from "../TournamentContext";
 import { playerNames } from "../utils/view";
 
@@ -88,7 +89,13 @@ export default function DirectorShell({ id }: { id: string }) {
   );
 
   const base = `/t/${encodeURIComponent(id)}`;
-  const tabGroups = TAB_GROUPS.map((group) => group.map((tab) => ({ to: `${base}/${tab}`, label: t(`tabs.${tab}`) })));
+  const tabGroups = TAB_GROUPS.map((group, index) =>
+    // The deal calculator joins the live tabs once a deal is possible.
+    (index === 0 && view && dealAvailable(view) ? [...group, "deal" as const] : group).map((tab) => ({
+      to: `${base}/${tab}`,
+      label: t(`tabs.${tab}`)
+    }))
+  );
   // 1 to 9 open the tabs in the order they are shown.
   const tabs = tabGroups.flat();
   const shortcuts = useDirectorShortcuts({ id, view, run, report, tabs });
