@@ -3,6 +3,9 @@ import { afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
 
 afterEach(() => {
+  // Node-environment test files have no DOM.
+  if (typeof window === "undefined") return;
   cleanup();
-  localStorage.clear();
+  window.localStorage.clear();
+  window.location.hash = "";
 });

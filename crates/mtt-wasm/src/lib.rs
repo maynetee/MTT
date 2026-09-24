@@ -255,4 +255,35 @@ mod tests {
         assert_eq!(reloaded, agg);
         assert_eq!(view(&reloaded, T0), view(&agg, T0));
     }
+
+    /// The same draws are asserted by src/engine/wasmEngine.test.ts through the wasm build.
+    #[test]
+    fn seeded_seat_draws_are_reproducible() {
+        let mut agg = create("t-1", &input(), T0, "7").expect("created");
+        for i in 1..=12 {
+            let seed = (u64::MAX - i).to_string();
+            register(&mut agg, &format!("P{i}"), &seed);
+        }
+        let view = parse(&view(&agg, T0));
+        let seats: Vec<String> = view["ranking"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                format!(
+                    "{}@{}.{}",
+                    row["name"].as_str().unwrap(),
+                    row["seat"]["table"],
+                    row["seat"]["seat"]
+                )
+            })
+            .collect();
+        assert_eq!(
+            seats,
+            [
+                "P2@1.1", "P7@1.2", "P9@1.3", "P4@1.4", "P1@1.5", "P3@1.6", "P5@1.7", "P8@1.8",
+                "P6@1.9", "P11@2.1", "P12@2.4", "P10@2.9"
+            ]
+        );
+    }
 }
