@@ -8,6 +8,7 @@ import { Icon } from "../components/Icon";
 import { useEngine } from "../EngineContext";
 import { useClock, type LocalClock } from "../hooks/useClock";
 import { useTournamentView } from "../hooks/useTournamentView";
+import { useLevelSounds } from "../sound/useLevelSounds";
 import { useTournament } from "../TournamentContext";
 import { anteLabel, blindsLabel } from "../utils/labels";
 import { displayState, finalPlaces, formatMoney, payoutLadder, type DisplayState } from "./DisplayModel";
@@ -377,9 +378,11 @@ interface DisplayProps {
   view: View;
   offsetMs: number;
   preview?: boolean;
+  /** Invites a click: the browser keeps this window silent until one. */
+  soundLocked?: boolean;
 }
 
-export default function DisplayScreen({ view, offsetMs, preview = false }: DisplayProps) {
+export default function DisplayScreen({ view, offsetMs, preview = false, soundLocked = false }: DisplayProps) {
   const i18n = useI18n();
   const { t } = i18n;
   const engine = useEngine();
@@ -452,6 +455,12 @@ export default function DisplayScreen({ view, offsetMs, preview = false }: Displ
             <Rail view={view} />
           </>
         )}
+        {soundLocked && (
+          <p className="tv-sound-hint">
+            <Icon name="volume" size={20} />
+            {t("display.enableSound")}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -482,13 +491,14 @@ export function DisplayPreview() {
 function DisplayWindow({ id }: { id: string }) {
   const { t, error } = useI18n();
   const { view, offsetMs, loadError } = useTournamentView(id);
+  const sound = useLevelSounds(view, offsetMs, "display");
   if (!view)
     return (
       <div className="tv-frame" data-theme="dark">
         <p className="tv-loading">{loadError ? error(loadError) : t("common.loading")}</p>
       </div>
     );
-  return <DisplayScreen view={view} offsetMs={offsetMs} />;
+  return <DisplayScreen view={view} offsetMs={offsetMs} soundLocked={sound.needsUnlock} />;
 }
 
 /** `/display/:id`: the public display window. Read-only: it never dispatches. */

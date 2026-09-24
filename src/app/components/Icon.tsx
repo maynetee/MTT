@@ -34,6 +34,18 @@ const PATHS = {
       <path d="M8.5 20.5h7M12 16.5v4" />
     </>
   ),
+  volume: (
+    <>
+      <path d="M4 9.5v5h3.5l4.5 4V5.5l-4.5 4H4Z" />
+      <path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.5a8 8 0 0 1 0 11" />
+    </>
+  ),
+  volumeOff: (
+    <>
+      <path d="M4 9.5v5h3.5l4.5 4V5.5l-4.5 4H4Z" />
+      <path d="m16 9.5 5 5M21 9.5l-5 5" />
+    </>
+  ),
   plus: <path d="M12 5v14M5 12h14" />,
   minus: <path d="M5 12h14" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,

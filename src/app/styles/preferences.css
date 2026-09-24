@@ -1,0 +1,60 @@
+/* Preferences panel (header): the menu surface, holding a few controls. */
+
+.preferences {
+  width: 340px;
+  max-width: calc(100vw - 2 * var(--page-gutter));
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+}
+
+.preferences-head {
+  display: grid;
+  gap: var(--space-0);
+}
+
+.preferences-title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.preferences-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.preferences-volume {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.preferences-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+}
+
+.preferences-range {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+.preferences-range:disabled {
+  opacity: 0.5;
+}
+
+.preferences-percent {
+  min-width: 4ch;
+  text-align: right;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.preferences .radio-option {
+  padding-block: 0;
+}

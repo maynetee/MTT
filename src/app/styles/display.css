@@ -662,7 +662,7 @@
   color: var(--color-accent-fg);
 }
 
-/* Window chrome: the exit control, loading. -------------------------------- */
+/* Window chrome: the exit control, the sound hint, loading. -------------------------------- */
 
 .tv-exit {
   position: absolute;
@@ -692,6 +692,30 @@
   font: inherit;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+}
+
+/* For whoever sits at the computer, not for the room: small, in the bottom margin. */
+.tv-sound-hint {
+  position: absolute;
+  bottom: calc(var(--u) * 0.35);
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: calc(var(--u) * 0.25) calc(var(--u) * 1);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-size: calc(var(--u) * 1.2);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.tv-sound-hint .icon {
+  width: 1.2em;
+  height: 1.2em;
+  color: var(--color-accent-fg);
 }
 
 .tv-loading {

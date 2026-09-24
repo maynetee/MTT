@@ -12,6 +12,7 @@ import { Tabs } from "../components/Tabs";
 import { useToast } from "../components/Toast";
 import { useTournamentView } from "../hooks/useTournamentView";
 import { TAB_KEYS, useDirectorShortcuts, useShortcutText } from "../keyboard";
+import { LevelSounds } from "../sound/LevelSounds";
 import { TournamentContext, type TournamentContextValue } from "../TournamentContext";
 import { playerNames } from "../utils/view";
 
@@ -186,6 +187,7 @@ export default function DirectorShell({ id }: { id: string }) {
           {i18n.warning({ code: "FINISH_PENDING" })}
         </Callout>
       )}
+      <LevelSounds view={view} offsetMs={offsetMs} />
       <TournamentContext.Provider value={context}>
         <Outlet />
       </TournamentContext.Provider>

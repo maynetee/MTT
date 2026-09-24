@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Command, NewTournamentInput, View } from "../../engine/types";
 import type { WasmEngine } from "../../engine/wasmEngine";
+import { installFakeAudio, installLocalSoundChannels } from "../../test/audio";
 import { Providers, register, renderApp } from "../../test/app";
 import { MIN, createTestEngine, pause, play, tournamentInput } from "../../test/wasm";
 import DisplayScreen, { EXIT_CONTROL_HIDE_DELAY_MS } from "./DisplayScreen";
@@ -55,7 +56,7 @@ async function running(players = 4, config: Partial<NewTournamentInput["config"]
   return t;
 }
 
-function show(engine: WasmEngine, view: View, options: { preview?: boolean } = {}) {
+function show(engine: WasmEngine, view: View, options: { preview?: boolean; soundLocked?: boolean } = {}) {
   // Measured like useTournamentView does: host clock minus local clock.
   const offsetMs = view.generatedAtMs - Date.now();
   return render(
@@ -289,6 +290,12 @@ describe("DisplayScreen", () => {
     ]);
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   });
+
+  it("invites a click when the browser keeps the sound off", async () => {
+    const t = await running();
+    show(t.engine, await t.view(), { soundLocked: true });
+    expect(screen.getByText("Click to enable sound")).toBeInTheDocument();
+  });
 });
 
 describe("DisplayScreen clock", () => {
@@ -385,6 +392,26 @@ describe("DisplayScreen clock", () => {
     await act(async () => vi.advanceTimersByTime(MIN));
     expect(display.container.querySelector(".tv-time")!.textContent).toBe("16:30");
     expect(within(display.container).getByText("Paused")).toBeInTheDocument();
+  });
+});
+
+describe("DisplayScreen sound hint (browser)", () => {
+  it("asks for a click on the display window until the sound is enabled", async () => {
+    const audio = installFakeAudio({ locked: true });
+    const channels = installLocalSoundChannels();
+    try {
+      const t = await running();
+      renderApp(t.engine, `/display/${t.id}`);
+      await settle();
+      expect(screen.getByText("Click to enable sound")).toBeInTheDocument();
+
+      fireEvent.pointerDown(window);
+      await settle();
+      expect(screen.queryByText("Click to enable sound")).not.toBeInTheDocument();
+    } finally {
+      audio.restore();
+      channels.restore();
+    }
   });
 });
 

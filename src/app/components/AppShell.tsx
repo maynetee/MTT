@@ -2,6 +2,7 @@ import { useRef, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "../../i18n";
 import { useEngine } from "../EngineContext";
+import { PreferencesMenu } from "../preferences/PreferencesMenu";
 import { BrandMark } from "./BrandMark";
 import { DemoBanner } from "./DemoBanner";
 import { Pill } from "./Pill";
@@ -54,6 +55,7 @@ export function AppShell({
                 {t("app.demo")}
               </Pill>
             )}
+            <PreferencesMenu />
             <ThemeSwitch />
           </div>
         </div>
