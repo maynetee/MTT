@@ -1,11 +1,13 @@
 [package]
 name = "mtt"
-version = "0.1.0"
-edition = "2021"
 description = "Poker tournament director for live events"
-license = "MIT"
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 authors = ["Mendel Teichman"]
 repository = "https://github.com/maynetee/MTT"
+publish = false
 
 [lib]
 # The `_lib` suffix keeps the library name distinct from the binary's (see
@@ -17,12 +19,14 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
+mtt-core = { path = "../crates/mtt-core" }
 tauri = { version = "2.11.6", features = [] }
 tauri-plugin-dialog = "2.7.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rusqlite = { version = "0.30", features = ["bundled"] }
-rand = "0.8"
+uuid = { version = "1", features = ["v4"] }
+getrandom = "0.3"
 percent-encoding = "2.3"
 
 [dev-dependencies]

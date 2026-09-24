@@ -1,12 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "display",
-  "description": "Public display window: reads the state and can close itself, nothing else.",
+  "description": "Public display window: reads tournaments and can close itself, nothing else.",
   "windows": ["display"],
   "permissions": [
     "core:event:allow-listen",
     "core:event:allow-unlisten",
-    "allow-get-state",
+    "allow-get-view",
+    "allow-list-tournaments",
     "core:window:allow-close",
     "core:window:allow-set-fullscreen"
   ]

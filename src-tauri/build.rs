@@ -2,24 +2,11 @@
 /// (underscores become dashes) and puts every command under the capabilities, so that a
 /// window can only call the commands its capability grants.
 const COMMANDS: &[&str] = &[
-    "get_state",
+    "list_tournaments",
     "create_tournament",
-    "reset_tournament",
-    "register_player",
-    "register_player_at_seat",
-    "eliminate_player",
-    "revive_player_at_seat",
-    "move_player",
-    "balance_suggestions",
-    "close_table",
-    "clock_start",
-    "clock_pause",
-    "clock_next",
-    "clock_prev",
-    "clock_adjust",
-    "clock_trigger_break",
-    "update_itm",
-    "undo_last_event",
+    "delete_tournament",
+    "get_view",
+    "dispatch",
     "open_display_window",
     "save_export",
 ];
