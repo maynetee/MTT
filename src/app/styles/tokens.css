@@ -1,0 +1,211 @@
+/*
+ * Design tokens. Colors come from the app icon: the navy tile is the felt, the amber chip is
+ * the one accent (primary actions, the level in play, keyboard focus) and the cream inlay is
+ * the text of the dark theme. State colors: green running/open, red paused/danger, periwinkle
+ * break. The theme is resolved in JS (see theme.ts) and set as `data-theme` on <html>; any
+ * subtree can force one (the TV display is always dark).
+ */
+
+:root {
+  /* Type: Inter Variable with its optical-size axis (display cut for large numerals). */
+  --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* l with a tail and I with serifs: player names stay unambiguous at a glance. */
+  --font-features: "cv05" 1, "cv08" 1;
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.8125rem; /* 13px: labels, hints */
+  --text-md: 0.9375rem; /* 15px: body */
+  --text-lg: 1.0625rem; /* 17px: section titles */
+  --text-xl: 1.25rem; /* 20px */
+  --text-2xl: 1.5rem; /* 24px: page titles */
+  --text-3xl: 2rem; /* 32px: stats */
+  --text-4xl: 2.75rem; /* 44px: seat ticket */
+  --text-clock: 6rem; /* 96px: clock screen */
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-normal: 1.45;
+  --weight-regular: 400;
+  --weight-medium: 520;
+  --weight-semibold: 620;
+  --weight-bold: 700;
+  --tracking-tight: -0.012em;
+  --tracking-numerals: -0.03em;
+
+  /* Spacing: 4px steps. */
+  --space-0: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radii grow with the size of the thing: controls, panels, dialogs; pills for status only. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* Hit targets. */
+  --control-sm: 32px;
+  --control-md: 40px;
+  --control-lg: 48px;
+
+  /* Layout. */
+  --page-max: 1480px;
+  --page-gutter: var(--space-6);
+  --header-height: 68px;
+  --tabs-height: 46px;
+
+  /* Motion: short, only to show what changed. */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 260ms;
+
+  /* Layers. */
+  --z-sticky: 10;
+  --z-header: 20;
+  --z-popover: 40;
+  --z-modal: 60;
+  --z-toast: 80;
+}
+
+@media (max-width: 1100px) {
+  :root {
+    --page-gutter: var(--space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}
+
+/* Light: a cool paper, not cream, with navy ink. */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: #eef1f6;
+  --color-chrome: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-hover: #f3f5f9;
+  --color-surface-selected: #e8edf5;
+  --color-sunken: #f6f8fb;
+  --color-field: #ffffff;
+  --color-border: #d3dae6;
+  --color-border-strong: #aeb9cc;
+  --color-divider: #e3e8f0;
+
+  --color-text: #0c1631;
+  --color-text-muted: #4a5874;
+  --color-text-subtle: #7a869d;
+  --color-text-inverse: #f7f3ea;
+
+  --color-accent: #f3a83b;
+  --color-accent-hover: #ea9a24;
+  --color-accent-text: #0c1631;
+  --color-accent-fg: #95560a;
+  --color-accent-soft: #fdf0da;
+  --color-accent-border: #efc47f;
+
+  --color-success: #1e8a58;
+  --color-success-fg: #17744a;
+  --color-success-soft: #e2f3ea;
+
+  --color-danger: #c8413c;
+  --color-danger-hover: #b33530;
+  --color-danger-fg: #b23631;
+  --color-danger-soft: #fbe9e8;
+  --color-danger-border: #eeb3b0;
+  --color-on-danger: #ffffff;
+
+  --color-break: #4757c9;
+  --color-break-fg: #3b4ab5;
+  --color-break-soft: #e9ecfb;
+
+  --color-puck: #ffffff;
+  --color-puck-text: #0c1631;
+  --color-puck-ring: #aeb9cc;
+
+  --color-focus: #b86e00;
+  --color-backdrop: rgb(12 22 49 / 0.42);
+  --color-selection: rgb(243 168 59 / 0.3);
+
+  --shadow-sm: 0 1px 2px rgb(12 22 49 / 0.06);
+  --shadow-md: 0 6px 16px rgb(12 22 49 / 0.1), 0 1px 3px rgb(12 22 49 / 0.08);
+  --shadow-lg: 0 18px 44px rgb(12 22 49 / 0.18), 0 2px 6px rgb(12 22 49 / 0.08);
+}
+
+/* Dark: the icon's navy tile as felt under low light, cream text dimmed against glare. */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0c152b;
+  --color-chrome: #091124;
+  --color-surface: #111c35;
+  --color-surface-raised: #17243f;
+  --color-surface-hover: #172542;
+  --color-surface-selected: #1d2d50;
+  --color-sunken: #0a1328;
+  --color-field: #0b1530;
+  --color-border: #23345a;
+  --color-border-strong: #34497a;
+  --color-divider: #1b2a4a;
+
+  --color-text: #f2ecdf;
+  --color-text-muted: #a7b2c7;
+  --color-text-subtle: #74809a;
+  --color-text-inverse: #0c1631;
+
+  --color-accent: #f3a83b;
+  --color-accent-hover: #f7b955;
+  --color-accent-text: #0c1631;
+  --color-accent-fg: #f5b452;
+  --color-accent-soft: rgb(243 168 59 / 0.13);
+  --color-accent-border: rgb(243 168 59 / 0.45);
+
+  --color-success: #4cc38a;
+  --color-success-fg: #6fd6a3;
+  --color-success-soft: rgb(76 195 138 / 0.13);
+
+  --color-danger: #c8413c;
+  --color-danger-hover: #d64f4a;
+  --color-danger-fg: #f58f8b;
+  --color-danger-soft: rgb(239 107 103 / 0.13);
+  --color-danger-border: rgb(239 107 103 / 0.45);
+  --color-on-danger: #ffffff;
+
+  --color-break: #9daeff;
+  --color-break-fg: #b4c1ff;
+  --color-break-soft: rgb(157 174 255 / 0.13);
+
+  --color-puck: #f2ecdf;
+  --color-puck-text: #0c1631;
+  --color-puck-ring: #0c1631;
+
+  --color-focus: #f3a83b;
+  --color-backdrop: rgb(3 8 20 / 0.66);
+  --color-selection: rgb(243 168 59 / 0.32);
+
+  --shadow-sm: 0 1px 2px rgb(3 8 20 / 0.4);
+  --shadow-md: 0 8px 20px rgb(3 8 20 / 0.45), 0 1px 3px rgb(3 8 20 / 0.4);
+  --shadow-lg: 0 22px 48px rgb(3 8 20 / 0.6), 0 2px 6px rgb(3 8 20 / 0.4);
+}
+
+/* Before the theme script runs, and with it off, follow the system. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --color-bg: #0c152b;
+    --color-text: #f2ecdf;
+  }
+}

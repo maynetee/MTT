@@ -127,7 +127,8 @@ export default function DisplayScreen({ view, offsetMs, preview = false }: Displ
         : { className: "display-warning", text: t("display.toMoney", { count: itm.toMoney }) };
 
   const content = (
-    <div className={preview ? "display-preview" : "display"}>
+    // The TV display stays dark whatever the director's theme: it faces a dim room.
+    <div className={preview ? "display-preview" : "display"} data-theme="dark">
       {exitVisible && (
         <button
           type="button"
@@ -215,7 +216,7 @@ export function DisplayPreview() {
 function DisplayWindow({ id }: { id: string }) {
   const { t, error } = useI18n();
   const { view, offsetMs, loadError } = useTournamentView(id);
-  if (!view) return <div className="display">{loadError ? error(loadError) : t("common.loading")}</div>;
+  if (!view) return <div className="display" data-theme="dark">{loadError ? error(loadError) : t("common.loading")}</div>;
   return <DisplayScreen view={view} offsetMs={offsetMs} />;
 }
 

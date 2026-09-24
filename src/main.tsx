@@ -5,9 +5,13 @@ import App from "./app/App";
 import { EngineProvider } from "./app/EngineContext";
 import { getEngine, toEngineError } from "./engine";
 import { I18nProvider, i18n } from "./i18n";
-// Bundled locally (OFL): no network request, compatible with a font-src 'self' CSP.
-import "@fontsource-variable/inter";
+import { initTheme } from "./app/theme";
+// Bundled locally (OFL): no network request, compatible with a font-src 'self' CSP. The
+// optical-size axis gives large numerals (the clock) Inter's display cut.
+import "@fontsource-variable/inter/opsz.css";
 import "./app/styles.css";
+
+initTheme();
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
