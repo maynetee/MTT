@@ -4,6 +4,7 @@
 mod commands;
 mod error;
 mod host;
+mod legacy;
 mod store;
 
 use std::path::{Path, PathBuf};
@@ -12,6 +13,7 @@ use tauri::{AppHandle, Manager, Runtime};
 
 use error::EngineError;
 use host::Host;
+use legacy::{LEGACY_DB_ENV, LEGACY_IDENTIFIER, LegacySource};
 use store::Store;
 
 /// Registers the plugins and the commands. Shared by `run` and the IPC tests, so that the
@@ -26,7 +28,9 @@ fn with_handlers<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
             commands::get_view,
             commands::dispatch,
             commands::open_display_window,
-            commands::save_export
+            commands::save_export,
+            commands::legacy_import_status,
+            commands::import_legacy
         ])
 }
 
@@ -38,7 +42,7 @@ fn with_handlers<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
 /// `~/Library/Application Support/com.maynetee.mtt`).
 const DATA_DIR_ENV: &str = "MTT_DATA_DIR";
 
-/// Name of the database file in the data directory.
+/// Name of the database file in the data directory (the previous version used the same).
 const DB_FILE: &str = "mtt.sqlite";
 
 fn env_path(name: &str) -> Option<PathBuf> {
@@ -52,6 +56,16 @@ fn data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, EngineError> {
         Some(dir) => Ok(dir),
         None => Ok(app.path().app_data_dir()?),
     }
+}
+
+/// The previous version's database: `MTT_LEGACY_DB` when set, else `mtt.sqlite` in the
+/// data directory of its identifier, next to ours (on macOS,
+/// `~/Library/Application Support/com.mtt.app/mtt.sqlite`).
+fn legacy_db<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    env_path(LEGACY_DB_ENV).or_else(|| {
+        let ours = app.path().app_data_dir().ok()?;
+        Some(ours.parent()?.join(LEGACY_IDENTIFIER).join(DB_FILE))
+    })
 }
 
 /// Creates the data directory and the database if needed, and brings the schema up to date.
@@ -72,6 +86,9 @@ pub fn run() {
         .setup(|app| {
             let host = open_host(&data_dir(app.handle())?)?;
             app.manage(host);
+            app.manage(LegacySource {
+                path: legacy_db(app.handle()),
+            });
             Ok(())
         })
         .run(context())

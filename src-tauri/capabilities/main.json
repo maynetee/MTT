@@ -12,6 +12,8 @@
     "allow-get-view",
     "allow-dispatch",
     "allow-open-display-window",
-    "allow-save-export"
+    "allow-save-export",
+    "allow-legacy-import-status",
+    "allow-import-legacy"
   ]
 }

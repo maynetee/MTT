@@ -14,12 +14,20 @@ use tauri::{App, Listener, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use super::*;
 use crate::commands::{DISPLAY_WINDOW, EXPORT_FILE_NAME_HEADER, TOURNAMENT_CHANGED};
 
-/// The app with its real configuration and capabilities, on the mock runtime.
-fn mock_app(data_dir: &Path) -> App<MockRuntime> {
+/// The app with its real configuration and capabilities, on the mock runtime. The
+/// previous version's database is `legacy_db`: tests never look for the real one.
+fn mock_app_with_legacy(data_dir: &Path, legacy_db: Option<&Path>) -> App<MockRuntime> {
     with_handlers(mock_builder())
         .manage(open_host(data_dir).expect("failed to open the database"))
+        .manage(LegacySource {
+            path: legacy_db.map(Path::to_path_buf),
+        })
         .build(context())
         .expect("failed to build the app")
+}
+
+fn mock_app(data_dir: &Path) -> App<MockRuntime> {
+    mock_app_with_legacy(data_dir, None)
 }
 
 fn window(app: &App<MockRuntime>, label: &str) -> WebviewWindow<MockRuntime> {
@@ -339,6 +347,8 @@ fn the_display_window_can_read_tournaments_but_not_change_them() {
         ("delete_tournament", json!({"id": id})),
         ("open_display_window", json!({"id": id})),
         ("save_export", json!({})),
+        ("legacy_import_status", json!({})),
+        ("import_legacy", json!({})),
     ] {
         let denied = invoke(&display, cmd, args).expect_err(cmd);
         assert!(
@@ -418,4 +428,77 @@ fn a_new_data_dir_gets_the_event_log_schema() {
         })
         .unwrap();
     assert_eq!(version, 2);
+}
+
+#[test]
+fn the_previous_version_tournament_is_imported_without_touching_its_database() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let legacy_dir = tempfile::tempdir().unwrap();
+    let legacy_db = legacy_dir.path().join(DB_FILE);
+    crate::legacy::tests::write_fixture(&legacy_db);
+    let original = std::fs::read(&legacy_db).unwrap();
+    let app = mock_app_with_legacy(data_dir.path(), Some(&legacy_db));
+    let main = main_window(&app);
+    let changed = Arc::new(Mutex::new(Vec::new()));
+    let seen = Arc::clone(&changed);
+    app.listen_any(TOURNAMENT_CHANGED, move |event| {
+        seen.lock().unwrap().push(event.payload().to_owned());
+    });
+
+    assert_eq!(
+        invoke(&main, "legacy_import_status", json!({})),
+        Ok(json!({"available": true}))
+    );
+    let id = invoke(&main, "import_legacy", json!({})).unwrap();
+    let id = id.as_str().unwrap();
+
+    let view = get_view(&main, id).unwrap();
+    assert_eq!(view["config"]["name"], "Friday Freezeout");
+    assert_eq!(view["phase"], "running");
+    assert_eq!(view["counts"]["unique"], 8);
+    assert_eq!(view["counts"]["alive"], 5);
+    assert_eq!(view["placesPaid"], 3);
+    assert_eq!(
+        view["config"]["lateReg"],
+        json!({"type": "end_of_play_level", "n": 3, "throughBreak": false})
+    );
+    assert_eq!(view["clock"]["levelIndex"], 4);
+    assert_eq!(view["clock"]["remainingMs"], 250_000);
+    let list = invoke(&main, "list_tournaments", json!({})).unwrap();
+    assert_eq!(list[0]["id"], json!(id));
+    assert_eq!(
+        *changed.lock().unwrap(),
+        vec![json!({ "id": id }).to_string()]
+    );
+
+    // Imported again after a restart: the log was stored, and the old file never changed.
+    drop(main);
+    drop(app);
+    let app = mock_app_with_legacy(data_dir.path(), Some(&legacy_db));
+    let reloaded = get_view(&main_window(&app), id).unwrap();
+    assert_eq!(timeless(reloaded), timeless(view));
+    assert_eq!(std::fs::read(&legacy_db).unwrap(), original);
+    let files: Vec<_> = std::fs::read_dir(legacy_dir.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(files, [DB_FILE]);
+}
+
+#[test]
+fn nothing_is_imported_without_a_previous_database() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let missing = data_dir.path().join("missing").join(DB_FILE);
+    for legacy_db in [None, Some(missing.as_path())] {
+        let app = mock_app_with_legacy(data_dir.path(), legacy_db);
+        let main = main_window(&app);
+        assert_eq!(
+            invoke(&main, "legacy_import_status", json!({})),
+            Ok(json!({"available": false}))
+        );
+        let err = invoke(&main, "import_legacy", json!({})).unwrap_err();
+        assert_eq!(err["code"], "HOST_ERROR");
+        assert_eq!(invoke(&main, "list_tournaments", json!({})), Ok(json!([])));
+    }
+    assert!(!missing.exists());
 }

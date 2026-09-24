@@ -9,6 +9,8 @@ const COMMANDS: &[&str] = &[
     "dispatch",
     "open_display_window",
     "save_export",
+    "legacy_import_status",
+    "import_legacy",
 ];
 
 fn main() {

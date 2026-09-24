@@ -16,6 +16,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::error::EngineError;
 use crate::host::{self, Host, NewTournamentInput, TournamentSummary};
+use crate::legacy::{self, LegacySource, LegacyStatus};
 
 type CmdResult<T> = Result<T, EngineError>;
 
@@ -86,6 +87,33 @@ pub fn dispatch<R: Runtime>(
     let view = host.dispatch(&id, command, &host::fresh_ctx()?)?;
     notify_changed(&app, &view.id);
     Ok(view)
+}
+
+/// Whether the previous version left a tournament to import.
+#[tauri::command]
+pub fn legacy_import_status(source: State<'_, LegacySource>) -> CmdResult<LegacyStatus> {
+    Ok(LegacyStatus {
+        available: source.path.as_deref().is_some_and(legacy::available),
+    })
+}
+
+/// Imports the latest tournament of the previous version as a new tournament. The old
+/// database is only read.
+#[tauri::command]
+pub fn import_legacy<R: Runtime>(
+    app: AppHandle<R>,
+    host: State<'_, Host>,
+    source: State<'_, LegacySource>,
+) -> CmdResult<TournamentId> {
+    let v1 = match source.path.as_deref() {
+        Some(path) => legacy::read(path)?,
+        None => None,
+    }
+    .ok_or_else(|| EngineError::host("No tournament from the previous version to import"))?;
+    let agg = legacy::rebuild(&v1, host::new_tournament_id(), host::fresh_ctx)?;
+    let id = host.insert(agg, host::now_ms())?;
+    notify_changed(&app, &id);
+    Ok(id)
 }
 
 pub(crate) const DISPLAY_WINDOW: &str = "display";
