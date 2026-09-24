@@ -36,14 +36,14 @@ test("the clock counts down in real time, also with the display open in another 
   const [display] = await Promise.all([context.waitForEvent("page"), preview(page).getByRole("button", { name: "Open display window" }).click()]);
   await display.waitForLoadState();
   expect(display.url()).toBe(new URL(`/#/display/${encodeURIComponent(id)}`, page.url()).href);
-  await expect(tv.time(display.locator("body"))).toBeVisible();
-  await expect(display.locator("body")).toContainText(tv.level(1));
+  await expect(tv.time(display)).toBeVisible();
+  await expect(tv.level(display, 1)).toBeVisible();
 
   // Regression: with the display open, both pages advanced the clock and it ran twice as fast.
   const seen = await elapsedOver(clockPod(page), 4_000);
   expect(seen).toBeGreaterThanOrEqual(3);
   expect(seen).toBeLessThanOrEqual(5);
-  const shown = await secondsShown(tv.time(display.locator("body")));
+  const shown = await secondsShown(tv.time(display));
   expect(Math.abs(shown - (await secondsShown(clockPod(page))))).toBeLessThanOrEqual(1);
 });
 
@@ -53,7 +53,7 @@ test("the display says PAUSED and BREAK, and level numbers skip breaks", async (
   await startClock(page);
   await openTab(page, "Display");
   await expect(tv.time(preview(page))).toBeVisible();
-  await expect(preview(page)).toContainText(tv.level(1));
+  await expect(tv.level(preview(page), 1)).toBeVisible();
   await expect(tv.paused(preview(page))).toHaveCount(0);
 
   await pauseClock(page);
@@ -81,7 +81,7 @@ test("the display says PAUSED and BREAK, and level numbers skip breaks", async (
   await expect(page.getByRole("heading", { level: 2, name: "Level 5" })).toBeVisible();
   await expect(page.getByText(/^150\/300\s+BBA 300$/).first()).toBeVisible();
   await openTab(page, "Display");
-  await expect(preview(page)).toContainText(tv.level(5));
+  await expect(tv.level(preview(page), 5)).toBeVisible();
   await expect(tv.onBreak(preview(page))).toHaveCount(0);
 
   await openTab(page, "Clock");

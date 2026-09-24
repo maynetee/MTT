@@ -43,8 +43,8 @@ test("the display window opens at its own URL and can be left", async ({ page, c
   const [display] = await Promise.all([context.waitForEvent("page"), page.getByRole("button", { name: "Open display window" }).click()]);
   await display.waitForLoadState();
   expect(display.url()).toBe(new URL(`/#/display/${encodeURIComponent(id)}`, page.url()).href);
-  await expect(tv.time(display.locator("body"))).toBeVisible();
-  await expect(display.locator("body")).toContainText(tv.level(3));
+  await expect(tv.time(display)).toBeVisible();
+  await expect(tv.level(display, 3)).toBeVisible();
 
   // The exit control shows when the mouse moves.
   await display.mouse.move(200, 200);
@@ -58,7 +58,7 @@ test("the display window opens at its own URL and can be left", async ({ page, c
   const [again] = await Promise.all([context.waitForEvent("page"), page.keyboard.press("d")]);
   await again.waitForLoadState();
   expect(again.url()).toBe(display.url());
-  await expect(again.locator("body")).toContainText(tv.level(3));
+  await expect(tv.level(again, 3)).toBeVisible();
   // The page closes while the key is still being pressed.
   await Promise.all([again.waitForEvent("close"), again.keyboard.press("Escape").catch(() => undefined)]);
 });

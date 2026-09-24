@@ -95,14 +95,13 @@ export async function openTab(page: Page, label: string): Promise<void> {
 
 /**
  * The TV display, in its window or previewed in the Display tab. Only what any layout keeps is
- * checked: the time left, the level, PAUSED and BREAK.
+ * checked: the time left (a timer), the level or break as the heading of the clock, PAUSED.
  */
 export const tv = {
-  time: (scope: Locator) => scope.getByText(/^(\d+:)?\d{1,2}:\d{2}$/),
-  paused: (scope: Locator) => scope.getByText(/^paused$/i),
-  onBreak: (scope: Locator) => scope.getByText(/^break$/i),
-  // Text content runs lines together ("Level 1Blinds 25/50"): no word boundary after the number.
-  level: (n: number) => new RegExp(`Level ${n}(?!\\d)`, "i")
+  time: (scope: Locator | Page) => scope.getByRole("timer"),
+  level: (scope: Locator | Page, n: number) => scope.getByRole("heading", { name: `Level ${n}`, exact: true }),
+  onBreak: (scope: Locator | Page) => scope.getByRole("heading", { name: "Break", exact: true }),
+  paused: (scope: Locator | Page) => scope.getByText(/^paused$/i)
 };
 
 /** The header clock: level, state and time left. */

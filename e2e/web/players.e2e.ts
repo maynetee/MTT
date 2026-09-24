@@ -20,8 +20,8 @@ import {
 const PLAYERS = ["Łukasz Nowak", "Zoë Brennan", "Søren Kjær", "Ngozi Okafor", "Björn Lindqvist", "Aoife Byrne"];
 
 const preview = (page: Page) => page.getByRole("region", { name: "Display preview" });
-/** The money status of the display: the one line beyond the clock these tests read there. */
-const bubble = (page: Page) => preview(page).getByText(/^bubble!?$/i);
+/** Where the field stands against the places paid, on the display. */
+const moneyStatus = (page: Page) => preview(page).getByRole("status");
 const exportsTable = (page: Page) => page.getByRole("table", { name: "Exports" });
 
 async function closeRegistration(page: Page) {
@@ -50,15 +50,14 @@ test("eliminations, the live ranking, its exports and the end of the tournament"
 
   // Four left for three places: the next elimination is the bubble.
   await openTab(page, "Display");
-  await expect(bubble(page)).toBeVisible();
+  await expect(moneyStatus(page)).toHaveText(/^Bubble/);
 
   await openTab(page, "Players");
   await eliminate(page, "Søren Kjær");
   // Regression: the bubble was announced one elimination late, with everyone left already paid.
   await openTab(page, "Display");
   await expect(tv.time(preview(page))).toBeVisible();
-  await expect(bubble(page)).toHaveCount(0);
-  await expect(preview(page)).not.toContainText(/(?<!\d)1 eliminations/);
+  await expect(moneyStatus(page)).toHaveText("In the money");
 
   // Regression: the ranking put the first players out on top while others were still playing.
   await openTab(page, "Exports");
